@@ -1,0 +1,16 @@
+[Unit]
+Description=Strategies Migration Services React Web Portal
+After=network.target
+
+[Service]
+WorkingDirectory=/var/www/strategies-web
+# Assumes the use of 'serve' package to host the static build in production
+ExecStart=/usr/bin/npx serve -s build -l 3000
+Restart=always
+RestartSec=10
+SyslogIdentifier=strategies-web
+User=www-data
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
