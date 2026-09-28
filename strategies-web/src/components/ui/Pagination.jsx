@@ -3,9 +3,14 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 const BUTTON_CLASSES =
   'inline-flex items-center gap-1 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50'
 
-export default function Pagination({ page, totalPages, totalCount, pageSize, onPageChange }) {
-  const first = (page - 1) * pageSize + 1
-  const last = Math.min(page * pageSize, totalCount)
+// itemCount (optional) is the number of rows actually shown on this page.
+// When provided, the "Showing x–y" range reflects what the server returned.
+export default function Pagination({ page, totalPages, totalCount, pageSize, itemCount, onPageChange }) {
+  const first = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const last =
+    itemCount === undefined || itemCount === null
+      ? Math.min(page * pageSize, totalCount)
+      : Math.max(first, first + itemCount - 1)
 
   return (
     <nav

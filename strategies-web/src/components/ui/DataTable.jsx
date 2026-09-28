@@ -25,15 +25,23 @@ function LoadingRows({ columnCount }) {
   ))
 }
 
+// Two modes:
+// - Client mode (default): the table searches, filters, sorts and paginates `rows` itself.
+// - Server mode: pass `pagination` (and optionally `onSearchChange`/`searchValue`) and the
+//   API does the paging and searching; `rows` is treated as the current page only.
+//   In server mode, only offer sorting or filters the API itself supports.
 export default function DataTable({
   columns,
   rows = [],
   getRowId = (row) => row.id,
   searchKeys = [],
   searchPlaceholder = 'Search',
+  searchValue,
+  onSearchChange,
   filters = [],
   initialSort = null,
   pageSize = 10,
+  pagination = null,
   loading = false,
   error = null,
   onRetry,
@@ -42,34 +50,59 @@ export default function DataTable({
   actions,
   caption,
 }) {
-  const [search, setSearch] = useState('')
+  const isServerSearch = typeof onSearchChange === 'function'
+  const isServerPaged = pagination !== null
+
+  const [localSearch, setLocalSearch] = useState('')
   const [activeFilters, setActiveFilters] = useState({})
   const [sort, setSort] = useState(initialSort)
-  const [page, setPage] = useState(1)
+  const [localPage, setLocalPage] = useState(1)
+
+  const search = isServerSearch ? (searchValue ?? '') : localSearch
+  const showSearch = isServerSearch || searchKeys.length > 0
 
   const sortColumn = columns.find((column) => column.key === sort?.key)
   const sortDirection = sort?.direction
 
   const processedRows = useMemo(() => {
     const filtered = rows.filter(
-      (row) => matchesSearch(row, search, searchKeys) && matchesFilters(row, activeFilters, filters),
+      (row) =>
+        (isServerSearch || matchesSearch(row, search, searchKeys)) && matchesFilters(row, activeFilters, filters),
     )
     return sortRows(filtered, sortColumn, sortDirection)
-  }, [rows, search, searchKeys, activeFilters, filters, sortColumn, sortDirection])
+  }, [rows, isServerSearch, search, searchKeys, activeFilters, filters, sortColumn, sortDirection])
 
-  const { items, totalCount, totalPages, currentPage } = paginate(processedRows, page, pageSize)
+  const { items, totalCount, totalPages, currentPage } = isServerPaged
+    ? {
+        items: processedRows,
+        totalCount: pagination.totalCount,
+        totalPages: Math.max(1, pagination.totalPages),
+        currentPage: pagination.page,
+      }
+    : paginate(processedRows, localPage, pageSize)
 
   const hasActiveQuery =
     search.trim() !== '' || Object.values(activeFilters).some((value) => value !== '' && value !== undefined)
 
+  function resetLocalPage() {
+    if (!isServerPaged) setLocalPage(1)
+  }
+
+  function changePage(nextPage) {
+    if (isServerPaged) pagination.onPageChange(nextPage)
+    else setLocalPage(nextPage)
+  }
+
   function handleSearch(event) {
-    setSearch(event.target.value)
-    setPage(1)
+    const value = event.target.value
+    if (isServerSearch) onSearchChange(value)
+    else setLocalSearch(value)
+    resetLocalPage()
   }
 
   function handleFilter(key, value) {
     setActiveFilters((previous) => ({ ...previous, [key]: value }))
-    setPage(1)
+    resetLocalPage()
   }
 
   function handleSort(key) {
@@ -78,21 +111,24 @@ export default function DataTable({
       if (previous.direction === 'asc') return { key, direction: 'desc' }
       return null
     })
-    setPage(1)
+    resetLocalPage()
   }
 
   function clearQuery() {
-    setSearch('')
+    if (isServerSearch) onSearchChange('')
+    else setLocalSearch('')
     setActiveFilters({})
-    setPage(1)
+    resetLocalPage()
   }
+
+  const showPagination = !error && totalCount > 0 && (isServerPaged || !loading)
 
   return (
     <div className="rounded-lg border border-stone-200 bg-white">
-      {(searchKeys.length > 0 || filters.length > 0 || actions) && (
+      {(showSearch || filters.length > 0 || actions) && (
         <div className="flex flex-col gap-3 border-b border-stone-200 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            {searchKeys.length > 0 && (
+            {showSearch && (
               <label className="relative block sm:w-72">
                 <span className="sr-only">{searchPlaceholder}</span>
                 <Search
@@ -101,7 +137,8 @@ export default function DataTable({
                   aria-hidden="true"
                 />
                 <input
-                  type="search" autoComplete="off"
+                  type="search"
+                  autoComplete="off"
                   value={search}
                   onChange={handleSearch}
                   placeholder={searchPlaceholder}
@@ -230,13 +267,14 @@ export default function DataTable({
         </div>
       )}
 
-      {!error && !loading && totalCount > 0 && (
+      {showPagination && (
         <Pagination
           page={currentPage}
           totalPages={totalPages}
           totalCount={totalCount}
-          pageSize={pageSize}
-          onPageChange={setPage}
+          pageSize={isServerPaged ? pagination.pageSize : pageSize}
+          itemCount={isServerPaged ? items.length : undefined}
+          onPageChange={changePage}
         />
       )}
     </div>
