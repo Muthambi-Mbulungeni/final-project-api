@@ -3,11 +3,13 @@ import EmptyState from '../../components/ui/EmptyState'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
+import RequestState from '../../components/ui/RequestState'
 import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { CASE_STAGES } from '../../config/caseStages'
 import { resolveEnum } from '../../config/enums'
 import { formatDate } from '../../lib/format'
+import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 
 const QUEUE_STATUSES = ['Pending', 'NeedsReview']
@@ -17,15 +19,26 @@ function isInQueue(lead) {
   return QUEUE_STATUSES.includes(resolveEnum('triageStatus', lead.triageStatus)?.value)
 }
 
+function hasValue(value) {
+  return value !== undefined && value !== null
+}
+
 export default function ConsultantDashboard() {
   const stats = useApi('/api/stats/consultant')
   const leadsRequest = useApi('/api/leads')
 
-  const leads = Array.isArray(leadsRequest.data) ? leadsRequest.data : []
-  const queue = leads
+  const queue = listItems(leadsRequest.data)
     .filter(isInQueue)
     .sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)))
     .slice(0, QUEUE_LIMIT)
+
+  // documentsAwaitingReview is in frontend-contracts.md but not yet returned by the API,
+  // so its tile only appears once the field is present.
+  const tiles = [
+    { label: 'Pending leads', value: stats.data?.pendingLeads },
+    { label: 'Active cases', value: stats.data?.activeCases },
+    { label: 'Documents awaiting review', value: stats.data?.documentsAwaitingReview, optional: true },
+  ].filter((tile) => !tile.optional || hasValue(tile.value))
 
   return (
     <>
@@ -42,9 +55,10 @@ export default function ConsultantDashboard() {
 
       {stats.error && <ErrorNotice className="mt-8" message={stats.error.message} onRetry={stats.reload} />}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <StatTile label="Pending leads" value={stats.data?.pendingLeads} />
-        <StatTile label="Active cases" value={stats.data?.activeCases} />
+      <div className={`mt-8 grid gap-4 ${tiles.length > 2 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        {tiles.map((tile) => (
+          <StatTile key={tile.label} label={tile.label} value={tile.value} />
+        ))}
       </div>
 
       <Panel title="Case pipeline" className="mt-6">
@@ -68,13 +82,13 @@ export default function ConsultantDashboard() {
             </Link>
           }
         >
-          {leadsRequest.error ? (
-            <ErrorNotice message={leadsRequest.error.message} onRetry={leadsRequest.reload} />
-          ) : leadsRequest.loading ? (
-            <p className="py-6 text-center text-sm text-stone-500">Loading leads…</p>
-          ) : queue.length === 0 ? (
-            <EmptyState title="Queue is clear" message="There are no leads waiting for triage." />
-          ) : (
+          <RequestState
+            request={leadsRequest}
+            isEmpty={queue.length === 0}
+            emptyTitle="Queue is clear"
+            emptyMessage="There are no leads waiting for triage."
+            loadingText="Loading leads…"
+          >
             <ul className="-my-3 divide-y divide-stone-100">
               {queue.map((lead) => (
                 <li key={lead.id} className="flex items-center justify-between gap-4 py-3">
@@ -86,7 +100,7 @@ export default function ConsultantDashboard() {
                 </li>
               ))}
             </ul>
-          )}
+          </RequestState>
         </Panel>
 
         <Panel title="Documents awaiting review">

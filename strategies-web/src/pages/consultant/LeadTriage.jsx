@@ -3,6 +3,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { enumFilter, enumOrder, resolveEnum } from '../../config/enums'
 import { formatDate } from '../../lib/format'
+import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 
 const COLUMNS = [
@@ -28,7 +29,7 @@ const COLUMNS = [
     key: 'needsAssistance',
     header: 'Needs assistance',
     sortable: true,
-    render: (lead) => (lead.needsAssistance ? 'Yes' : 'No'),
+    render: (lead) => (lead.needsAssistance === undefined ? '—' : lead.needsAssistance ? 'Yes' : 'No'),
   },
   {
     key: 'desiredStartDate',
@@ -63,7 +64,7 @@ const INITIAL_SORT = { key: 'submittedAt', direction: 'desc' }
 
 export default function LeadTriage() {
   const { data, loading, error, reload } = useApi('/api/leads')
-  const leads = Array.isArray(data) ? data : []
+  const leads = listItems(data)
 
   return (
     <>

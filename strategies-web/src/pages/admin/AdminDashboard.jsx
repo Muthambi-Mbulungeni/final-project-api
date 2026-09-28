@@ -4,6 +4,9 @@ import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
 import StatTile from '../../components/ui/StatTile'
+import StatusBadge from '../../components/ui/StatusBadge'
+import { formatDate } from '../../lib/format'
+import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 
 const LIST_LIMIT = 5
@@ -18,8 +21,8 @@ function getInitials(name = '') {
     .toUpperCase()
 }
 
-function pagedItems(request) {
-  return Array.isArray(request.data?.data) ? request.data.data.slice(0, LIST_LIMIT) : []
+function hasValue(value) {
+  return value !== undefined && value !== null
 }
 
 export default function AdminDashboard() {
@@ -27,8 +30,17 @@ export default function AdminDashboard() {
   const auditLogs = useApi('/api/admin/audit-logs')
   const users = useApi('/api/admin/users')
 
-  const auditEntries = pagedItems(auditLogs)
-  const recentUsers = pagedItems(users)
+  const auditEntries = listItems(auditLogs.data).slice(0, LIST_LIMIT)
+  const recentUsers = listItems(users.data).slice(0, LIST_LIMIT)
+
+  // pendingLeads is in frontend-contracts.md but not yet returned by the API,
+  // so its tile only appears once the field is present.
+  const tiles = [
+    { label: 'Total users', value: stats.data?.totalUsers },
+    { label: 'Active cases', value: stats.data?.activeCases },
+    { label: 'Pending leads', value: stats.data?.pendingLeads, optional: true },
+    { label: 'System errors', value: stats.data?.systemErrors },
+  ].filter((tile) => !tile.optional || hasValue(tile.value))
 
   return (
     <>
@@ -45,10 +57,10 @@ export default function AdminDashboard() {
 
       {stats.error && <ErrorNotice className="mt-8" message={stats.error.message} onRetry={stats.reload} />}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        <StatTile label="Total users" value={stats.data?.totalUsers} />
-        <StatTile label="Active cases" value={stats.data?.activeCases} />
-        <StatTile label="System errors" value={stats.data?.systemErrors} />
+      <div className={`mt-8 grid gap-4 ${tiles.length > 3 ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-3'}`}>
+        {tiles.map((tile) => (
+          <StatTile key={tile.label} label={tile.label} value={tile.value} />
+        ))}
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -70,8 +82,12 @@ export default function AdminDashboard() {
           >
             <ul className="-my-3 divide-y divide-stone-100">
               {auditEntries.map((entry, index) => (
-                <li key={entry.id ?? index} className="py-3 text-sm text-stone-800">
-                  {entry.action}
+                <li key={entry.id ?? index} className="flex items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-stone-900">{entry.action}</p>
+                    {entry.entityType && <p className="text-xs text-stone-500">{entry.entityType}</p>}
+                  </div>
+                  <span className="shrink-0 text-xs text-stone-500 tabular-nums">{formatDate(entry.createdAt)}</span>
                 </li>
               ))}
             </ul>
@@ -95,13 +111,20 @@ export default function AdminDashboard() {
           >
             <ul className="-my-3 divide-y divide-stone-100">
               {recentUsers.map((user, index) => {
-                const displayName = user.name ?? user.fullName ?? 'Unnamed user'
+                const displayName = user.fullName ?? user.name ?? 'Unnamed user'
                 return (
                   <li key={user.id ?? index} className="flex items-center gap-3 py-3">
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs font-semibold text-stone-700">
                       {getInitials(displayName)}
                     </span>
-                    <span className="truncate text-sm font-medium text-stone-900">{displayName}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-stone-900">{displayName}</p>
+                      {user.email && <p className="truncate text-xs text-stone-500">{user.email}</p>}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {hasValue(user.role) && <StatusBadge type="userRole" value={user.role} />}
+                      {user.isActive === false && <span className="text-xs font-medium text-brand-700">Inactive</span>}
+                    </div>
                   </li>
                 )
               })}
