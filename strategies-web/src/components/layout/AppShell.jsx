@@ -1,26 +1,26 @@
-import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LogOut, Menu, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { ChevronRight, LogOut, Menu, X } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 import logo from '../../assets/strategies-logo.png'
-import { NAVIGATION } from '../../config/navigation'
+import { findCurrentItem, NAVIGATION, WORKSPACE_LABELS } from '../../config/navigation'
+import { getInitials } from '../../lib/format'
 import { endSession, getSession, ROLES } from '../../lib/session'
 
-function getInitials(name = '') {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
+const APP_NAME = 'Strategies Migration Services'
 
 export default function AppShell({ role }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const session = getSession()
   const items = NAVIGATION[role]
+  const workspace = WORKSPACE_LABELS[role]
+  const current = findCurrentItem(items, pathname)
+
+  useEffect(() => {
+    document.title = current ? `${current.label} · ${workspace} · ${APP_NAME}` : APP_NAME
+  }, [current, workspace])
 
   function handleSignOut() {
     endSession()
@@ -43,7 +43,7 @@ export default function AppShell({ role }) {
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-stone-200 px-5">
-          <img src={logo} alt="Strategies Migration Services" className="h-10 w-auto" />
+          <img src={logo} alt={APP_NAME} className="h-10 w-auto" />
           <button
             type="button"
             onClick={() => setMenuOpen(false)}
@@ -105,7 +105,7 @@ export default function AppShell({ role }) {
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-stone-200 bg-white px-4 sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-stone-200 bg-white px-4 sm:px-6 lg:px-10">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -115,7 +115,21 @@ export default function AppShell({ role }) {
             <Menu className="size-5" strokeWidth={1.75} />
           </button>
 
-          <div className="flex-1" />
+          <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
+            <ol className="flex items-center gap-1.5 text-sm">
+              <li className="hidden truncate text-stone-500 sm:block">{workspace}</li>
+              {current && (
+                <>
+                  <li className="hidden text-stone-300 sm:block" aria-hidden="true">
+                    <ChevronRight className="size-4" strokeWidth={1.75} />
+                  </li>
+                  <li className="truncate font-medium text-stone-900" aria-current="page">
+                    {current.label}
+                  </li>
+                </>
+              )}
+            </ol>
+          </nav>
 
           <NotificationBell />
 
@@ -130,10 +144,8 @@ export default function AppShell({ role }) {
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-8 sm:px-6 lg:px-8">
-          <div className="max-w-7xl">
-            <Outlet />
-          </div>
+        <main className="flex-1 px-4 py-8 sm:px-6 lg:px-10">
+          <Outlet />
         </main>
       </div>
     </div>

@@ -10,6 +10,12 @@ import {
   Users,
 } from 'lucide-react'
 
+export const WORKSPACE_LABELS = {
+  admin: 'Administration',
+  consultant: 'Consultant workspace',
+  client: 'Client portal',
+}
+
 export const NAVIGATION = {
   admin: [
     { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -32,4 +38,13 @@ export const NAVIGATION = {
     { to: '/client/messages', label: 'Messages', icon: MessageSquare, description: 'Updates and questions from your consultant.' },
     { to: '/client/profile', label: 'Profile', icon: UserRound, description: 'Your personal and contact details.' },
   ],
+}
+
+// Returns the navigation item for the current path, or null if none matches.
+// Items marked `end` only match their exact path; others also match sub-paths
+// (e.g. /admin/users/123 matches Users). The most specific match wins.
+export function findCurrentItem(items, pathname) {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
+  const matches = items.filter(({ to, end }) => path === to || (!end && path.startsWith(`${to}/`)))
+  return matches.sort((a, b) => b.to.length - a.to.length)[0] ?? null
 }
