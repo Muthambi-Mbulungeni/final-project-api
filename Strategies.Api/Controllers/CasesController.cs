@@ -48,44 +48,56 @@ namespace Strategies.Api.Controllers
                             LastUpdated = c.UpdatedAt
                         };
 
-            if (!string.IsNullOrEmpty(search))
-                query = query.Where(c => c.ClientName.Contains(search) || c.VisaCategoryName.Contains(search));
-
-            if (!string.IsNullOrEmpty(stage) && Enum.TryParse<CaseStage>(stage, true, out var parsedStage))
-                query = query.Where(c => c.Stage == parsedStage.ToString());
+            if (!string.IsNullOrEmpty(search)) query = query.Where(c => c.ClientName.Contains(search) || c.VisaCategoryName.Contains(search));
+            if (!string.IsNullOrEmpty(stage) && Enum.TryParse<CaseStage>(stage, true, out var parsedStage)) query = query.Where(c => c.Stage == parsedStage.ToString());
 
             var totalRecords = await query.CountAsync();
             var cases = await query.OrderByDescending(c => c.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-
             return Ok(new PagedResponse<CaseDto> { Data = cases, TotalRecords = totalRecords, TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize), CurrentPage = page });
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin,Consultant")]
-        public async Task<IActionResult> GetCaseById(Guid id)
+        public async Task<IActionResult> GetCase(Guid id)
         {
-            var c = await _context.Cases.FindAsync(id);
-            if (c == null) return NotFound();
+            var caseRecord = await (from c in _context.Cases
+                                    join cl in _context.Users on c.ClientId equals cl.Id into cg
+                                    from client in cg.DefaultIfEmpty()
+                                    join co in _context.Users on c.ConsultantId equals co.Id into cog
+                                    from consultant in cog.DefaultIfEmpty()
+                                    join vc in _context.VisaCategories on c.VisaCategoryId equals vc.Id into vcg
+                                    from visaCat in vcg.DefaultIfEmpty()
+                                    where c.Id == id
+                                    select new CaseDto
+                                    {
+                                        Id = c.Id,
+                                        ClientId = c.ClientId,
+                                        ClientName = client != null ? client.FullName : "Unassigned",
+                                        ConsultantName = consultant != null ? consultant.FullName : "Unassigned",
+                                        VisaCategoryName = visaCat != null ? visaCat.Name : "N/A",
+                                        Stage = c.Stage.ToString(),
+                                        IsArchived = c.IsArchived,
+                                        CreatedAt = c.CreatedAt,
+                                        LastUpdated = c.UpdatedAt
+                                    }).FirstOrDefaultAsync();
 
-            var client = await _context.Users.FindAsync(c.ClientId);
-            var consultant = c.ConsultantId.HasValue ? await _context.Users.FindAsync(c.ConsultantId.Value) : null;
-            var visaCategory = await _context.VisaCategories.FindAsync(c.VisaCategoryId);
-
-            return Ok(new
-            {
-                Id = c.Id,
-                ClientId = c.ClientId,
-                ClientName = client?.FullName ?? "Unassigned",
-                ConsultantName = consultant?.FullName ?? "Unassigned",
-                VisaCategoryName = visaCategory?.Name ?? "N/A",
-                Stage = c.Stage.ToString(),
-                IsArchived = c.IsArchived,
-                CreatedAt = c.CreatedAt,
-                LastUpdated = c.UpdatedAt
-            });
+            if (caseRecord == null) return NotFound();
+            return Ok(caseRecord);
         }
 
-        // Dedicated endpoint for Clients, Consultants, and Admins
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportCases()
+        {
+            var cases = await (from c in _context.Cases
+                               join cl in _context.Users on c.ClientId equals cl.Id into cg
+                               from client in cg.DefaultIfEmpty()
+                               join vc in _context.VisaCategories on c.VisaCategoryId equals vc.Id into vcg
+                               from visaCat in vcg.DefaultIfEmpty()
+                               select new { c.Id, ClientName = client != null ? client.FullName : "Unassigned", VisaName = visaCat != null ? visaCat.Name : "N/A", c.Stage, c.CreatedAt }).ToListAsync();
+
+            var csv = "Id,Client,VisaCategory,Stage,Created\n" + string.Join("\n", cases.Select(c => $"{c.Id},{c.ClientName},{c.VisaName},{c.Stage},{c.CreatedAt}"));
+            return File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "cases_export.csv");
+        }
+
         [HttpGet("client/{clientId}")]
         [Authorize(Roles = "Admin,Consultant,Client")]
         public async Task<IActionResult> GetClientCases(Guid clientId)

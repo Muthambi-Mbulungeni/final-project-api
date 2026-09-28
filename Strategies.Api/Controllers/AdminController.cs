@@ -1,3 +1,8 @@
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Strategies.Api.Data;
+using Strategies.Api.Data.Models;
+using Strategies.Api.DTOs;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -25,9 +30,7 @@ namespace Strategies.Api.Controllers
         public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null)
         {
             var query = _context.Users.AsQueryable();
-
-            if (!string.IsNullOrEmpty(search))
-                query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
+            if (!string.IsNullOrEmpty(search)) query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
 
             var totalRecords = await query.CountAsync();
             var users = await query.Skip((page - 1) * pageSize).Take(pageSize).Select(u => new UserDto
@@ -58,26 +61,17 @@ namespace Strategies.Api.Controllers
         {
             var user = await _context.Users.FindAsync(id);
             if (user == null) return NotFound();
-
-            user.IsActive = false; // Soft delete via IsActive status
+            user.IsActive = false;
             await _context.SaveChangesAsync();
             return Ok(new { Message = "User successfully deactivated." });
         }
 
         [HttpGet("audit-logs")]
-        public async Task<IActionResult> GetLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetAuditLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
-            var query = _context.AuditLogs.AsQueryable();
-            var totalRecords = await query.CountAsync();
-            var logs = await query.OrderByDescending(l => l.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-
-            return Ok(new PagedResponse<object>
-            {
-                Data = logs,
-                TotalRecords = totalRecords,
-                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                CurrentPage = page
-            });
+            var totalRecords = await _context.AuditLogs.CountAsync();
+            var logs = await _context.AuditLogs.OrderByDescending(a => a.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+            return Ok(new PagedResponse<AuditLog> { Data = logs, TotalRecords = totalRecords, TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize), CurrentPage = page });
         }
     }
 }
