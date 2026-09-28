@@ -2,8 +2,8 @@ import DataTable from '../../components/ui/DataTable'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { enumFilter, enumOrder, resolveEnum } from '../../config/enums'
-import { SAMPLE_LEADS } from '../../data/sampleLeads'
 import { formatDate } from '../../lib/format'
+import { useApi } from '../../lib/useApi'
 
 const COLUMNS = [
   {
@@ -62,6 +62,9 @@ const SEARCH_KEYS = ['fullName', 'email']
 const INITIAL_SORT = { key: 'submittedAt', direction: 'desc' }
 
 export default function LeadTriage() {
+  const { data, loading, error, reload } = useApi('/api/leads')
+  const leads = Array.isArray(data) ? data : []
+
   return (
     <>
       <PageHeader
@@ -70,7 +73,7 @@ export default function LeadTriage() {
         description="Qualify new enquiries captured by the intake agent and convert them into cases."
         actions={
           <span className="inline-flex items-center rounded-md border border-dashed border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-500">
-            Sample data
+            Mock API
           </span>
         }
       />
@@ -79,7 +82,10 @@ export default function LeadTriage() {
         <DataTable
           caption="Leads"
           columns={COLUMNS}
-          rows={SAMPLE_LEADS}
+          rows={leads}
+          loading={loading}
+          error={error?.message}
+          onRetry={reload}
           searchKeys={SEARCH_KEYS}
           searchPlaceholder="Search by name or email"
           filters={FILTERS}

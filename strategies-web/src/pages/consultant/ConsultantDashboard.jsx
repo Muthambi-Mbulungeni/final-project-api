@@ -1,30 +1,29 @@
 import { Link } from 'react-router-dom'
 import EmptyState from '../../components/ui/EmptyState'
+import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { CASE_STAGES } from '../../config/caseStages'
 import { resolveEnum } from '../../config/enums'
-import { SAMPLE_LEADS } from '../../data/sampleLeads'
 import { formatDate } from '../../lib/format'
+import { useApi } from '../../lib/useApi'
 
 const QUEUE_STATUSES = ['Pending', 'NeedsReview']
 const QUEUE_LIMIT = 5
 
-function triageValue(lead) {
-  return resolveEnum('triageStatus', lead.triageStatus)?.value
-}
-
-function countByTriage(leads, status) {
-  return leads.filter((lead) => triageValue(lead) === status).length
+function isInQueue(lead) {
+  return QUEUE_STATUSES.includes(resolveEnum('triageStatus', lead.triageStatus)?.value)
 }
 
 export default function ConsultantDashboard() {
-  const leads = SAMPLE_LEADS
+  const stats = useApi('/api/stats/consultant')
+  const leadsRequest = useApi('/api/leads')
 
+  const leads = Array.isArray(leadsRequest.data) ? leadsRequest.data : []
   const queue = leads
-    .filter((lead) => QUEUE_STATUSES.includes(triageValue(lead)))
+    .filter(isInQueue)
     .sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)))
     .slice(0, QUEUE_LIMIT)
 
@@ -33,19 +32,19 @@ export default function ConsultantDashboard() {
       <PageHeader
         eyebrow="Consultant"
         title="Today's caseload"
-        description="New leads to qualify, documents to review and cases moving through each stage."
+        description="New leads to qualify and cases moving through each stage."
         actions={
           <span className="inline-flex items-center rounded-md border border-dashed border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-500">
-            Sample data
+            Mock API
           </span>
         }
       />
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Pending leads" value={countByTriage(leads, 'Pending')} hint="Triage status: Pending" />
-        <StatTile label="Leads needing review" value={countByTriage(leads, 'NeedsReview')} hint="Triage status: Needs review" />
-        <StatTile label="Active cases" hint="Available once case data is connected" />
-        <StatTile label="Documents to review" hint="Available once document data is connected" />
+      {stats.error && <ErrorNotice className="mt-8" message={stats.error.message} onRetry={stats.reload} />}
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <StatTile label="Pending leads" value={stats.data?.pendingLeads} />
+        <StatTile label="Active cases" value={stats.data?.activeCases} />
       </div>
 
       <Panel title="Case pipeline" className="mt-6">
@@ -69,7 +68,11 @@ export default function ConsultantDashboard() {
             </Link>
           }
         >
-          {queue.length === 0 ? (
+          {leadsRequest.error ? (
+            <ErrorNotice message={leadsRequest.error.message} onRetry={leadsRequest.reload} />
+          ) : leadsRequest.loading ? (
+            <p className="py-6 text-center text-sm text-stone-500">Loading leads…</p>
+          ) : queue.length === 0 ? (
             <EmptyState title="Queue is clear" message="There are no leads waiting for triage." />
           ) : (
             <ul className="-my-3 divide-y divide-stone-100">
