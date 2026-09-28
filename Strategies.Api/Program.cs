@@ -1,13 +1,15 @@
 using Microsoft.EntityFrameworkCore;
 using Strategies.Api.Data;
+using Strategies.Api.Services;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Database Context
+// 1. Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. CORS Policy (Unblocks Riaad's Vite 5173 and CRA 3000)
+// 2. CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -18,14 +20,23 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 3. Add Controllers (Crucial for routing)
-builder.Services.AddControllers();
+// 3. Controllers & String Enums
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// 4. Register Custom Services
+builder.Services.AddHttpClient<IAgentService, GeminiAgentService>();
+builder.Services.AddScoped<IAgentService, GeminiAgentService>();
+builder.Services.AddScoped<CaseManagementService>();
+
 var app = builder.Build();
 
-// 4. Enable Swagger for you and Kundai
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -33,13 +44,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
-// 5. Apply CORS before Authorization
 app.UseCors("AllowFrontend");
-
 app.UseAuthorization();
-
-// 6. Map the Controllers (Fixes the 404 issue)
 app.MapControllers();
-
 app.Run();
