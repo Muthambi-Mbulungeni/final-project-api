@@ -1,3 +1,4 @@
+import { Briefcase, MessageSquare } from 'lucide-react'
 import EmptyState from '../../components/ui/EmptyState'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
@@ -28,8 +29,19 @@ export default function ClientDashboard() {
       {stats.error && <ErrorNotice className="mt-8" message={stats.error.message} onRetry={stats.reload} />}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <StatTile label="Active applications" value={stats.data?.activeApplications} />
-        <StatTile label="Unread messages" value={stats.data?.unreadMessages} />
+        <StatTile
+          label="Active applications"
+          value={stats.data?.activeApplications}
+          icon={Briefcase}
+          loading={stats.loading}
+        />
+        <StatTile
+          label="Unread messages"
+          value={stats.data?.unreadMessages}
+          icon={MessageSquare}
+          to="/client/messages"
+          loading={stats.loading}
+        />
       </div>
 
       <Panel title="Application progress" className="mt-6">

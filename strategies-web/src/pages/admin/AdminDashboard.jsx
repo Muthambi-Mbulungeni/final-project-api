@@ -1,25 +1,16 @@
 import { Link } from 'react-router-dom'
+import { Briefcase, Inbox, ShieldAlert, Users } from 'lucide-react'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
 import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
-import { formatDate } from '../../lib/format'
+import { formatDate, getInitials } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 
 const LIST_LIMIT = 5
-
-function getInitials(name = '') {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
 
 function hasValue(value) {
   return value !== undefined && value !== null
@@ -36,10 +27,10 @@ export default function AdminDashboard() {
   // pendingLeads is in frontend-contracts.md but not yet returned by the API,
   // so its tile only appears once the field is present.
   const tiles = [
-    { label: 'Total users', value: stats.data?.totalUsers },
-    { label: 'Active cases', value: stats.data?.activeCases },
-    { label: 'Pending leads', value: stats.data?.pendingLeads, optional: true },
-    { label: 'System errors', value: stats.data?.systemErrors },
+    { label: 'Total users', value: stats.data?.totalUsers, icon: Users, to: '/admin/users' },
+    { label: 'Active cases', value: stats.data?.activeCases, icon: Briefcase, to: '/admin/cases' },
+    { label: 'Pending leads', value: stats.data?.pendingLeads, icon: Inbox, to: '/admin/leads', optional: true },
+    { label: 'System errors', value: stats.data?.systemErrors, icon: ShieldAlert },
   ].filter((tile) => !tile.optional || hasValue(tile.value))
 
   return (
@@ -59,7 +50,14 @@ export default function AdminDashboard() {
 
       <div className={`mt-8 grid gap-4 ${tiles.length > 3 ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-3'}`}>
         {tiles.map((tile) => (
-          <StatTile key={tile.label} label={tile.label} value={tile.value} />
+          <StatTile
+            key={tile.label}
+            label={tile.label}
+            value={tile.value}
+            icon={tile.icon}
+            to={tile.to}
+            loading={stats.loading}
+          />
         ))}
       </div>
 

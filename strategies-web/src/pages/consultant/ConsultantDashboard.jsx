@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Briefcase, FolderOpen, Inbox } from 'lucide-react'
 import EmptyState from '../../components/ui/EmptyState'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
@@ -35,9 +36,15 @@ export default function ConsultantDashboard() {
   // documentsAwaitingReview is in frontend-contracts.md but not yet returned by the API,
   // so its tile only appears once the field is present.
   const tiles = [
-    { label: 'Pending leads', value: stats.data?.pendingLeads },
-    { label: 'Active cases', value: stats.data?.activeCases },
-    { label: 'Documents awaiting review', value: stats.data?.documentsAwaitingReview, optional: true },
+    { label: 'Pending leads', value: stats.data?.pendingLeads, icon: Inbox, to: '/consultant/leads' },
+    { label: 'Active cases', value: stats.data?.activeCases, icon: Briefcase, to: '/consultant/cases' },
+    {
+      label: 'Documents awaiting review',
+      value: stats.data?.documentsAwaitingReview,
+      icon: FolderOpen,
+      to: '/consultant/documents',
+      optional: true,
+    },
   ].filter((tile) => !tile.optional || hasValue(tile.value))
 
   return (
@@ -57,7 +64,14 @@ export default function ConsultantDashboard() {
 
       <div className={`mt-8 grid gap-4 ${tiles.length > 2 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         {tiles.map((tile) => (
-          <StatTile key={tile.label} label={tile.label} value={tile.value} />
+          <StatTile
+            key={tile.label}
+            label={tile.label}
+            value={tile.value}
+            icon={tile.icon}
+            to={tile.to}
+            loading={stats.loading}
+          />
         ))}
       </div>
 
