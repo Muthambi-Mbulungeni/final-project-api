@@ -4,33 +4,23 @@ import AppShell from './components/layout/AppShell'
 import { NAVIGATION } from './config/navigation'
 import { getSession, ROLES } from './lib/session'
 import AdminDashboard from './pages/admin/AdminDashboard'
-import AuditLogPage from './pages/admin/AuditLogPage'
-import UsersPage from './pages/admin/UsersPage'
-import { AdminCasesPage, ConsultantCasesPage } from './pages/cases/CasesPage'
 import ClientDashboard from './pages/client/ClientDashboard'
 import ConsultantDashboard from './pages/consultant/ConsultantDashboard'
-import LeadTriage from './pages/consultant/LeadTriage'
 import EnquiryPage from './pages/EnquiryPage'
 import ForgotPassword from './pages/ForgotPassword'
 import Login from './pages/Login'
 import ModulePlaceholder from './pages/ModulePlaceholder'
 import NotFound from './pages/NotFound'
+import { MODULE_PAGES } from './routes/modulePages'
 import RequireRole from './routes/RequireRole'
-
-// Pages that have been built. Any navigation item not listed here shows a placeholder.
-const MODULE_PAGES = {
-  '/admin/users': UsersPage,
-  '/admin/cases': AdminCasesPage,
-  '/admin/audit-log': AuditLogPage,
-  '/consultant/leads': LeadTriage,
-  '/consultant/cases': ConsultantCasesPage,
-}
 
 function HomeRedirect() {
   const session = getSession()
   return <Navigate to={session ? ROLES[session.role].home : '/login'} replace />
 }
 
+// Built pages get their component. Unbuilt ones are hidden from the sidebar,
+// and anyone typing their URL sees a neutral placeholder instead of a 404.
 function moduleRoutes(role) {
   return NAVIGATION[role]
     .filter((item) => !item.end)

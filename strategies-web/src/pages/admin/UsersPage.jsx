@@ -122,11 +122,6 @@ export default function UsersPage() {
         eyebrow="Administration"
         title="Users"
         description="View accounts and suspend access."
-        actions={
-          <span className="inline-flex items-center rounded-md border border-dashed border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-500">
-            Mock API
-          </span>
-        }
       />
 
       <div className="mt-8">

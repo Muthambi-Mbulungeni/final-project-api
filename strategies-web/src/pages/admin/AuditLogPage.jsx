@@ -63,11 +63,6 @@ export default function AuditLogPage() {
         eyebrow="Administration"
         title="Audit log"
         description="A record of who changed what, and when, across core records."
-        actions={
-          <span className="inline-flex items-center rounded-md border border-dashed border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-500">
-            Mock API
-          </span>
-        }
       />
 
       <div className="mt-8">

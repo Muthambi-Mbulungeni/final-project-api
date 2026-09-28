@@ -6,6 +6,7 @@ import logo from '../../assets/strategies-logo.png'
 import { findCurrentItem, NAVIGATION, WORKSPACE_LABELS } from '../../config/navigation'
 import { getInitials } from '../../lib/format'
 import { endSession, getSession, ROLES } from '../../lib/session'
+import { isBuilt } from '../../routes/modulePages'
 
 const APP_NAME = 'Strategies Migration Services'
 
@@ -14,7 +15,7 @@ export default function AppShell({ role }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const session = getSession()
-  const items = NAVIGATION[role]
+  const items = NAVIGATION[role].filter(isBuilt)
   const workspace = WORKSPACE_LABELS[role]
   const current = findCurrentItem(items, pathname)
 

@@ -106,11 +106,6 @@ function CasesPage({ eyebrow, title, description }) {
         eyebrow={eyebrow}
         title={title}
         description={description}
-        actions={
-          <span className="inline-flex items-center rounded-md border border-dashed border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-500">
-            Mock API
-          </span>
-        }
       />
 
       {exportState.error && (
