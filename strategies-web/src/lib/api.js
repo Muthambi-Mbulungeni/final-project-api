@@ -49,16 +49,9 @@ async function send(path, options) {
   }
 }
 
-export async function apiGet(path, { signal } = {}) {
-  const response = await send(path, { headers: { Accept: 'application/json' }, signal })
-  const body = await readBody(response)
-  if (!response.ok) throw toApiError(response, body)
-  return body
-}
-
-// Sends a PATCH request, with an optional JSON body. Returns the parsed response body (or null).
-export async function apiPatch(path, data) {
-  const options = { method: 'PATCH', headers: { Accept: 'application/json' } }
+// Sends a request with an optional JSON body and returns the parsed response body (or null).
+async function sendJson(method, path, data, signal) {
+  const options = { method, headers: { Accept: 'application/json' }, signal }
   if (data !== undefined) {
     options.headers['Content-Type'] = 'application/json'
     options.body = JSON.stringify(data)
@@ -68,6 +61,18 @@ export async function apiPatch(path, data) {
   const body = await readBody(response)
   if (!response.ok) throw toApiError(response, body)
   return body
+}
+
+export function apiGet(path, { signal } = {}) {
+  return sendJson('GET', path, undefined, signal)
+}
+
+export function apiPost(path, data) {
+  return sendJson('POST', path, data)
+}
+
+export function apiPatch(path, data) {
+  return sendJson('PATCH', path, data)
 }
 
 // Reads the filename from a Content-Disposition header, preferring the UTF-8 form.
