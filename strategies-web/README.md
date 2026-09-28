@@ -13,7 +13,7 @@ Each role signs in to its own workspace with its own landing page, navigation an
 | Role | Landing page | What they can do |
 |---|---|---|
 | **Public visitor** | Sign in / Start an enquiry | Submit a two-step enquiry with POPIA consent and receive a reference; request a password reset |
-| **Consultant** | Today's caseload | See the intake agent's results (screened, awaiting review, qualified, filtered out), work through the lead triage queue with search, filters and sorting, and follow their cases |
+| **Consultant** | Today's caseload | See the intake agent's results (screened, awaiting review, qualified, filtered out), work through the lead triage queue with search, filters and sorting, open any lead to see the full enquiry and the agent's verdict, email the lead, and follow their cases |
 | **Client** | My case | Follow their application through the five lifecycle stages, see what happens next, their case reference and when it was opened |
 | **Administrator** | System overview | See account, case and enquiry totals, manage users (view and suspend with confirmation), browse and export cases to CSV, and read the audit log |
 
@@ -170,7 +170,7 @@ Login, ForgotPassword, EnquiryPage, NotFound
 
 ## Quality
 
-- **Tests:** 66 Vitest tests in 10 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
+- **Tests:** 72 Vitest tests in 10 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
 - **Linting:** `npm run lint` passes with no warnings.
 - **Accessibility:**
   - labelled form fields with linked error messages

@@ -30,6 +30,8 @@ function LoadingRows({ columnCount }) {
 // - Server mode: pass `pagination` (and optionally `onSearchChange`/`searchValue`) and the
 //   API does the paging and searching; `rows` is treated as the current page only.
 //   In server mode, only offer sorting or filters the API itself supports.
+// Optional `onRowClick(row)` makes each row clickable. For keyboard users, also render a
+// real button inside the row (e.g. on the name) that does the same thing.
 export default function DataTable({
   columns,
   rows = [],
@@ -45,6 +47,7 @@ export default function DataTable({
   loading = false,
   error = null,
   onRetry,
+  onRowClick,
   emptyTitle = 'Nothing to show',
   emptyMessage,
   actions,
@@ -248,7 +251,11 @@ export default function DataTable({
                 </tr>
               ) : (
                 items.map((row) => (
-                  <tr key={getRowId(row)} className="transition-colors hover:bg-stone-50/70">
+                  <tr
+                    key={getRowId(row)}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={`transition-colors hover:bg-stone-50/70 ${onRowClick ? 'cursor-pointer' : ''}`}
+                  >
                     {columns.map((column) => (
                       <td
                         key={column.key}
