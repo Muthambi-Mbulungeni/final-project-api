@@ -4,6 +4,7 @@ import DataTable from '../../components/ui/DataTable'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
+import { useToast } from '../../components/ui/toastContext'
 import { apiDownload } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import { listItems } from '../../lib/listData'
@@ -61,6 +62,7 @@ function buildCasesPath(page, search) {
 }
 
 function CasesPage({ eyebrow, title, description }) {
+  const toast = useToast()
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [exportState, setExportState] = useState({ busy: false, error: null })
@@ -78,8 +80,9 @@ function CasesPage({ eyebrow, title, description }) {
   async function handleExport() {
     setExportState({ busy: true, error: null })
     try {
-      await apiDownload(EXPORT_PATH, 'cases.csv')
+      const filename = await apiDownload(EXPORT_PATH, 'cases.csv')
       setExportState({ busy: false, error: null })
+      toast.show(`Exported ${filename}`)
     } catch (error) {
       setExportState({ busy: false, error: error.message })
     }

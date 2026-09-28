@@ -21,6 +21,14 @@ export default function AdminDashboard() {
   const auditLogs = useApi('/api/admin/audit-logs')
   const users = useApi('/api/admin/users')
 
+  // When every request fails (e.g. the API is down), show one banner instead of three.
+  const requests = [stats, auditLogs, users]
+  const allFailed = requests.every((request) => request.error)
+
+  function retryAll() {
+    requests.forEach((request) => request.reload())
+  }
+
   const auditEntries = listItems(auditLogs.data).slice(0, LIST_LIMIT)
   const recentUsers = listItems(users.data).slice(0, LIST_LIMIT)
 
@@ -46,7 +54,13 @@ export default function AdminDashboard() {
         }
       />
 
-      {stats.error && <ErrorNotice className="mt-8" message={stats.error.message} onRetry={stats.reload} />}
+      {stats.error && (
+        <ErrorNotice
+          className="mt-8"
+          message={stats.error.message}
+          onRetry={allFailed ? retryAll : stats.reload}
+        />
+      )}
 
       <div className={`mt-8 grid gap-4 ${tiles.length > 3 ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-3'}`}>
         {tiles.map((tile) => (
@@ -77,6 +91,7 @@ export default function AdminDashboard() {
             emptyTitle="No activity recorded"
             emptyMessage="Changes to core records appear here."
             loadingText="Loading activity…"
+            hideError={allFailed}
           >
             <ul className="-my-3 divide-y divide-stone-100">
               {auditEntries.map((entry, index) => (
@@ -106,6 +121,7 @@ export default function AdminDashboard() {
             emptyTitle="No users found"
             emptyMessage="Registered accounts appear here."
             loadingText="Loading users…"
+            hideError={allFailed}
           >
             <ul className="-my-3 divide-y divide-stone-100">
               {recentUsers.map((user, index) => {

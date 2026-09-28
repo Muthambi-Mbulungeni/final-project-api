@@ -3,6 +3,7 @@ import ConfirmDialog from '../../components/ui/ConfirmDialog'
 import DataTable from '../../components/ui/DataTable'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
+import { useToast } from '../../components/ui/toastContext'
 import { apiPatch } from '../../lib/api'
 import { getInitials } from '../../lib/format'
 import { listItems } from '../../lib/listData'
@@ -23,11 +24,11 @@ function displayName(user) {
 }
 
 export default function UsersPage() {
+  const toast = useToast()
   const [page, setPage] = useState(1)
   const [suspendedIds, setSuspendedIds] = useState(() => new Set())
   const [target, setTarget] = useState(null)
   const [action, setAction] = useState({ busy: false, error: '' })
-  const [notice, setNotice] = useState('')
 
   const request = useApi(buildUsersPath(page))
   const response = request.data
@@ -36,7 +37,6 @@ export default function UsersPage() {
   )
 
   function openSuspend(user) {
-    setNotice('')
     setAction({ busy: false, error: '' })
     setTarget(user)
   }
@@ -53,7 +53,7 @@ export default function UsersPage() {
     try {
       const result = await apiPatch(`/api/admin/users/${encodeURIComponent(target.id)}/suspend`)
       setSuspendedIds((previous) => new Set([...previous, target.id]))
-      setNotice(`${displayName(target)}: ${result?.message ?? 'User suspended.'}`)
+      toast.show(`${displayName(target)}: ${result?.message ?? 'User suspended.'}`)
       closeDialog()
     } catch (error) {
       setAction({ busy: false, error: error.message })
@@ -128,22 +128,6 @@ export default function UsersPage() {
           </span>
         }
       />
-
-      {notice && (
-        <div
-          role="status"
-          className="mt-8 flex items-center justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3"
-        >
-          <p className="text-sm text-emerald-900">{notice}</p>
-          <button
-            type="button"
-            onClick={() => setNotice('')}
-            className="shrink-0 text-sm font-medium text-emerald-900 hover:underline"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
 
       <div className="mt-8">
         <DataTable
