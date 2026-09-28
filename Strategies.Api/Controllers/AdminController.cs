@@ -6,11 +6,17 @@ using Strategies.Api.DTOs;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Strategies.Api.Data;
+using Strategies.Api.DTOs;
 
 namespace Strategies.Api.Controllers
 {
     [ApiController]
     [Route("api/admin")]
+    [Authorize(Roles = "Admin")]
     public class AdminController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -21,7 +27,7 @@ namespace Strategies.Api.Controllers
         }
 
         [HttpGet("users")]
-        public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string search = null)
+        public async Task<IActionResult> GetUsers([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null)
         {
             var query = _context.Users.AsQueryable();
             if (!string.IsNullOrEmpty(search)) query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
@@ -37,6 +43,17 @@ namespace Strategies.Api.Controllers
             }).ToListAsync();
 
             return Ok(new PagedResponse<UserDto> { Data = users, TotalRecords = totalRecords, TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize), CurrentPage = page });
+        }
+
+        [HttpPatch("users/{id}/suspend")]
+        public async Task<IActionResult> SuspendUser(Guid id)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            user.IsActive = false;
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "User account has been suspended." });
         }
 
         [HttpDelete("users/{id}")]
