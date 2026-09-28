@@ -55,11 +55,7 @@ export default function AppShell({ role }) {
           </button>
         </div>
 
-        <p className="px-5 pt-6 pb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone-500">
-          {ROLES[role].label} workspace
-        </p>
-
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3" aria-label="Main">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pt-5" aria-label="Main">
           {items.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -146,7 +142,9 @@ export default function AppShell({ role }) {
         </header>
 
         <main className="flex-1 px-4 py-8 sm:px-6 lg:px-10">
-          <Outlet />
+          <div className="mx-auto w-full max-w-7xl">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

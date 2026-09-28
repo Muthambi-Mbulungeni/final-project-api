@@ -37,7 +37,7 @@ function tomorrowInputValue() {
 
 function submissionErrorMessage(error) {
   if (error.status === 429) return 'Too many enquiries have been sent from this connection. Please wait a minute and try again.'
-  return error.message
+  return error.status >= 400 && error.status < 500 ? error.message : 'We could not send your enquiry just now. Please try again in a moment.'
 }
 
 function ProgressIndicator({ step }) {

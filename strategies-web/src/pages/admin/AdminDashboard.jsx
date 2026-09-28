@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom'
-import { Briefcase, Inbox, ShieldAlert, Users } from 'lucide-react'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
 import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
-import { formatDate, getInitials } from '../../lib/format'
+import { formatDateTime, getInitials } from '../../lib/format'
+import { summariseLeads } from '../../lib/leads'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 
@@ -16,13 +16,21 @@ function hasValue(value) {
   return value !== undefined && value !== null
 }
 
-export default function AdminDashboard() {
-  const stats = useApi('/api/stats/admin')
-  const auditLogs = useApi('/api/admin/audit-logs')
-  const users = useApi('/api/admin/users')
+// The total from a list response: the paginated wrapper's totalRecords, or the length of a plain array.
+function totalOf(request) {
+  if (request.loading || request.error || !request.data) return null
+  if (typeof request.data.totalRecords === 'number') return request.data.totalRecords
+  return listItems(request.data).length
+}
 
-  // When every request fails (e.g. the API is down), show one banner instead of three.
-  const requests = [stats, auditLogs, users]
+export default function AdminDashboard() {
+  const users = useApi(`/api/admin/users?page=1&pageSize=${LIST_LIMIT}`)
+  const cases = useApi('/api/cases?page=1&pageSize=1')
+  const leads = useApi('/api/leads')
+  const auditLogs = useApi('/api/admin/audit-logs')
+
+  // When every request fails (e.g. the API is down), show one banner instead of several.
+  const requests = [users, cases, leads, auditLogs]
   const allFailed = requests.every((request) => request.error)
 
   function retryAll() {
@@ -31,15 +39,35 @@ export default function AdminDashboard() {
 
   const auditEntries = listItems(auditLogs.data).slice(0, LIST_LIMIT)
   const recentUsers = listItems(users.data).slice(0, LIST_LIMIT)
+  const awaitingReview = summariseLeads(listItems(leads.data)).awaiting
 
-  // pendingLeads is in frontend-contracts.md but not yet returned by the API,
-  // so its tile only appears once the field is present.
+  const userTotal = totalOf(users)
+  const caseTotal = totalOf(cases)
+  const leadTotal = totalOf(leads)
+
+  // Figures come from the same list endpoints the admin pages use, so they match what those pages show.
   const tiles = [
-    { label: 'Total users', value: stats.data?.totalUsers, icon: Users, to: '/admin/users' },
-    { label: 'Active cases', value: stats.data?.activeCases, icon: Briefcase, to: '/admin/cases' },
-    { label: 'Pending leads', value: stats.data?.pendingLeads, icon: Inbox, to: '/admin/leads', optional: true },
-    { label: 'System errors', value: stats.data?.systemErrors, icon: ShieldAlert },
-  ].filter((tile) => !tile.optional || hasValue(tile.value))
+    {
+      label: 'User accounts',
+      value: userTotal,
+      hint: hasValue(userTotal) ? 'Administrators, consultants and clients' : undefined,
+      to: '/admin/users',
+      loading: users.loading,
+    },
+    {
+      label: 'Cases',
+      value: caseTotal,
+      hint: hasValue(caseTotal) ? 'Across all five lifecycle stages' : undefined,
+      to: '/admin/cases',
+      loading: cases.loading,
+    },
+    {
+      label: 'Enquiries received',
+      value: leadTotal,
+      hint: hasValue(leadTotal) ? `${awaitingReview} awaiting consultant review` : undefined,
+      loading: leads.loading,
+    },
+  ]
 
   return (
     <>
@@ -49,34 +77,28 @@ export default function AdminDashboard() {
         description="Accounts, case volume and recent activity across the practice."
       />
 
-      {stats.error && (
-        <ErrorNotice
-          className="mt-8"
-          message={stats.error.message}
-          onRetry={allFailed ? retryAll : stats.reload}
-        />
-      )}
+      {allFailed && <ErrorNotice className="mt-8" message={users.error.message} onRetry={retryAll} />}
 
-      <div className={`mt-8 grid gap-4 ${tiles.length > 3 ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-3'}`}>
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {tiles.map((tile) => (
           <StatTile
             key={tile.label}
             label={tile.label}
             value={tile.value}
-            icon={tile.icon}
+            hint={tile.hint}
             to={tile.to}
-            loading={stats.loading}
+            loading={tile.loading}
           />
         ))}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-8 grid gap-6 lg:grid-cols-3">
         <Panel
           title="Recent activity"
           className="lg:col-span-2"
           action={
             <Link to="/admin/audit-log" className="text-sm font-medium text-brand-700 hover:text-brand-800">
-              View all
+              View audit log
             </Link>
           }
         >
@@ -93,9 +115,9 @@ export default function AdminDashboard() {
                 <li key={entry.id ?? index} className="flex items-center justify-between gap-4 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-stone-900">{entry.action}</p>
-                    {entry.entityType && <p className="text-xs text-stone-500">{entry.entityType}</p>}
+                    {entry.entityType && <p className="text-xs text-stone-500">{entry.entityType} record</p>}
                   </div>
-                  <span className="shrink-0 text-xs text-stone-500 tabular-nums">{formatDate(entry.createdAt)}</span>
+                  <span className="shrink-0 text-xs text-stone-500 tabular-nums">{formatDateTime(entry.createdAt)}</span>
                 </li>
               ))}
             </ul>
@@ -132,7 +154,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {hasValue(user.role) && <StatusBadge type="userRole" value={user.role} />}
-                      {user.isActive === false && <span className="text-xs font-medium text-brand-700">Inactive</span>}
+                      {user.isActive === false && <span className="text-xs font-medium text-brand-700">Suspended</span>}
                     </div>
                   </li>
                 )

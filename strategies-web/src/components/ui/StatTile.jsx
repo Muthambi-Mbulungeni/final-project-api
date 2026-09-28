@@ -1,20 +1,23 @@
 import { Link } from 'react-router-dom'
+import { ArrowRight } from 'lucide-react'
 
-const BASE_CLASSES = 'block h-full rounded-lg border border-stone-200 bg-white px-5 py-4'
+const BASE_CLASSES = 'flex h-full flex-col rounded-lg border border-stone-200 bg-white px-5 py-4'
 
-// A single statistic. Optional icon, optional link to the related page,
-// and a shimmer placeholder while the value is loading.
-export default function StatTile({ label, value, hint, icon: Icon, to, loading = false }) {
+// A single figure with an optional line of context underneath.
+// Pass `to` to make the whole tile a link to the related page.
+export default function StatTile({ label, value, hint, to, loading = false }) {
   const content = (
     <>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-stone-600">{label}</p>
-        {Icon && (
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-stone-100 text-stone-500 transition-colors group-hover:bg-brand-50 group-hover:text-brand-600">
-            <Icon className="size-4" strokeWidth={1.75} aria-hidden="true" />
-          </span>
+      <p className="flex items-center gap-1.5 text-sm font-medium text-stone-600">
+        {label}
+        {to && (
+          <ArrowRight
+            className="size-3.5 -translate-x-1 text-stone-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+            strokeWidth={2}
+            aria-hidden="true"
+          />
         )}
-      </div>
+      </p>
 
       {loading ? (
         <>
@@ -22,10 +25,10 @@ export default function StatTile({ label, value, hint, icon: Icon, to, loading =
           <span className="sr-only">Loading</span>
         </>
       ) : (
-        <p className="mt-1 text-3xl font-semibold tracking-tight text-stone-900 tabular-nums">{value ?? '—'}</p>
+        <p className="mt-2 text-3xl font-semibold tracking-tight text-stone-900 tabular-nums">{value ?? '—'}</p>
       )}
 
-      {hint && <p className="mt-1 text-xs text-stone-500">{hint}</p>}
+      {hint && !loading && <p className="mt-auto pt-2 text-xs text-stone-500">{hint}</p>}
     </>
   )
 
@@ -33,7 +36,7 @@ export default function StatTile({ label, value, hint, icon: Icon, to, loading =
     return (
       <Link
         to={to}
-        className={`group ${BASE_CLASSES} transition-all hover:-translate-y-px hover:border-stone-300 hover:shadow-sm hover:shadow-stone-900/5`}
+        className={`group ${BASE_CLASSES} transition-colors hover:border-stone-300 hover:bg-stone-50/60`}
       >
         {content}
       </Link>
