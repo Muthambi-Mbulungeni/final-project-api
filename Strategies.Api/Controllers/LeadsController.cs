@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
+using Strategies.Api.Services;
 using System;
-using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Strategies.Api.Controllers
 {
@@ -10,50 +13,38 @@ namespace Strategies.Api.Controllers
     [Route("api/[controller]")]
     public class LeadsController : ControllerBase
     {
-        // GET: api/leads
-        // Unblocks Riaad: Consultant Dashboard Lead View
-        [HttpGet]
-        public IActionResult GetLeads()
-        {
-            var mockLeads = new List<Lead>
-            {
-                new Lead
-                {
-                    Id = Guid.NewGuid(),
-                    FullName = "John Doe",
-                    Email = "john.doe@example.com",
-                    ImmigrationStatus = ImmigrationStatus.Foreigner,
-                    TriageStatus = TriageStatus.Pending,
-                    DesiredStartDate = DateTime.UtcNow.AddMonths(2),
-                    SubmittedAt = DateTime.UtcNow
-                },
-                new Lead
-                {
-                    Id = Guid.NewGuid(),
-                    FullName = "Jane Smith",
-                    Email = "jane.smith@example.com",
-                    ImmigrationStatus = ImmigrationStatus.TemporaryResident,
-                    TriageStatus = TriageStatus.Qualified,
-                    DesiredStartDate = DateTime.UtcNow.AddMonths(1),
-                    SubmittedAt = DateTime.UtcNow.AddDays(-2)
-                }
-            };
+        private readonly ApplicationDbContext _context;
 
-            return Ok(mockLeads);
+        public LeadsController(ApplicationDbContext context)
+        {
+            _context = context;
         }
 
-        // POST: api/leads
-        // Unblocks Riaad: Public Intake Form Submission
-        [HttpPost]
-        public IActionResult CreateLead([FromBody] Lead newLead)
+        [HttpGet]
+        public async Task<IActionResult> GetLeads()
         {
-            // Simulate a successful save and return a 201 Created status
-            // In a real scenario, the AI triage agent would run here.
-            return CreatedAtAction(nameof(GetLeads), new { id = Guid.NewGuid() }, new
+            var leads = await _context.Leads.ToListAsync();
+            return Ok(leads);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateLead([FromBody] Lead newLead, [FromServices] IAgentService agentService)
+        {
+            var aiResult = await agentService.ProcessLeadAsync($"Name: {newLead.FullName}, Status: {newLead.ImmigrationStatus}");
+
+            newLead.Id = Guid.NewGuid();
+            newLead.TriageStatus = aiResult.Status == RunStatus.Success.ToString() ? TriageStatus.Qualified : TriageStatus.Pending;
+            newLead.SubmittedAt = DateTime.UtcNow;
+
+            _context.Leads.Add(newLead);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetLeads), new { id = newLead.Id }, new
             {
                 Message = "Lead successfully submitted.",
-                LeadId = Guid.NewGuid(),
-                Status = TriageStatus.Pending.ToString()
+                LeadId = newLead.Id,
+                AiAnalysis = aiResult.ExtractedData,
+                Status = newLead.TriageStatus.ToString()
             });
         }
     }
