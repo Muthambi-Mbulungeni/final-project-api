@@ -10,6 +10,7 @@ import { AdminCasesPage, ConsultantCasesPage } from './pages/cases/CasesPage'
 import ClientDashboard from './pages/client/ClientDashboard'
 import ConsultantDashboard from './pages/consultant/ConsultantDashboard'
 import LeadTriage from './pages/consultant/LeadTriage'
+import EnquiryPage from './pages/EnquiryPage'
 import ForgotPassword from './pages/ForgotPassword'
 import Login from './pages/Login'
 import ModulePlaceholder from './pages/ModulePlaceholder'
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/enquire" element={<EnquiryPage />} />
 
         <Route element={<RequireRole role="admin" />}>
           <Route path="/admin" element={<AppShell role="admin" />}>

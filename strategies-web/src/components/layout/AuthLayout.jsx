@@ -1,13 +1,14 @@
 import logo from '../../assets/strategies-logo.png'
 
-// Centred card layout shared by the sign-in and password reset pages.
-export default function AuthLayout({ children }) {
+// Centred card layout shared by the sign-in, password reset and enquiry pages.
+// `wide` gives forms with more content (like the enquiry) extra room.
+export default function AuthLayout({ children, wide = false }) {
   const year = new Date().getFullYear()
 
   return (
     <div className="flex min-h-screen flex-col bg-stone-50">
       <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
-        <div className="w-full max-w-md">
+        <div className={`w-full ${wide ? 'max-w-xl' : 'max-w-md'}`}>
           <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm shadow-stone-900/5">
             <div className="h-1 bg-brand-600" aria-hidden="true" />
             <div className="px-6 py-10 sm:px-10">

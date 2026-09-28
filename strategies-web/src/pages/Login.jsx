@@ -129,6 +129,13 @@ export default function Login() {
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
+
+      <p className="mt-8 border-t border-stone-200 pt-6 text-center text-sm text-stone-600">
+        New client?{' '}
+        <Link to="/enquire" className="font-medium text-brand-700 hover:text-brand-800">
+          Start an enquiry
+        </Link>
+      </p>
     </AuthLayout>
   )
 }
