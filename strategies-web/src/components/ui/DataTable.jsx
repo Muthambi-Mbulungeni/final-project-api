@@ -1,0 +1,282 @@
+import { useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, ChevronsUpDown, Search } from 'lucide-react'
+import EmptyState from './EmptyState'
+import Pagination from './Pagination'
+import { matchesFilters, matchesSearch, paginate, sortRows } from '../../lib/table'
+
+const CONTROL_CLASSES =
+  'block w-full rounded-md border border-stone-300 bg-white text-sm text-stone-900 focus:border-stone-500 focus:ring-2 focus:ring-stone-900/10 focus:outline-none'
+
+function SortIcon({ direction }) {
+  if (direction === 'asc') return <ArrowUp className="size-3.5" strokeWidth={2} aria-hidden="true" />
+  if (direction === 'desc') return <ArrowDown className="size-3.5" strokeWidth={2} aria-hidden="true" />
+  return <ChevronsUpDown className="size-3.5 text-stone-400" strokeWidth={2} aria-hidden="true" />
+}
+
+function LoadingRows({ columnCount }) {
+  return Array.from({ length: 5 }, (_, rowIndex) => (
+    <tr key={rowIndex}>
+      {Array.from({ length: columnCount }, (_, cellIndex) => (
+        <td key={cellIndex} className="px-4 py-3.5">
+          <div className="h-3.5 w-3/4 animate-pulse rounded bg-stone-100" />
+        </td>
+      ))}
+    </tr>
+  ))
+}
+
+// Two modes:
+// - Client mode (default): the table searches, filters, sorts and paginates `rows` itself.
+// - Server mode: pass `pagination` (and optionally `onSearchChange`/`searchValue`) and the
+//   API does the paging and searching; `rows` is treated as the current page only.
+//   In server mode, only offer sorting or filters the API itself supports.
+export default function DataTable({
+  columns,
+  rows = [],
+  getRowId = (row) => row.id,
+  searchKeys = [],
+  searchPlaceholder = 'Search',
+  searchValue,
+  onSearchChange,
+  filters = [],
+  initialSort = null,
+  pageSize = 10,
+  pagination = null,
+  loading = false,
+  error = null,
+  onRetry,
+  emptyTitle = 'Nothing to show',
+  emptyMessage,
+  actions,
+  caption,
+}) {
+  const isServerSearch = typeof onSearchChange === 'function'
+  const isServerPaged = pagination !== null
+
+  const [localSearch, setLocalSearch] = useState('')
+  const [activeFilters, setActiveFilters] = useState({})
+  const [sort, setSort] = useState(initialSort)
+  const [localPage, setLocalPage] = useState(1)
+
+  const search = isServerSearch ? (searchValue ?? '') : localSearch
+  const showSearch = isServerSearch || searchKeys.length > 0
+
+  const sortColumn = columns.find((column) => column.key === sort?.key)
+  const sortDirection = sort?.direction
+
+  const processedRows = useMemo(() => {
+    const filtered = rows.filter(
+      (row) =>
+        (isServerSearch || matchesSearch(row, search, searchKeys)) && matchesFilters(row, activeFilters, filters),
+    )
+    return sortRows(filtered, sortColumn, sortDirection)
+  }, [rows, isServerSearch, search, searchKeys, activeFilters, filters, sortColumn, sortDirection])
+
+  const { items, totalCount, totalPages, currentPage } = isServerPaged
+    ? {
+        items: processedRows,
+        totalCount: pagination.totalCount,
+        totalPages: Math.max(1, pagination.totalPages),
+        currentPage: pagination.page,
+      }
+    : paginate(processedRows, localPage, pageSize)
+
+  const hasActiveQuery =
+    search.trim() !== '' || Object.values(activeFilters).some((value) => value !== '' && value !== undefined)
+
+  function resetLocalPage() {
+    if (!isServerPaged) setLocalPage(1)
+  }
+
+  function changePage(nextPage) {
+    if (isServerPaged) pagination.onPageChange(nextPage)
+    else setLocalPage(nextPage)
+  }
+
+  function handleSearch(event) {
+    const value = event.target.value
+    if (isServerSearch) onSearchChange(value)
+    else setLocalSearch(value)
+    resetLocalPage()
+  }
+
+  function handleFilter(key, value) {
+    setActiveFilters((previous) => ({ ...previous, [key]: value }))
+    resetLocalPage()
+  }
+
+  function handleSort(key) {
+    setSort((previous) => {
+      if (previous?.key !== key) return { key, direction: 'asc' }
+      if (previous.direction === 'asc') return { key, direction: 'desc' }
+      return null
+    })
+    resetLocalPage()
+  }
+
+  function clearQuery() {
+    if (isServerSearch) onSearchChange('')
+    else setLocalSearch('')
+    setActiveFilters({})
+    resetLocalPage()
+  }
+
+  const showPagination = !error && totalCount > 0 && (isServerPaged || !loading)
+
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white">
+      {(showSearch || filters.length > 0 || actions) && (
+        <div className="flex flex-col gap-3 border-b border-stone-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            {showSearch && (
+              <label className="relative block sm:w-72">
+                <span className="sr-only">{searchPlaceholder}</span>
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
+                <input
+                  type="search"
+                  autoComplete="off"
+                  value={search}
+                  onChange={handleSearch}
+                  placeholder={searchPlaceholder}
+                  className={`${CONTROL_CLASSES} py-2 pr-3 pl-9 placeholder:text-stone-400`}
+                />
+              </label>
+            )}
+
+            {filters.map((filter) => (
+              <label key={filter.key} className="block">
+                <span className="sr-only">{filter.label}</span>
+                <select
+                  value={activeFilters[filter.key] ?? ''}
+                  onChange={(event) => handleFilter(filter.key, event.target.value)}
+                  className={`${CONTROL_CLASSES} py-2 pr-8 pl-3 sm:w-auto`}
+                >
+                  <option value="">{filter.label}: All</option>
+                  {filter.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+
+            {hasActiveQuery && (
+              <button
+                type="button"
+                onClick={clearQuery}
+                className="self-start text-sm font-medium text-stone-600 hover:text-stone-900 sm:self-center"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {actions && <div className="flex shrink-0 gap-2">{actions}</div>}
+        </div>
+      )}
+
+      {error ? (
+        <div role="alert" className="px-6 py-12 text-center">
+          <p className="text-sm font-medium text-stone-900">This list could not be loaded</p>
+          <p className="mt-1 text-sm text-stone-500">
+            {typeof error === 'string' ? error : 'The server did not respond. Try again in a moment.'}
+          </p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-4 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-stone-50"
+            >
+              Try again
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            {caption && <caption className="sr-only">{caption}</caption>}
+            <thead className="bg-stone-50 text-xs text-stone-500">
+              <tr>
+                {columns.map((column) => {
+                  const isSorted = sort?.key === column.key
+                  const ariaSort = isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'
+
+                  return (
+                    <th
+                      key={column.key}
+                      scope="col"
+                      aria-sort={column.sortable ? ariaSort : undefined}
+                      className={`px-4 py-2.5 font-medium whitespace-nowrap ${column.align === 'right' ? 'text-right' : ''}`}
+                    >
+                      {column.sortable ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(column.key)}
+                          className={`inline-flex items-center gap-1 transition-colors hover:text-stone-900 ${
+                            isSorted ? 'text-stone-900' : ''
+                          }`}
+                        >
+                          {column.header}
+                          <SortIcon direction={isSorted ? sortDirection : null} />
+                        </button>
+                      ) : (
+                        column.header
+                      )}
+                    </th>
+                  )
+                })}
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-stone-100">
+              {loading ? (
+                <LoadingRows columnCount={columns.length} />
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length}>
+                    {hasActiveQuery ? (
+                      <EmptyState title="No matching results" message="Try a different search term or clear the filters." />
+                    ) : (
+                      <EmptyState title={emptyTitle} message={emptyMessage} />
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                items.map((row) => (
+                  <tr key={getRowId(row)} className="transition-colors hover:bg-stone-50/70">
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={`px-4 py-3 align-middle text-stone-700 ${column.align === 'right' ? 'text-right' : ''} ${
+                          column.className ?? ''
+                        }`}
+                      >
+                        {column.render ? column.render(row) : row[column.key]}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showPagination && (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          pageSize={isServerPaged ? pagination.pageSize : pageSize}
+          itemCount={isServerPaged ? items.length : undefined}
+          onPageChange={changePage}
+        />
+      )}
+    </div>
+  )
+}
