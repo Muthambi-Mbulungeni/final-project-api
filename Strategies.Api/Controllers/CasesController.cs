@@ -1,7 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Strategies.Api.Data;
+using Strategies.Api.Data.Enums;
 using Strategies.Api.DTOs;
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Strategies.Api.Controllers
 {
@@ -9,42 +13,54 @@ namespace Strategies.Api.Controllers
     [Route("api/[controller]")]
     public class CasesController : ControllerBase
     {
-        private static readonly Guid StaticCaseId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        private readonly ApplicationDbContext _context;
+
+        public CasesController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         [HttpGet]
-        public IActionResult GetCases([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string search = null)
+        public async Task<IActionResult> GetCases([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string search = null, [FromQuery] string stage = null)
         {
-            var data = new List<object>
-            {
-                new { Id = StaticCaseId, ClientName = "John Doe", VisaCategoryName = "Critical Skills Work Visa", Stage = "UnderReview", IsArchived = false, CreatedAt = DateTime.UtcNow.AddDays(-30), LastUpdated = DateTime.UtcNow.AddHours(-2) }
-            };
-            return Ok(new PagedResponse<object> { Data = data, TotalRecords = 45, TotalPages = 5, CurrentPage = page });
+            // Manual joins to bypass the missing EF navigation properties
+            var query = from c in _context.Cases
+                        join cl in _context.Users on c.ClientId equals cl.Id into clientGroup
+                        from client in clientGroup.DefaultIfEmpty()
+                        join co in _context.Users on c.ConsultantId equals co.Id into consultantGroup
+                        from consultant in consultantGroup.DefaultIfEmpty()
+                        join vc in _context.VisaCategories on c.VisaCategoryId equals vc.Id into vcGroup
+                        from visaCat in vcGroup.DefaultIfEmpty()
+                        select new CaseDto
+                        {
+                            Id = c.Id,
+                            ClientId = c.ClientId,
+                            ClientName = client != null ? client.FullName : "Unassigned",
+                            ConsultantName = consultant != null ? consultant.FullName : "Unassigned",
+                            VisaCategoryName = visaCat != null ? visaCat.Name : "N/A",
+                            Stage = c.Stage.ToString(),
+                            IsArchived = c.IsArchived,
+                            CreatedAt = c.CreatedAt,
+                            LastUpdated = c.UpdatedAt
+                        };
+
+            if (!string.IsNullOrEmpty(search))
+                query = query.Where(c => c.ClientName.Contains(search) || c.VisaCategoryName.Contains(search));
+
+            if (!string.IsNullOrEmpty(stage) && Enum.TryParse<CaseStage>(stage, true, out var parsedStage))
+                query = query.Where(c => c.Stage == parsedStage.ToString());
+
+            var totalRecords = await query.CountAsync();
+            var cases = await query.OrderByDescending(c => c.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            return Ok(new PagedResponse<CaseDto> { Data = cases, TotalRecords = totalRecords, TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize), CurrentPage = page });
         }
 
-        [HttpGet("{id}")]
-        public IActionResult GetCaseById(Guid id)
-        {
-            return Ok(new { Id = id, ClientName = "John Doe", ConsultantName = "Riaad", VisaCategoryName = "Critical Skills Work Visa", Stage = "UnderReview", IsArchived = false, CreatedAt = DateTime.UtcNow.AddDays(-30), LastUpdated = DateTime.UtcNow.AddHours(-2) });
-        }
-
-        // Restored for Kundai
         [HttpGet("client/{clientId}")]
-        public IActionResult GetClientCases(Guid clientId)
+        public async Task<IActionResult> GetClientCases(Guid clientId)
         {
-            var data = new List<object>
-            {
-                new { Id = StaticCaseId, ClientId = clientId, ClientName = "John Doe", Stage = "UnderReview", CreatedAt = DateTime.UtcNow.AddDays(-30) }
-            };
-            return Ok(new PagedResponse<object> { Data = data, TotalRecords = 1, TotalPages = 1, CurrentPage = 1 });
-        }
-
-        [HttpGet("export")]
-        public IActionResult ExportCases([FromQuery] string format = "csv")
-        {
-            if (format.ToLower() == "csv")
-                return File(System.Text.Encoding.UTF8.GetBytes("Id,ClientName,Stage\n11111111-1111-1111-1111-111111111111,John Doe,UnderReview\n"), "text/csv", "cases.csv");
-
-            return BadRequest(new ApiErrorResponse { Message = "Format not supported", Errors = new List<string> { "Only CSV is currently supported." } });
+            var cases = await _context.Cases.Where(c => c.ClientId == clientId).Select(c => new CaseDto { Id = c.Id, ClientId = c.ClientId, Stage = c.Stage.ToString(), CreatedAt = c.CreatedAt }).ToListAsync();
+            return Ok(new PagedResponse<CaseDto> { Data = cases, TotalRecords = cases.Count, TotalPages = 1, CurrentPage = 1 });
         }
     }
 }
