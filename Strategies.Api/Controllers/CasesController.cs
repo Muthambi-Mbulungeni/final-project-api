@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Strategies.Api.Data.Enums;
-using Strategies.Api.Data.Models;
+using Strategies.Api.DTOs;
 using System;
 using System.Collections.Generic;
 
@@ -10,48 +9,32 @@ namespace Strategies.Api.Controllers
     [Route("api/[controller]")]
     public class CasesController : ControllerBase
     {
-        // GET: api/cases/{clientId}
-        // Unblocks Kundai: Kotlin Mobile App Case Status Screen
-        [HttpGet("client/{clientId}")]
-        public IActionResult GetClientCases(Guid clientId)
-        {
-            var mockCase = new Case
-            {
-                Id = Guid.NewGuid(),
-                ClientId = clientId,
-                VisaCategoryId = Guid.NewGuid(),
-                Stage = CaseStage.DocumentGathering,
-                CreatedAt = DateTime.UtcNow.AddDays(-14),
-                UpdatedAt = DateTime.UtcNow
-            };
+        // Static GUIDs so React Router click-throughs work
+        private static readonly Guid StaticCaseId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-            return Ok(new List<Case> { mockCase });
+        [HttpGet]
+        public IActionResult GetCases([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string search = null)
+        {
+            var data = new List<object>
+            {
+                new { Id = StaticCaseId, ClientName = "John Doe", Stage = "UnderReview" }
+            };
+            return Ok(new PagedResponse<object> { Data = data, TotalRecords = 45, TotalPages = 5, CurrentPage = page });
         }
 
-        // GET: api/cases
-        // Unblocks Riaad: Consultant Active Cases Dashboard
-        [HttpGet]
-        public IActionResult GetAllCases()
+        [HttpGet("{id}")]
+        public IActionResult GetCaseById(Guid id)
         {
-            var mockCases = new List<Case>
-            {
-                new Case
-                {
-                    Id = Guid.NewGuid(),
-                    ClientId = Guid.NewGuid(),
-                    Stage = CaseStage.UnderReview,
-                    CreatedAt = DateTime.UtcNow.AddDays(-30)
-                },
-                new Case
-                {
-                    Id = Guid.NewGuid(),
-                    ClientId = Guid.NewGuid(),
-                    Stage = CaseStage.SubmittedToAuthority,
-                    CreatedAt = DateTime.UtcNow.AddDays(-60)
-                }
-            };
+            return Ok(new { Id = id, ClientName = "John Doe", Stage = "UnderReview" });
+        }
 
-            return Ok(mockCases);
+        [HttpGet("export")]
+        public IActionResult ExportCases([FromQuery] string format = "csv")
+        {
+            if (format.ToLower() == "csv")
+                return File(System.Text.Encoding.UTF8.GetBytes("Id,ClientName\n1,John Doe\n"), "text/csv", "cases.csv");
+
+            return BadRequest(new ApiErrorResponse { Message = "Format not supported" });
         }
     }
 }
