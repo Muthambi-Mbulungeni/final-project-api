@@ -56,6 +56,20 @@ export async function apiGet(path, { signal } = {}) {
   return body
 }
 
+// Sends a PATCH request, with an optional JSON body. Returns the parsed response body (or null).
+export async function apiPatch(path, data) {
+  const options = { method: 'PATCH', headers: { Accept: 'application/json' } }
+  if (data !== undefined) {
+    options.headers['Content-Type'] = 'application/json'
+    options.body = JSON.stringify(data)
+  }
+
+  const response = await send(path, options)
+  const body = await readBody(response)
+  if (!response.ok) throw toApiError(response, body)
+  return body
+}
+
 // Reads the filename from a Content-Disposition header, preferring the UTF-8 form.
 export function filenameFromDisposition(header, fallback) {
   if (!header) return fallback

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Bell, LogOut, Menu, X } from 'lucide-react'
+import { LogOut, Menu, X } from 'lucide-react'
+import NotificationBell from './NotificationBell'
 import logo from '../../assets/strategies-logo.png'
 import { NAVIGATION } from '../../config/navigation'
 import { endSession, getSession, ROLES } from '../../lib/session'
@@ -116,13 +117,7 @@ export default function AppShell({ role }) {
 
           <div className="flex-1" />
 
-          <button
-            type="button"
-            className="rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900"
-            aria-label="Notifications"
-          >
-            <Bell className="size-5" strokeWidth={1.75} />
-          </button>
+          <NotificationBell />
 
           <div className="flex items-center gap-3 border-l border-stone-200 pl-4">
             <div className="hidden text-right sm:block">
