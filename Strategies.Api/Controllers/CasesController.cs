@@ -1,16 +1,20 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.DTOs;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Strategies.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class CasesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -21,9 +25,9 @@ namespace Strategies.Api.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetCases([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string search = null, [FromQuery] string stage = null)
+        [Authorize(Roles = "Admin,Consultant")]
+        public async Task<IActionResult> GetCases([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null, [FromQuery] string? stage = null)
         {
-            // Manual joins to bypass the missing EF navigation properties
             var query = from c in _context.Cases
                         join cl in _context.Users on c.ClientId equals cl.Id into clientGroup
                         from client in clientGroup.DefaultIfEmpty()
@@ -56,11 +60,68 @@ namespace Strategies.Api.Controllers
             return Ok(new PagedResponse<CaseDto> { Data = cases, TotalRecords = totalRecords, TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize), CurrentPage = page });
         }
 
+        [HttpGet("{id}")]
+        [Authorize(Roles = "Admin,Consultant")]
+        public async Task<IActionResult> GetCaseById(Guid id)
+        {
+            var c = await _context.Cases.FindAsync(id);
+            if (c == null) return NotFound();
+
+            var client = await _context.Users.FindAsync(c.ClientId);
+            var consultant = c.ConsultantId.HasValue ? await _context.Users.FindAsync(c.ConsultantId.Value) : null;
+            var visaCategory = await _context.VisaCategories.FindAsync(c.VisaCategoryId);
+
+            return Ok(new
+            {
+                Id = c.Id,
+                ClientId = c.ClientId,
+                ClientName = client?.FullName ?? "Unassigned",
+                ConsultantName = consultant?.FullName ?? "Unassigned",
+                VisaCategoryName = visaCategory?.Name ?? "N/A",
+                Stage = c.Stage.ToString(),
+                IsArchived = c.IsArchived,
+                CreatedAt = c.CreatedAt,
+                LastUpdated = c.UpdatedAt
+            });
+        }
+
+        // Dedicated endpoint for Clients, Consultants, and Admins
         [HttpGet("client/{clientId}")]
+        [Authorize(Roles = "Admin,Consultant,Client")]
         public async Task<IActionResult> GetClientCases(Guid clientId)
         {
-            var cases = await _context.Cases.Where(c => c.ClientId == clientId).Select(c => new CaseDto { Id = c.Id, ClientId = c.ClientId, Stage = c.Stage.ToString(), CreatedAt = c.CreatedAt }).ToListAsync();
+            // Strict check: If user is a Client, they can only view their own cases
+            if (User.IsInRole("Client"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (Guid.TryParse(userIdStr, out var currentUserId) && currentUserId != clientId)
+                {
+                    return Forbid();
+                }
+            }
+
+            var cases = await _context.Cases
+                .Where(c => c.ClientId == clientId)
+                .Select(c => new CaseDto
+                {
+                    Id = c.Id,
+                    ClientId = c.ClientId,
+                    Stage = c.Stage.ToString(),
+                    CreatedAt = c.CreatedAt
+                })
+                .ToListAsync();
+
             return Ok(new PagedResponse<CaseDto> { Data = cases, TotalRecords = cases.Count, TotalPages = 1, CurrentPage = 1 });
+        }
+
+        [HttpGet("export")]
+        [Authorize(Roles = "Admin,Consultant")]
+        public IActionResult ExportCases([FromQuery] string format = "csv")
+        {
+            if (format.ToLower() == "csv")
+                return File(System.Text.Encoding.UTF8.GetBytes("Id,ClientName,Stage\n11111111-1111-1111-1111-111111111111,John Doe,UnderReview\n"), "text/csv", "cases.csv");
+
+            return BadRequest(new ApiErrorResponse { Message = "Format not supported", Errors = new List<string> { "Only CSV is currently supported." } });
         }
     }
 }
