@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, getInitials } from './format'
+import { formatDate, formatDateTime, getInitials, shortId } from './format'
 
 describe('formatDate', () => {
   it('returns a dash for empty or invalid values', () => {
@@ -15,6 +15,20 @@ describe('formatDate', () => {
   })
 })
 
+describe('formatDateTime', () => {
+  it('returns a dash for empty or invalid values', () => {
+    expect(formatDateTime(undefined)).toBe('—')
+    expect(formatDateTime('not a date')).toBe('—')
+  })
+
+  it('includes the time and handles .NET timestamps', () => {
+    const fromDotNet = formatDateTime('2026-09-28T09:15:00.1234567Z')
+    expect(fromDotNet).not.toBe('—')
+    expect(fromDotNet).toBe(formatDateTime('2026-09-28T09:15:00.123Z'))
+    expect(fromDotNet).not.toBe(formatDate('2026-09-28T09:15:00.123Z'))
+  })
+})
+
 describe('getInitials', () => {
   it('returns up to two uppercase initials', () => {
     expect(getInitials('Thandi Mokoena')).toBe('TM')
@@ -26,5 +40,16 @@ describe('getInitials', () => {
     expect(getInitials('')).toBe('')
     expect(getInitials(null)).toBe('')
     expect(getInitials(undefined)).toBe('')
+  })
+})
+
+describe('shortId', () => {
+  it('returns the first 8 characters of an ID', () => {
+    expect(shortId('33333333-3333-3333-3333-333333333333')).toBe('33333333')
+  })
+
+  it('returns a dash when there is no ID', () => {
+    expect(shortId(null)).toBe('—')
+    expect(shortId('')).toBe('—')
   })
 })

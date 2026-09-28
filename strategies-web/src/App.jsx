@@ -3,6 +3,7 @@ import AppShell from './components/layout/AppShell'
 import { NAVIGATION } from './config/navigation'
 import { getSession, ROLES } from './lib/session'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import AuditLogPage from './pages/admin/AuditLogPage'
 import UsersPage from './pages/admin/UsersPage'
 import { AdminCasesPage, ConsultantCasesPage } from './pages/cases/CasesPage'
 import ClientDashboard from './pages/client/ClientDashboard'
@@ -17,6 +18,7 @@ import RequireRole from './routes/RequireRole'
 const MODULE_PAGES = {
   '/admin/users': UsersPage,
   '/admin/cases': AdminCasesPage,
+  '/admin/audit-log': AuditLogPage,
   '/consultant/leads': LeadTriage,
   '/consultant/cases': ConsultantCasesPage,
 }
