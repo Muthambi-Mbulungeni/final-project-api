@@ -1,11 +1,16 @@
 import EmptyState from '../../components/ui/EmptyState'
+import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
+import StatTile from '../../components/ui/StatTile'
 import { CASE_STAGES } from '../../config/caseStages'
 import { getSession } from '../../lib/session'
+import { useApi } from '../../lib/useApi'
 
 export default function ClientDashboard() {
-  const firstName = getSession()?.name?.split(' ')[0] ?? 'there'
+  const session = getSession()
+  const firstName = session?.name?.split(' ')[0] ?? 'there'
+  const stats = useApi(`/api/stats/client/${session?.id}`)
 
   return (
     <>
@@ -13,9 +18,21 @@ export default function ClientDashboard() {
         eyebrow="Your application"
         title={`Welcome back, ${firstName}`}
         description="See where your application stands and what we need from you next."
+        actions={
+          <span className="inline-flex items-center rounded-md border border-dashed border-stone-300 px-2.5 py-1 text-xs font-medium text-stone-500">
+            Mock API
+          </span>
+        }
       />
 
-      <Panel title="Application progress" className="mt-8">
+      {stats.error && <ErrorNotice className="mt-8" message={stats.error.message} onRetry={stats.reload} />}
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <StatTile label="Active applications" value={stats.data?.activeApplications} />
+        <StatTile label="Unread messages" value={stats.data?.unreadMessages} />
+      </div>
+
+      <Panel title="Application progress" className="mt-6">
         <ol className="grid gap-5 md:grid-cols-5 md:gap-4">
           {CASE_STAGES.map((stage, index) => (
             <li key={stage.key} className="flex gap-3 md:flex-col md:gap-2">
@@ -36,7 +53,7 @@ export default function ClientDashboard() {
           <EmptyState title="Checklist not loaded" message="Documents required for your visa category appear here." />
         </Panel>
         <Panel title="Latest messages">
-          <EmptyState title="No messages yet" message="Updates from your consultant appear here." />
+          <EmptyState title="No messages loaded" message="Updates from your consultant appear here." />
         </Panel>
       </div>
     </>
