@@ -3,6 +3,7 @@ import AppShell from './components/layout/AppShell'
 import { NAVIGATION } from './config/navigation'
 import { getSession, ROLES } from './lib/session'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import UsersPage from './pages/admin/UsersPage'
 import { AdminCasesPage, ConsultantCasesPage } from './pages/cases/CasesPage'
 import ClientDashboard from './pages/client/ClientDashboard'
 import ConsultantDashboard from './pages/consultant/ConsultantDashboard'
@@ -14,6 +15,7 @@ import RequireRole from './routes/RequireRole'
 
 // Pages that have been built. Any navigation item not listed here shows a placeholder.
 const MODULE_PAGES = {
+  '/admin/users': UsersPage,
   '/admin/cases': AdminCasesPage,
   '/consultant/leads': LeadTriage,
   '/consultant/cases': ConsultantCasesPage,

@@ -15,3 +15,14 @@ export function formatDate(value) {
   const date = new Date(normaliseTimestamp(value))
   return Number.isNaN(date.getTime()) ? '—' : dateFormatter.format(date)
 }
+
+// Up to two initials from a person's name, e.g. "Thandi Mokoena" -> "TM".
+export function getInitials(name) {
+  return String(name ?? '')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
