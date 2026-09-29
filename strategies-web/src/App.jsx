@@ -1,8 +1,12 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import DevRoleSwitcher from './components/dev/DevRoleSwitcher'
 import AppShell from './components/layout/AppShell'
+import SessionCheck from './components/layout/SessionCheck'
 import { NAVIGATION } from './config/navigation'
-import { getSession, ROLES } from './lib/session'
+import { onSessionExpired } from './lib/api'
+import { ROLES } from './lib/session'
+import { useRestoredSession } from './lib/useSession'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import ClientDashboard from './pages/client/ClientDashboard'
 import ConsultantDashboard from './pages/consultant/ConsultantDashboard'
@@ -15,7 +19,8 @@ import { MODULE_PAGES } from './routes/modulePages'
 import RequireRole from './routes/RequireRole'
 
 function HomeRedirect() {
-  const session = getSession()
+  const { session, checking } = useRestoredSession()
+  if (checking) return <SessionCheck />
   return <Navigate to={session ? ROLES[session.role].home : '/login'} replace />
 }
 
@@ -37,6 +42,19 @@ function moduleRoutes(role) {
 }
 
 export default function App() {
+  const navigate = useNavigate()
+
+  // When a session can no longer be renewed, go to sign-in and come back to this page afterwards.
+  useEffect(() => {
+    onSessionExpired(() => {
+      navigate('/login', {
+        replace: true,
+        state: { reason: 'expired', from: `${window.location.pathname}${window.location.search}` },
+      })
+    })
+    return () => onSessionExpired(null)
+  }, [navigate])
+
   return (
     <>
       <Routes>

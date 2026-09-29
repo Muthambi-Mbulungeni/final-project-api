@@ -135,6 +135,8 @@ Endpoints the portal uses:
 | Method | Endpoint | Used by |
 |---|---|---|
 | POST | `/api/auth/login` | Sign in |
+| POST | `/api/auth/refresh` | Staying signed in; renewing an expired access token |
+| POST | `/api/auth/revoke` | Sign out |
 | POST | `/api/auth/forgot-password` | Forgot password |
 | POST | `/api/leads` | Public enquiry form |
 | GET | `/api/leads` | Consultant overview and lead triage; admin overview |
@@ -170,7 +172,7 @@ Login, ForgotPassword, EnquiryPage, NotFound
 
 ## Quality
 
-- **Tests:** 72 Vitest tests in 10 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
+- **Tests:** 96 Vitest tests in 13 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
 - **Linting:** `npm run lint` passes with no warnings.
 - **Accessibility:**
   - labelled form fields with linked error messages
@@ -180,6 +182,24 @@ Login, ForgotPassword, EnquiryPage, NotFound
   - `aria-current` on the active page and the current lifecycle stage
   - focus moved to each new step of the enquiry form
 - **Responsive:** the sidebar becomes a slide-out menu below 1024px, tables scroll horizontally on small screens, and the lifecycle stepper switches to a vertical list on phones.
+
+## Authentication and sessions
+
+Sign-in uses the API's JWT tokens. Where each token lives was chosen with POPIA in mind, because the system holds passports and ID documents.
+
+| Token | Where it lives | Why |
+|---|---|---|
+| Access token (60 minutes) | Memory only | Never written to storage, so it cannot be copied out of the browser later. |
+| Refresh token (rotating) | `httpOnly`, `Secure`, `SameSite=Strict` cookie on `/api/auth`, set by the API | JavaScript cannot read it at all, including any injected script. |
+
+- **Staying signed in:** on page load or in a new tab the portal silently calls `/api/auth/refresh`. The browser sends the cookie, so the user carries on without signing in again. The cookie has no expiry date, so closing the browser ends the session, which matters on shared computers.
+- **Expired access tokens:** a request that gets a 401 refreshes once and is retried. Refresh tokens rotate (each works once), so requests that fail at the same moment share one refresh call. If the refresh fails, the user returns to sign-in with an explanation and is taken back to the page they were on afterwards.
+- **Returning to a page after sign-in** only happens inside the user's own workspace, which prevents open redirects.
+- **Signing out** calls `/api/auth/revoke`, so the refresh token also stops working on the server.
+- **Inactivity:** staff workspaces sign out after 30 minutes without activity, because they show many clients' personal documents.
+- **Fallback:** if the API returns the refresh token in the response body instead of a cookie, the portal keeps it in `sessionStorage` (this tab only, cleared when it closes). The portal detects this automatically.
+- **Honest limit:** no browser storage defeats injected script completely. With this design, an attacker could act only while the page is open and could not take away a reusable credential.
+- **Mobile (agreed contract):** the Android app sends `X-Client-Type: mobile` and receives the refresh token in the response body, because apps cannot use browser cookies.
 
 ## Security and privacy
 
@@ -198,9 +218,8 @@ Login, ForgotPassword, EnquiryPage, NotFound
 
 ## Current status
 
-- The portal runs end to end against the API's mock contracts (`develop`, PR #2). No database is required for a demo.
-- Sign-in validates input and handles every error response. Starting a session waits on the auth endpoint (`AuthResponse` with access and refresh tokens). Until then, the development role switcher opens each workspace.
-- Planned once auth is merged: bearer tokens on every request, refresh on 401, sign-out with token revocation, and mapping the token's role to its workspace.
+- The portal runs end to end against the API's mock contracts. No database is required for a demo.
+- The sign-in flow described above is built and unit-tested against the agreed contract (`/api/auth/login`, `/refresh`, `/revoke`). It connects to the real endpoints once the API's `AuthController` is merged. Until then, the development role switcher opens each workspace, in development builds only.
 - Modules not yet built (documents, messages, profile, reports) are hidden from navigation. Visiting their URL directly shows a neutral placeholder.
 
 ## Contributing

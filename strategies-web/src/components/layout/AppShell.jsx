@@ -4,17 +4,21 @@ import { ChevronRight, LogOut, Menu, X } from 'lucide-react'
 import NotificationBell from './NotificationBell'
 import logo from '../../assets/strategies-logo.png'
 import { findCurrentItem, NAVIGATION, WORKSPACE_LABELS } from '../../config/navigation'
+import { signOut } from '../../lib/auth'
 import { getInitials } from '../../lib/format'
-import { endSession, getSession, ROLES } from '../../lib/session'
+import { ROLES } from '../../lib/session'
+import { useIdleSignOut } from '../../lib/useIdleSignOut'
+import { useSession } from '../../lib/useSession'
 import { isBuilt } from '../../routes/modulePages'
 
 const APP_NAME = 'Strategies Migration Services'
 
 export default function AppShell({ role }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const session = getSession()
+  const session = useSession()
   const items = NAVIGATION[role].filter(isBuilt)
   const workspace = WORKSPACE_LABELS[role]
   const current = findCurrentItem(items, pathname)
@@ -23,10 +27,15 @@ export default function AppShell({ role }) {
     document.title = current ? `${current.label} · ${workspace} · ${APP_NAME}` : APP_NAME
   }, [current, workspace])
 
-  function handleSignOut() {
-    endSession()
-    navigate('/login', { replace: true })
+  async function leave(reason) {
+    setSigningOut(true)
+    await signOut()
+    navigate('/login', { replace: true, state: { reason } })
   }
+
+  // Real staff sessions only: staff screens show many clients' documents.
+  // Development sessions are exempt so a demo is never interrupted.
+  useIdleSignOut(session?.source === 'api' && role !== 'client', () => leave('idle'))
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
@@ -92,11 +101,12 @@ export default function AppShell({ role }) {
         <div className="border-t border-stone-200 p-3">
           <button
             type="button"
-            onClick={handleSignOut}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50 hover:text-stone-900"
+            onClick={() => leave('signed-out')}
+            disabled={signingOut}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-50 hover:text-stone-900 disabled:cursor-wait disabled:opacity-60"
           >
             <LogOut className="size-4 text-stone-400" strokeWidth={1.75} aria-hidden="true" />
-            Sign out
+            {signingOut ? 'Signing out…' : 'Sign out'}
           </button>
         </div>
       </aside>

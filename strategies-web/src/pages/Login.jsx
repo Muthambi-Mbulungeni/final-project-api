@@ -1,22 +1,28 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import AuthLayout from '../components/layout/AuthLayout'
 import { inputClasses } from '../components/ui/fieldStyles'
 import TextField from '../components/ui/TextField'
-import { apiPost } from '../lib/api'
+import { destinationFor, signIn, signInNotice } from '../lib/auth'
 import { signInErrorMessage } from '../lib/authMessages'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
+import { useSession } from '../lib/useSession'
 import { validateSignIn } from '../lib/validation'
 
 export default function Login() {
   useDocumentTitle('Sign in')
+  const location = useLocation()
+  const session = useSession()
   const [values, setValues] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [capsLockOn, setCapsLockOn] = useState(false)
+
+  const from = location.state?.from
+  const notice = signInNotice(location.state?.reason)
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -41,15 +47,17 @@ export default function Login() {
     setFormError('')
 
     try {
-      await apiPost('/api/auth/login', { email: values.email.trim(), password: values.password })
-      // The login response contract (token, expiry, role) has not been published yet,
-      // so a successful response cannot start a session. Finish this once it is.
-      setFormError(signInErrorMessage({ status: 501 }))
+      // On success the session changes and this page redirects below.
+      await signIn(values.email.trim(), values.password)
     } catch (error) {
       setFormError(signInErrorMessage(error))
-    } finally {
       setSubmitting(false)
     }
+  }
+
+  // Signed in (just now, or already): go to the page they wanted, inside their own workspace.
+  if (session) {
+    return <Navigate to={destinationFor(session, from)} replace />
   }
 
   const passwordErrorId = 'password-error'
@@ -60,10 +68,16 @@ export default function Login() {
       <p className="mt-1.5 text-center text-sm text-stone-600">Strategies Migration Services portal</p>
 
       <form noValidate onSubmit={handleSubmit} className="mt-8 space-y-5">
-        {formError && (
+        {formError ? (
           <div role="alert" className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2.5 text-sm text-brand-800">
             {formError}
           </div>
+        ) : (
+          notice && (
+            <div role="status" className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-700">
+              {notice}
+            </div>
+          )
         )}
 
         <TextField
