@@ -38,4 +38,14 @@
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand-600;
   }
+
+  /* Touch screens: no grey flash on tap and no double-tap-zoom delay on controls. */
+  a,
+  button,
+  select,
+  summary,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
 }

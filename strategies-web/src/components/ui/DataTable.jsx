@@ -32,6 +32,10 @@ function LoadingRows({ columnCount }) {
 //   In server mode, only offer sorting or filters the API itself supports.
 // Optional `onRowClick(row)` makes each row clickable. For keyboard users, also render a
 // real button inside the row (e.g. on the name) that does the same thing.
+//
+// Loading: placeholder rows appear only on the first load. When the page or search changes,
+// the current rows stay in place (dimmed) until the new ones arrive, so the table never grows
+// and shrinks under the cursor.
 export default function DataTable({
   columns,
   rows = [],
@@ -83,6 +87,9 @@ export default function DataTable({
         currentPage: pagination.page,
       }
     : paginate(processedRows, localPage, pageSize)
+
+  const showPlaceholders = loading && items.length === 0
+  const refreshing = loading && items.length > 0
 
   const hasActiveQuery =
     search.trim() !== '' || Object.values(activeFilters).some((value) => value !== '' && value !== undefined)
@@ -236,8 +243,11 @@ export default function DataTable({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-stone-100">
-              {loading ? (
+            <tbody
+              aria-busy={loading || undefined}
+              className={`divide-y divide-stone-100 transition-opacity duration-150 ${refreshing ? 'opacity-50' : ''}`}
+            >
+              {showPlaceholders ? (
                 <LoadingRows columnCount={columns.length} />
               ) : items.length === 0 ? (
                 <tr>
