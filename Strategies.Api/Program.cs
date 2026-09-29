@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -12,30 +7,33 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
 using Strategies.Api.Data;
 using Strategies.Api.DTOs;
 using Strategies.Api.Middleware;
 using Strategies.Api.Services;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Database Context (PostgreSQL EF Core)
+// 1. Database Context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Register Application Security Services
+// 2. Security Services (Kaan)
 builder.Services.AddSingleton<IPasswordHasherService, PasswordHasherService>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddSingleton<IRefreshTokenStore, InMemoryRefreshTokenStore>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// 3. Register Core Domain & AI Services (Marco)
+// 3. Core Domain & AI Services (Marco - Single clean registration, no duplicates)
 builder.Services.AddHttpClient<IAgentService, GeminiAgentService>();
-builder.Services.AddScoped<IAgentService, GeminiAgentService>();
 builder.Services.AddScoped<CaseManagementService>();
 
-// 4. JWT Authentication Configuration
+// 4. JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "StrategiesMigrationPlatform_SuperSecretKey_2026_WIL_Section10_Token_Security!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "StrategiesApi";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "StrategiesClients";
@@ -60,36 +58,9 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
-
-    options.Events = new JwtBearerEvents
-    {
-        OnChallenge = async context =>
-        {
-            context.HandleResponse();
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            context.Response.ContentType = "application/json";
-            var error = new ApiErrorResponse
-            {
-                Message = "Unauthorized access.",
-                Errors = new List<string> { "Authentication token is missing, expired, or invalid." }
-            };
-            await context.Response.WriteAsJsonAsync(error);
-        },
-        OnForbidden = async context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            context.Response.ContentType = "application/json";
-            var error = new ApiErrorResponse
-            {
-                Message = "Forbidden.",
-                Errors = new List<string> { "You do not have the required permissions to access this resource." }
-            };
-            await context.Response.WriteAsJsonAsync(error);
-        }
-    };
 });
 
-// 5. Role-Based Authorization Policies
+// 5. Authorization Policies
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
@@ -97,21 +68,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireClientRole", policy => policy.RequireRole("Admin", "Consultant", "Client"));
 });
 
-// 6. Native ASP.NET Core Rate Limiting Middleware (Partitioned per Client IP)
+// 6. Rate Limiting
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.OnRejected = async (context, cancellationToken) =>
-    {
-        context.HttpContext.Response.ContentType = "application/json";
-        await context.HttpContext.Response.WriteAsJsonAsync(new ApiErrorResponse
-        {
-            Message = "Too many requests.",
-            Errors = new List<string> { "Rate limit exceeded. Please wait before making more requests." }
-        }, cancellationToken);
-    };
-
-    // Strict limit: 5 requests per minute per IP for login and password reset
     options.AddPolicy("auth-strict", httpContext =>
     {
         var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "global-auth";
@@ -122,78 +82,38 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0
         });
     });
-
-    // Sliding window limit: 60 requests per minute per IP for general API stability
-    options.AddPolicy("sliding-general", httpContext =>
-    {
-        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "global-api";
-        return RateLimitPartition.GetSlidingWindowLimiter(ip, _ => new SlidingWindowRateLimiterOptions
-        {
-            PermitLimit = 60,
-            Window = TimeSpan.FromMinutes(1),
-            SegmentsPerWindow = 6,
-            QueueLimit = 2
-        });
-    });
 });
 
-// 7. CORS Policy (Unblocks Riaad's Vite 5173 and CRA 3000)
+// 7. CORS Policy
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
         policy.WithOrigins("http://localhost:3000", "http://localhost:5173")
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials();
-    });
+              .AllowCredentials());
 });
 
-// 8. Add Controllers & String Enum Serialization
+// 8. Controllers & JSON
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
+// 9. Swagger (Simplified & Error-Free)
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Strategies Migration Platform API",
-        Version = "v1"
-    });
-
-// Marco's Core Services ONLY
-builder.Services.AddHttpClient<IAgentService, GeminiAgentService>();
-builder.Services.AddScoped<CaseManagementService>();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 9. Security Headers
-app.UseSecurityHeaders();
-
-// 10. Enable Swagger UI in Development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Strategies Migration Platform API v1");
-    });
+    app.UseSwaggerUI();
 }
 
-// 11. CORS must be before Authentication & Authorization
 app.UseCors("AllowFrontend");
-
-// 12. Rate Limiting Middleware
 app.UseRateLimiter();
-
-// 13. Authentication & Authorization Middleware
 app.UseAuthentication();
 app.UseAuthorization();
-
-// 14. Map Controller Routes
 app.MapControllers();
 
 app.Run();
