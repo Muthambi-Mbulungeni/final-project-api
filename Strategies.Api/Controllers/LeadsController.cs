@@ -8,6 +8,7 @@ using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
 using Strategies.Api.DTOs;
+using Strategies.Api.Services;
 
 namespace Strategies.Api.Controllers
 {
