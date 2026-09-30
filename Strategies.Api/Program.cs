@@ -28,6 +28,7 @@ builder.Services.AddSingleton<IPasswordHasherService, PasswordHasherService>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddSingleton<IRefreshTokenStore, InMemoryRefreshTokenStore>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
 // 3. Core Domain & AI Services (Marco - Single clean registration, no duplicates)
 builder.Services.AddHttpClient<IAgentService, GeminiAgentService>();
