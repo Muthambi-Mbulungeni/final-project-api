@@ -250,7 +250,7 @@ export default function DataTable({
                   value={search}
                   onChange={handleSearch}
                   placeholder={searchPlaceholder}
-                  className={`${CONTROL_CLASSES} py-2 pr-3 pl-9 placeholder:text-stone-400`}
+                  className={`${CONTROL_CLASSES} py-2 pr-3 pl-9 placeholder:text-stone-500`}
                 />
               </label>
             )}

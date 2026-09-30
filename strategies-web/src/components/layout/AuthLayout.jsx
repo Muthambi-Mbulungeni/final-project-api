@@ -27,7 +27,7 @@ export default function AuthLayout({ children, wide = false }) {
         </div>
       </main>
 
-      <footer className="pb-6 text-center text-xs text-stone-400">© {year} Strategies Migration Services</footer>
+      <footer className="pb-6 text-center text-xs text-stone-500">© {year} Strategies Migration Services</footer>
     </div>
   )
 }

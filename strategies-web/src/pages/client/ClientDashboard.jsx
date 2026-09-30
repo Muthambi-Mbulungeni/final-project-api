@@ -45,7 +45,7 @@ function StageMarker({ index, state }) {
   }
 
   return (
-    <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border border-stone-300 bg-white text-xs font-semibold text-stone-400">
+    <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border border-stone-300 bg-white text-xs font-semibold text-stone-500">
       {index + 1}
     </span>
   )
@@ -124,13 +124,13 @@ export default function ClientDashboard() {
                           ? 'font-semibold text-stone-900'
                           : state === 'done'
                             ? 'font-medium text-stone-700'
-                            : 'font-medium text-stone-400'
+                            : 'font-medium text-stone-500'
                       }`}
                     >
                       {stage.label}
                       <StageLabel state={state} />
                     </p>
-                    <p className={`mt-0.5 text-xs ${state === 'upcoming' ? 'text-stone-400' : 'text-stone-500'}`}>
+                    <p className={`mt-0.5 text-xs ${state === 'upcoming' ? 'text-stone-500' : 'text-stone-600'}`}>
                       {stage.clientHint}
                     </p>
                   </div>

@@ -118,7 +118,7 @@ export default function Login() {
               onClick={() => setShowPassword((current) => !current)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
               aria-pressed={showPassword}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-stone-400 hover:text-stone-700"
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-stone-500 hover:text-stone-700"
             >
               {showPassword ? (
                 <EyeOff className="size-4" strokeWidth={1.75} aria-hidden="true" />
