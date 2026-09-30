@@ -19,7 +19,12 @@ export class ApiError extends Error {
   }
 }
 
-const UNREACHABLE_MESSAGE = 'The server could not be reached. Check that the API is running and try again.'
+// Developers get a hint about the API; clients and staff get plain language.
+function unreachableMessage() {
+  return import.meta.env.DEV
+    ? 'The server could not be reached. Check that the API is running and try again.'
+    : 'We cannot reach the service right now. Please try again shortly.'
+}
 const SERVER_ERROR_MESSAGE = 'Something went wrong on our side. Please try again in a moment.'
 const REFRESH_PATH = '/api/auth/refresh'
 
@@ -43,7 +48,7 @@ async function readBody(response) {
 
 function toApiError(response, body) {
   // 502, 503 and 504 come from the gateway in front of the API: the API itself did not answer.
-  if ([502, 503, 504].includes(response.status)) return new ApiError(UNREACHABLE_MESSAGE, { status: response.status })
+  if ([502, 503, 504].includes(response.status)) return new ApiError(unreachableMessage(), { status: response.status })
   if (response.status >= 500 && (body === null || typeof body !== 'object')) {
     return new ApiError(SERVER_ERROR_MESSAGE, { status: response.status })
   }
@@ -64,7 +69,7 @@ async function send(path, options) {
     return await fetch(path, options)
   } catch (error) {
     if (error.name === 'AbortError') throw error
-    throw new ApiError(UNREACHABLE_MESSAGE)
+    throw new ApiError(unreachableMessage())
   }
 }
 

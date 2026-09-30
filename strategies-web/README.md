@@ -125,7 +125,7 @@ The portal holds no secrets. Variables without the `VITE_` prefix are never incl
 ## How the portal talks to the API
 
 - All calls use relative `/api/...` paths. The dev server forwards them to the API. In production, the host forwards them (see [Deployment](#deployment)).
-- Error handling maps status codes to plain-language messages, for example 401 (incorrect details), 403 (inactive account), 429 (too many attempts). The public enquiry form never shows technical errors to visitors.
+- Error handling maps status codes to plain-language messages: 401 (incorrect details), 403 (inactive account), 429 (too many attempts), 500 (a problem on the server), and 502, 503, 504 or no response (the service cannot be reached). In development the dev proxy answers 502 when the API is not running, as a production gateway would. Production builds never mention the API in messages, and the public enquiry form never shows technical errors.
 - List endpoints may return a plain array or a paginated wrapper `{ data, totalRecords, totalPages, currentPage }`. `src/lib/listData.js` accepts both.
 - Enums are accepted as text (`"UnderReview"`) or numbers (`2`), so the portal works whether or not the API serialises enums as strings.
 - Dashboard figures are counted from the same list endpoints the tables use, so a tile can never disagree with the list beneath it.
@@ -172,7 +172,7 @@ Login, ForgotPassword, EnquiryPage, NotFound
 
 ## Quality
 
-- **Tests:** 96 Vitest tests in 13 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
+- **Tests:** 104 Vitest tests in 13 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
 - **Linting:** `npm run lint` passes with no warnings.
 - **Accessibility:**
   - labelled form fields with linked error messages
@@ -185,21 +185,50 @@ Login, ForgotPassword, EnquiryPage, NotFound
 
 ## Authentication and sessions
 
-Sign-in uses the API's JWT tokens. Where each token lives was chosen with POPIA in mind, because the system holds passports and ID documents.
+Sign-in uses the API's JWT access and refresh tokens (`/api/auth/login`, `/refresh` and `/revoke`).
+
+### How tokens are stored today
 
 | Token | Where it lives | Why |
 |---|---|---|
 | Access token (60 minutes) | Memory only | Never written to storage, so it cannot be copied out of the browser later. |
-| Refresh token (rotating) | `httpOnly`, `Secure`, `SameSite=Strict` cookie on `/api/auth`, set by the API | JavaScript cannot read it at all, including any injected script. |
+| Refresh token (rotating) | `sessionStorage`, this tab only | The API currently returns it in the response body. `sessionStorage` is cleared when the tab closes and is not shared with other tabs. |
 
-- **Staying signed in:** on page load or in a new tab the portal silently calls `/api/auth/refresh`. The browser sends the cookie, so the user carries on without signing in again. The cookie has no expiry date, so closing the browser ends the session, which matters on shared computers.
+- **Staying signed in:** on page load the portal silently calls `/api/auth/refresh`, so a reload keeps the user signed in. A new tab asks the user to sign in again, because each tab keeps its own session. That is a deliberate trade-off: nothing outlives the tab.
 - **Expired access tokens:** a request that gets a 401 refreshes once and is retried. Refresh tokens rotate (each works once), so requests that fail at the same moment share one refresh call. If the refresh fails, the user returns to sign-in with an explanation and is taken back to the page they were on afterwards.
 - **Returning to a page after sign-in** only happens inside the user's own workspace, which prevents open redirects.
 - **Signing out** calls `/api/auth/revoke`, so the refresh token also stops working on the server.
 - **Inactivity:** staff workspaces sign out after 30 minutes without activity, because they show many clients' personal documents.
-- **Fallback:** if the API returns the refresh token in the response body instead of a cookie, the portal keeps it in `sessionStorage` (this tab only, cleared when it closes). The portal detects this automatically.
-- **Honest limit:** no browser storage defeats injected script completely. With this design, an attacker could act only while the page is open and could not take away a reusable credential.
-- **Mobile (agreed contract):** the Android app sends `X-Client-Type: mobile` and receives the refresh token in the response body, because apps cannot use browser cookies.
+- **Development sessions** (the role switcher) are ignored by production builds, not just hidden.
+
+### Recommended upgrade: httpOnly cookie (supported by the portal, not yet enabled on the API)
+
+`sessionStorage` can be read by any script running on the page. If malicious script were ever injected (for example through a compromised dependency), it could copy the refresh token and use it elsewhere until it expires. For a system that holds passports and ID documents (POPIA section 19), the stronger design is for the API to set the refresh token as an `httpOnly`, `Secure`, `SameSite=Strict` cookie scoped to `/api/auth`. JavaScript cannot read such a cookie at all, and new tabs can sign in silently.
+
+The portal already supports this: when a login or refresh response contains no `refreshToken`, it relies on the cookie automatically, with no web change needed. The API change is to set, read and clear the cookie for web requests, while keeping the body-based tokens for the mobile app.
+
+No browser storage defeats injected script completely. With the cookie design, an attacker could act only while the page is open and could not take away a reusable credential.
+
+### Verified end to end
+
+Tested against the team's API on 30 September 2026:
+- sign-in for all three roles, each landing in its own workspace
+- silent restore on reload
+- `401 → /refresh → retry` after the access token expired (tested with 1-minute tokens)
+- `/revoke` on sign-out, with the stored token removed
+- the wrong-password message
+
+The results and screenshots are in the project's test evidence.
+
+### Development accounts
+
+Seeded by the API for local testing only. Never use them in production.
+
+| Role | Email | Password |
+|---|---|---|
+| Administrator | `admin@nexus.com` | `AdminPassword123!` |
+| Consultant | `consultant@nexus.com` | `ConsultantPassword123!` |
+| Client | `client@nexus.com` | `ClientPassword123!` |
 
 ## Security and privacy
 
@@ -218,8 +247,8 @@ Sign-in uses the API's JWT tokens. Where each token lives was chosen with POPIA 
 
 ## Current status
 
-- The portal runs end to end against the API's mock contracts. No database is required for a demo.
-- The sign-in flow described above is built and unit-tested against the agreed contract (`/api/auth/login`, `/refresh`, `/revoke`). It connects to the real endpoints once the API's `AuthController` is merged. Until then, the development role switcher opens each workspace, in development builds only.
+- Sign-in, token refresh and sign-out work against the real API (see "Verified end to end" above).
+- The data screens (leads, cases, users, audit log, notifications) need the hosted PostgreSQL database. Until it is connected, they show their error states. The API's mock contracts still run every screen end to end with sample data, using the development role switcher.
 - Modules not yet built (documents, messages, profile, reports) are hidden from navigation. Visiting their URL directly shows a neutral placeholder.
 
 ## Contributing

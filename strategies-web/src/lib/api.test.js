@@ -189,3 +189,25 @@ describe('gateway errors', () => {
     }
   })
 })
+
+describe('unreachable message in production builds', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it('does not mention the API to clients and staff', async () => {
+    vi.stubEnv('DEV', false)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    const error = await apiGet('/api/cases').catch((caught) => caught)
+
+    expect(error.message).toBe('We cannot reach the service right now. Please try again shortly.')
+    expect(error.message).not.toMatch(/API/)
+  })
+})
