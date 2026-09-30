@@ -100,9 +100,8 @@ namespace Strategies.Api.Controllers
 
         [HttpGet("client/{clientId}")]
         [Authorize(Roles = "Admin,Consultant,Client")]
-        public async Task<IActionResult> GetClientCases(Guid clientId)
+        public async Task<IActionResult> GetClientCases(Guid clientId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
-            // Strict check: If user is a Client, they can only view their own cases
             if (User.IsInRole("Client"))
             {
                 var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -112,28 +111,30 @@ namespace Strategies.Api.Controllers
                 }
             }
 
-            var cases = await _context.Cases
-                .Where(c => c.ClientId == clientId)
+            var query = _context.Cases.Where(c => c.ClientId == clientId);
+            var totalRecords = await query.CountAsync();
+            var cases = await query
+                .OrderByDescending(c => c.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .Select(c => new CaseDto
                 {
                     Id = c.Id,
                     ClientId = c.ClientId,
                     Stage = c.Stage.ToString(),
-                    CreatedAt = c.CreatedAt
+                    IsArchived = c.IsArchived,
+                    CreatedAt = c.CreatedAt,
+                    LastUpdated = c.UpdatedAt
                 })
                 .ToListAsync();
 
-            return Ok(new PagedResponse<CaseDto> { Data = cases, TotalRecords = cases.Count, TotalPages = 1, CurrentPage = 1 });
-        }
-
-        [HttpGet("export")]
-        [Authorize(Roles = "Admin,Consultant")]
-        public IActionResult ExportCases([FromQuery] string format = "csv")
-        {
-            if (format.ToLower() == "csv")
-                return File(System.Text.Encoding.UTF8.GetBytes("Id,ClientName,Stage\n11111111-1111-1111-1111-111111111111,John Doe,UnderReview\n"), "text/csv", "cases.csv");
-
-            return BadRequest(new ApiErrorResponse { Message = "Format not supported", Errors = new List<string> { "Only CSV is currently supported." } });
+            return Ok(new PagedResponse<CaseDto>
+            {
+                Data = cases,
+                TotalRecords = totalRecords,
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage = page
+            });
         }
     }
 }

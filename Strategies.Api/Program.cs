@@ -34,7 +34,9 @@ builder.Services.AddHttpClient<IAgentService, GeminiAgentService>();
 builder.Services.AddScoped<CaseManagementService>();
 
 // 4. JWT Authentication
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "StrategiesMigrationPlatform_SuperSecretKey_2026_WIL_Section10_Token_Security!";
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException("Jwt:Key is not configured. Set it via .NET User Secrets or environment variables.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "StrategiesApi";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "StrategiesClients";
 
@@ -45,7 +47,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = false;
+    options.RequireHttpsMetadata = !app.Environment.IsDevelopment();
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -111,6 +113,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFrontend");
+app.UseSecurityHeaders();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
