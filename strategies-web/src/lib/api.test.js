@@ -144,3 +144,48 @@ describe('authorised requests', () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ refreshToken: 'refresh-1' })
   })
 })
+
+describe('error messages', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('says the server had a problem, not that it was unreachable, when it answers 500', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>stack trace</html>', { status: 500 })))
+
+    await expect(apiGet('/api/cases')).rejects.toMatchObject({
+      status: 500,
+      message: 'Something went wrong on our side. Please try again in a moment.',
+    })
+  })
+
+  it('says the server could not be reached when there is no response at all', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    await expect(apiGet('/api/cases')).rejects.toMatchObject({
+      status: 0,
+      message: expect.stringContaining('could not be reached'),
+    })
+  })
+})
+
+describe('gateway errors', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('says the server could not be reached when the gateway answers 502, 503 or 504', async () => {
+    for (const status of [502, 503, 504]) {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('{"message":"The API is not reachable."}', { status })))
+      await expect(apiGet('/api/cases')).rejects.toMatchObject({
+        status,
+        message: expect.stringContaining('could not be reached'),
+      })
+    }
+  })
+})

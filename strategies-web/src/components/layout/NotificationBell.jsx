@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Bell } from 'lucide-react'
 import RequestState from '../ui/RequestState'
 import { apiPatch } from '../../lib/api'
-import { formatDate } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 import { listItems } from '../../lib/listData'
-import { isUnread, unreadCountLabel } from '../../lib/notifications'
+import { isUnread, notificationDate, notificationText, unreadCountLabel, unreadTotal } from '../../lib/notifications'
 import { useApi } from '../../lib/useApi'
 
 export default function NotificationBell() {
@@ -16,7 +16,8 @@ export default function NotificationBell() {
   const request = useApi('/api/notifications')
   const notifications = listItems(request.data)
   const unread = notifications.filter((notification) => isUnread(notification, readIds))
-  const countLabel = unreadCountLabel(unread.length)
+  const unreadCount = unreadTotal(request.data?.unreadCount, notifications, readIds)
+  const countLabel = unreadCountLabel(unreadCount)
 
   useEffect(() => {
     if (!open) return undefined
@@ -69,7 +70,7 @@ export default function NotificationBell() {
         onClick={toggleOpen}
         aria-haspopup="true"
         aria-expanded={open}
-        aria-label={unread.length > 0 ? `Notifications, ${unread.length} unread` : 'Notifications'}
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         className="relative rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900"
       >
         <Bell className="size-5" strokeWidth={1.75} aria-hidden="true" />
@@ -110,7 +111,7 @@ export default function NotificationBell() {
               request={request}
               isEmpty={notifications.length === 0}
               emptyTitle="You're all caught up"
-              emptyMessage="New notifications appear here."
+              emptyMessage="Messages about your cases appear here."
               loadingText="Loading notifications…"
             >
               <ul className="divide-y divide-stone-100">
@@ -131,9 +132,11 @@ export default function NotificationBell() {
                         />
                         <span className="min-w-0 flex-1">
                           <span className={`block text-sm ${unreadItem ? 'font-medium text-stone-900' : 'text-stone-600'}`}>
-                            {notification.message}
+                            {notificationText(notification) || 'New message on your case'}
                           </span>
-                          <span className="mt-0.5 block text-xs text-stone-500">{formatDate(notification.createdAt)}</span>
+                          <span className="mt-0.5 block text-xs text-stone-500 tabular-nums">
+                            {formatDateTime(notificationDate(notification))}
+                          </span>
                         </span>
                       </button>
                     </li>

@@ -16,6 +16,16 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: apiTarget,
           changeOrigin: true,
+          // When the API is not running, answer 502 Bad Gateway, as a production gateway would,
+          // so the portal can say "could not be reached" instead of "something went wrong".
+          configure: (proxy) => {
+            proxy.on('error', (_error, _request, response) => {
+              if (response && typeof response.writeHead === 'function' && !response.headersSent) {
+                response.writeHead(502, { 'Content-Type': 'application/json' })
+                response.end(JSON.stringify({ message: 'The API is not reachable.' }))
+              }
+            })
+          },
         },
       },
     },
