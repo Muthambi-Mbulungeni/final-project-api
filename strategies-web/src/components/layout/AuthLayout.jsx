@@ -1,7 +1,8 @@
+import { Link } from 'react-router-dom'
 import logo from '../../assets/strategies-logo.png'
 
-// Centred card layout shared by the sign-in, password reset and enquiry pages.
-// `wide` gives forms with more content (like the enquiry) extra room.
+// Centred card layout shared by the sign-in, password reset, enquiry and privacy pages.
+// `wide` gives pages with more content (like the enquiry) extra room.
 export default function AuthLayout({ children, wide = false }) {
   const year = new Date().getFullYear()
 
@@ -18,7 +19,10 @@ export default function AuthLayout({ children, wide = false }) {
           </div>
 
           <p className="mt-6 text-center text-xs leading-relaxed text-stone-500">
-            Client and consultant portal. Personal information is processed in accordance with POPIA.
+            Client and consultant portal. Personal information is processed in accordance with POPIA.{' '}
+            <Link to="/privacy" className="font-medium text-stone-600 underline hover:text-stone-900">
+              Privacy notice
+            </Link>
           </p>
         </div>
       </main>

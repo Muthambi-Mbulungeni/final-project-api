@@ -319,7 +319,16 @@ export default function EnquiryPage() {
               />
               <span className="text-sm text-stone-700">
                 I agree that Strategies Migration Services may process the personal information in this form to
-                assess my enquiry, in line with POPIA.
+                assess my enquiry, in line with POPIA.{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-brand-700 underline hover:text-brand-800"
+                >
+                  Read the privacy notice
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
               </span>
             </label>
             <FieldError id="consent-error" message={errors.consent} />

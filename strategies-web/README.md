@@ -235,7 +235,7 @@ Seeded by the API for local testing only. Never use them in production.
 - **Permissions are enforced by the API.** The portal hides pages a role cannot use, which improves the experience, but every role-restricted action is checked on the server.
 - **No secrets in the browser.** AI, database and token-signing keys exist only on the server.
 - **No account enumeration.** The forgot-password page always shows the same message, whether or not the account exists.
-- **POPIA.** The enquiry form requires explicit consent before any personal information is sent, and every public page carries a privacy note.
+- **POPIA.** The enquiry form requires explicit consent before any personal information is sent, and every public page carries a privacy note. A privacy notice page (`/privacy`) explains what is collected, why, who can see it, how it is protected and which AI service screens enquiries. Details only the client can confirm (retention period, information officer, where the AI provider processes data) are clearly marked for their sign-off.
 - **The development role switcher** (the "Dev" button) renders only when `import.meta.env.DEV` is true and is removed from production builds.
 
 ## Deployment
