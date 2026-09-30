@@ -83,8 +83,8 @@ namespace Strategies.Api.Services
             };
         }
 
-        private static bool _dbConnectionChecked = false;
-        private static bool _dbAvailable = false;
+        private bool _dbConnectionChecked = false;
+        private bool _dbAvailable = false;
 
         private async Task<bool> IsDbAvailableAsync()
         {

@@ -22,7 +22,9 @@ namespace Strategies.Api.Services
         public TokenService(IConfiguration config)
         {
             _config = config;
-            var secretKey = _config["Jwt:Key"] ?? "StrategiesMigrationPlatform_SuperSecretKey_2026_WIL_Section10_Token_Security!";
+            var secretKey = _config["Jwt:Key"];
+            if (string.IsNullOrWhiteSpace(secretKey))
+                throw new InvalidOperationException("Jwt:Key is not configured. Set it via .NET User Secrets or environment variables.");
             _key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
             _issuer = _config["Jwt:Issuer"] ?? "StrategiesApi";
             _audience = _config["Jwt:Audience"] ?? "StrategiesClients";

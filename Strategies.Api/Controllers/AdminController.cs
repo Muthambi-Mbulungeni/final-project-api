@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Strategies.Api.Data;
 using Strategies.Api.Data.Models;
@@ -6,11 +7,6 @@ using Strategies.Api.DTOs;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Strategies.Api.Data;
-using Strategies.Api.DTOs;
 
 namespace Strategies.Api.Controllers
 {
