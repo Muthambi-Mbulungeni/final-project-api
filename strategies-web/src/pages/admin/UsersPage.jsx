@@ -7,17 +7,14 @@ import { useToast } from '../../components/ui/toastContext'
 import { apiPatch } from '../../lib/api'
 import { getInitials } from '../../lib/format'
 import { listItems } from '../../lib/listData'
+import { usersPath } from '../../lib/listPaths'
 import { useApi } from '../../lib/useApi'
+import { useDebouncedValue } from '../../lib/useDebouncedValue'
 
 const PAGE_SIZE = 10
 
-// Matches GET /api/admin/users in frontend-contracts.md:
-// { data: [{ id, fullName, email, role, isActive }], totalRecords, totalPages, currentPage }.
-// Supports page and pageSize. Suspending uses PATCH /api/admin/users/{id}/suspend.
-function buildUsersPath(page) {
-  const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })
-  return `/api/admin/users?${params.toString()}`
-}
+// GET /api/admin/users returns { data: [{ id, fullName, email, role, isActive }], totalRecords, totalPages, currentPage }
+// and supports page, pageSize and search (name or email). Suspending uses PATCH /api/admin/users/{id}/suspend.
 
 function displayName(user) {
   return user.fullName ?? user.name ?? 'Unnamed user'
@@ -26,15 +23,22 @@ function displayName(user) {
 export default function UsersPage() {
   const toast = useToast()
   const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
   const [suspendedIds, setSuspendedIds] = useState(() => new Set())
   const [target, setTarget] = useState(null)
   const [action, setAction] = useState({ busy: false, error: '' })
+  const search = useDebouncedValue(searchInput, 400)
 
-  const request = useApi(buildUsersPath(page))
+  const request = useApi(usersPath({ page, pageSize: PAGE_SIZE, search }))
   const response = request.data
   const users = listItems(response).map((user) =>
     suspendedIds.has(user.id) ? { ...user, isActive: false } : user,
   )
+
+  function handleSearchChange(value) {
+    setSearchInput(value)
+    setPage(1)
+  }
 
   function openSuspend(user) {
     setAction({ busy: false, error: '' })
@@ -121,7 +125,7 @@ export default function UsersPage() {
       <PageHeader
         eyebrow="Administration"
         title="Users"
-        description="View accounts and suspend access."
+        description="Find accounts by name or email, and suspend access."
       />
 
       <div className="mt-8">
@@ -132,6 +136,9 @@ export default function UsersPage() {
           loading={request.loading}
           error={request.error?.message}
           onRetry={request.reload}
+          searchPlaceholder="Search by name or email"
+          searchValue={searchInput}
+          onSearchChange={handleSearchChange}
           pagination={{
             page: response?.currentPage ?? page,
             pageSize: PAGE_SIZE,

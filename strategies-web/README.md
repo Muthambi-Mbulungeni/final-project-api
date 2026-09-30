@@ -15,7 +15,7 @@ Each role signs in to its own workspace with its own landing page, navigation an
 | **Public visitor** | Sign in / Start an enquiry | Submit a two-step enquiry with POPIA consent and receive a reference; request a password reset |
 | **Consultant** | Today's caseload | See the intake agent's results (screened, awaiting review, qualified, filtered out), work through the lead triage queue with search, filters and sorting, open any lead to see the full enquiry and the agent's verdict, email the lead, and follow their cases |
 | **Client** | My case | Follow their application through the five lifecycle stages, see what happens next, their case reference and when it was opened |
-| **Administrator** | System overview | See account, case and enquiry totals, manage users (view and suspend with confirmation), browse and export cases to CSV, and read the audit log |
+| **Administrator** | System overview | See account, case and enquiry totals, manage users (search by name or email, view, and suspend with confirmation), browse cases by search and lifecycle stage, export cases to CSV, and read the audit log |
 
 Every workspace also has breadcrumbs, a notification bell with unread count and mark-as-read, toasts for completed actions, and loading, empty and error states with a retry option.
 
@@ -140,10 +140,10 @@ Endpoints the portal uses:
 | POST | `/api/auth/forgot-password` | Forgot password |
 | POST | `/api/leads` | Public enquiry form |
 | GET | `/api/leads?page=&pageSize=&search=&status=` | Lead triage (paged on the server, newest first); intake counts use `pageSize=1` per status and read `totalRecords` |
-| GET | `/api/cases?page=&pageSize=&search=` | Cases pages; overviews |
+| GET | `/api/cases?page=&pageSize=&search=&stage=` | Cases pages; overviews |
 | GET | `/api/cases/export?format=csv` | Export CSV |
 | GET | `/api/cases/client/{clientId}` | Client overview |
-| GET | `/api/admin/users?page=&pageSize=` | Users page; admin overview |
+| GET | `/api/admin/users?page=&pageSize=&search=` | Users page; admin overview |
 | PATCH | `/api/admin/users/{id}/suspend` | Suspend user |
 | GET | `/api/admin/audit-logs` | Audit log; admin overview |
 
@@ -172,7 +172,7 @@ Login, ForgotPassword, EnquiryPage, NotFound
 
 ## Quality
 
-- **Tests:** 107 Vitest tests in 13 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
+- **Tests:** 109 Vitest tests in 14 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
 - **Linting:** `npm run lint` passes with no warnings.
 - **Accessibility:**
   - labelled form fields with linked error messages

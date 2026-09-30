@@ -5,18 +5,19 @@ import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { useToast } from '../../components/ui/toastContext'
+import { enumFilter } from '../../config/enums'
 import { apiDownload } from '../../lib/api'
 import { formatDate } from '../../lib/format'
 import { listItems } from '../../lib/listData'
+import { casesPath } from '../../lib/listPaths'
 import { useApi } from '../../lib/useApi'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
 
 const PAGE_SIZE = 10
 const EXPORT_PATH = '/api/cases/export?format=csv'
 
-// Matches GET /api/cases in frontend-contracts.md:
-// { id, clientName, visaCategoryName, stage, isArchived, createdAt, lastUpdated }.
-// Supports page, pageSize and search. Sort and stage filter parameters are planned in the API.
+// GET /api/cases returns { data: [{ id, clientName, visaCategoryName, stage, isArchived, createdAt, lastUpdated }],
+// totalRecords, totalPages, currentPage } and supports page, pageSize, search and stage.
 const COLUMNS = [
   {
     key: 'clientName',
@@ -54,26 +55,28 @@ const COLUMNS = [
   },
 ]
 
-function buildCasesPath(page, search) {
-  const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })
-  const term = search.trim()
-  if (term) params.set('search', term)
-  return `/api/cases?${params.toString()}`
-}
+// The stage filter is sent to the API, which filters across every page.
+const FILTERS = [enumFilter('caseStage', 'stage', 'Stage')]
 
 function CasesPage({ eyebrow, title, description }) {
   const toast = useToast()
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
+  const [stage, setStage] = useState('')
   const [exportState, setExportState] = useState({ busy: false, error: null })
   const search = useDebouncedValue(searchInput, 400)
 
-  const request = useApi(buildCasesPath(page, search))
+  const request = useApi(casesPath({ page, pageSize: PAGE_SIZE, search, stage }))
   const response = request.data
   const rows = listItems(response)
 
   function handleSearchChange(value) {
     setSearchInput(value)
+    setPage(1)
+  }
+
+  function handleFiltersChange(filters) {
+    setStage(filters.stage ?? '')
     setPage(1)
   }
 
@@ -102,11 +105,7 @@ function CasesPage({ eyebrow, title, description }) {
 
   return (
     <>
-      <PageHeader
-        eyebrow={eyebrow}
-        title={title}
-        description={description}
-      />
+      <PageHeader eyebrow={eyebrow} title={title} description={description} />
 
       {exportState.error && (
         <ErrorNotice
@@ -124,9 +123,11 @@ function CasesPage({ eyebrow, title, description }) {
           loading={request.loading}
           error={request.error?.message}
           onRetry={request.reload}
-          searchPlaceholder="Search cases"
+          searchPlaceholder="Search by client or visa"
           searchValue={searchInput}
           onSearchChange={handleSearchChange}
+          filters={FILTERS}
+          onFiltersChange={handleFiltersChange}
           actions={exportButton}
           pagination={{
             page: response?.currentPage ?? page,
