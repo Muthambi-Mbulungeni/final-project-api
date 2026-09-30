@@ -139,7 +139,7 @@ Endpoints the portal uses:
 | POST | `/api/auth/revoke` | Sign out |
 | POST | `/api/auth/forgot-password` | Forgot password |
 | POST | `/api/leads` | Public enquiry form |
-| GET | `/api/leads` | Consultant overview and lead triage; admin overview |
+| GET | `/api/leads?page=&pageSize=&search=&status=` | Lead triage (paged on the server, newest first); intake counts use `pageSize=1` per status and read `totalRecords` |
 | GET | `/api/cases?page=&pageSize=&search=` | Cases pages; overviews |
 | GET | `/api/cases/export?format=csv` | Export CSV |
 | GET | `/api/cases/client/{clientId}` | Client overview |
@@ -172,7 +172,7 @@ Login, ForgotPassword, EnquiryPage, NotFound
 
 ## Quality
 
-- **Tests:** 104 Vitest tests in 13 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
+- **Tests:** 107 Vitest tests in 13 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
 - **Linting:** `npm run lint` passes with no warnings.
 - **Accessibility:**
   - labelled form fields with linked error messages

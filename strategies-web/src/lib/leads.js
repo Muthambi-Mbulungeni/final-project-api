@@ -13,7 +13,7 @@ export function isAwaitingReview(lead) {
   return AWAITING_REVIEW.includes(triageValue(lead))
 }
 
-// Counts leads by triage outcome. Accepts the enum as text or as its number.
+// Counts leads by triage outcome in a loaded list. Accepts the enum as text or as its number.
 export function summariseLeads(leads = []) {
   const summary = { total: leads.length, awaiting: 0, qualified: 0, unqualified: 0 }
 
@@ -32,17 +32,48 @@ export function percentOf(part, total) {
   return Math.round((part / total) * 100)
 }
 
+// One page of leads. The API pages, searches (name or email) and filters by status itself,
+// always newest first.
+export function leadsPath({ page = 1, pageSize = 10, search = '', status = '' } = {}) {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  const term = search.trim()
+  if (term) params.set('search', term)
+  if (status) params.set('status', status)
+  return `/api/leads?${params.toString()}`
+}
+
+// How many leads have a status. The API answers a one-row page with totalRecords.
+// The mock API returns every lead as a plain array, so those are counted here instead.
+export function countFromLeadsResponse(body, status) {
+  if (Array.isArray(body)) return body.filter((lead) => triageValue(lead) === status).length
+  if (typeof body?.totalRecords === 'number') return body.totalRecords
+  return null
+}
+
+// The intake funnel from one count per status. The four statuses cover every lead,
+// so their sum is the total. Returns null until every count is known.
+export function summaryFromCounts({ Pending, NeedsReview, Qualified, Unqualified }) {
+  const counts = [Pending, NeedsReview, Qualified, Unqualified]
+  if (counts.some((count) => typeof count !== 'number')) return null
+  return {
+    total: Pending + NeedsReview + Qualified + Unqualified,
+    awaiting: Pending + NeedsReview,
+    qualified: Qualified,
+    unqualified: Unqualified,
+  }
+}
+
 // What each triage outcome means in the consultant's workflow.
-// The API sets Qualified when the agent succeeds and Pending otherwise,
+// The API marks a lead Qualified when the agent succeeds and NeedsReview otherwise,
 // including when the AI service is unavailable (the fallback path).
 const VERDICTS = {
-  Pending: {
+  NeedsReview: {
     title: 'Waiting for your review',
     body: 'The intake agent could not qualify this enquiry automatically, or was unavailable when it arrived, so it has been routed to a consultant.',
   },
-  NeedsReview: {
-    title: 'Flagged for review',
-    body: 'The intake agent flagged details in this enquiry that need a consultant’s judgement.',
+  Pending: {
+    title: 'Not yet screened',
+    body: 'The intake agent has not recorded a verdict for this enquiry yet, so it is waiting for a consultant.',
   },
   Qualified: {
     title: 'Qualified by the intake agent',

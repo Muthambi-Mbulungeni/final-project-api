@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  countFromLeadsResponse,
   enquiryMailto,
   isAwaitingReview,
+  leadsPath,
   percentOf,
   startTimingLabel,
   summariseLeads,
+  summaryFromCounts,
   verdictExplanation,
 } from './leads'
 
@@ -51,12 +54,46 @@ describe('percentOf', () => {
   })
 })
 
+describe('leadsPath', () => {
+  it('asks the API for one page, with optional search and status', () => {
+    expect(leadsPath()).toBe('/api/leads?page=1&pageSize=10')
+    expect(leadsPath({ page: 2, pageSize: 10, search: '  jo ', status: 'NeedsReview' })).toBe(
+      '/api/leads?page=2&pageSize=10&search=jo&status=NeedsReview',
+    )
+  })
+})
+
+describe('countFromLeadsResponse', () => {
+  it('reads totalRecords from the API and counts a plain array from the mock', () => {
+    expect(countFromLeadsResponse({ data: [], totalRecords: 37 }, 'Qualified')).toBe(37)
+    expect(
+      countFromLeadsResponse(
+        [{ triageStatus: 'Qualified' }, { triageStatus: 1 }, { triageStatus: 'NeedsReview' }],
+        'Qualified',
+      ),
+    ).toBe(2)
+    expect(countFromLeadsResponse(null, 'Qualified')).toBeNull()
+  })
+})
+
+describe('summaryFromCounts', () => {
+  it('builds the intake funnel once every status has been counted', () => {
+    expect(summaryFromCounts({ Pending: 2, NeedsReview: 3, Qualified: 10, Unqualified: 25 })).toEqual({
+      total: 40,
+      awaiting: 5,
+      qualified: 10,
+      unqualified: 25,
+    })
+    expect(summaryFromCounts({ Pending: 2, NeedsReview: null, Qualified: 10, Unqualified: 25 })).toBeNull()
+  })
+})
+
 describe('verdictExplanation', () => {
   it('explains each triage outcome, from text or numeric enums', () => {
-    expect(verdictExplanation({ triageStatus: 'Pending' }).title).toBe('Waiting for your review')
+    expect(verdictExplanation({ triageStatus: 'NeedsReview' }).title).toBe('Waiting for your review')
+    expect(verdictExplanation({ triageStatus: 'Pending' }).title).toBe('Not yet screened')
     expect(verdictExplanation({ triageStatus: 1 }).title).toBe('Qualified by the intake agent')
     expect(verdictExplanation({ triageStatus: 'Unqualified' }).title).toBe('Filtered out by the intake agent')
-    expect(verdictExplanation({ triageStatus: 'NeedsReview' }).title).toBe('Flagged for review')
   })
 
   it('falls back when no verdict is recorded', () => {

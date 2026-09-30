@@ -29,7 +29,8 @@ function LoadingRows({ columnCount }) {
 // - Client mode (default): the table searches, filters, sorts and paginates `rows` itself.
 // - Server mode: pass `pagination` (and optionally `onSearchChange`/`searchValue`) and the
 //   API does the paging and searching; `rows` is treated as the current page only.
-//   In server mode, only offer sorting or filters the API itself supports.
+//   In server mode, only offer sorting or filters the API itself supports, and pass
+//   `onFiltersChange` so the page can send the selected filters to the API.
 // Optional `onRowClick(row)` makes each row clickable. For keyboard users, also render a
 // real button inside the row (e.g. on the name) that does the same thing.
 //
@@ -45,6 +46,7 @@ export default function DataTable({
   searchValue,
   onSearchChange,
   filters = [],
+  onFiltersChange,
   initialSort = null,
   pageSize = 10,
   pagination = null,
@@ -111,7 +113,9 @@ export default function DataTable({
   }
 
   function handleFilter(key, value) {
-    setActiveFilters((previous) => ({ ...previous, [key]: value }))
+    const next = { ...activeFilters, [key]: value }
+    setActiveFilters(next)
+    onFiltersChange?.(next)
     resetLocalPage()
   }
 
@@ -128,6 +132,7 @@ export default function DataTable({
     if (isServerSearch) onSearchChange('')
     else setLocalSearch('')
     setActiveFilters({})
+    onFiltersChange?.({})
     resetLocalPage()
   }
 
@@ -186,7 +191,7 @@ export default function DataTable({
             )}
           </div>
 
-          {actions && <div className="flex shrink-0 gap-2">{actions}</div>}
+          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>
       )}
 

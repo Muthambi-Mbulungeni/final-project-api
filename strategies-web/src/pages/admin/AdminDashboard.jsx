@@ -6,9 +6,9 @@ import RequestState from '../../components/ui/RequestState'
 import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { formatDateTime, getInitials } from '../../lib/format'
-import { summariseLeads } from '../../lib/leads'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
+import { useLeadSummary } from '../../lib/useLeadSummary'
 
 const LIST_LIMIT = 5
 
@@ -26,11 +26,11 @@ function totalOf(request) {
 export default function AdminDashboard() {
   const users = useApi(`/api/admin/users?page=1&pageSize=${LIST_LIMIT}`)
   const cases = useApi('/api/cases?page=1&pageSize=1')
-  const leads = useApi('/api/leads')
   const auditLogs = useApi('/api/admin/audit-logs')
+  const leadSummary = useLeadSummary()
 
   // When every request fails (e.g. the API is down), show one banner instead of several.
-  const requests = [users, cases, leads, auditLogs]
+  const requests = [users, cases, auditLogs, leadSummary]
   const allFailed = requests.every((request) => request.error)
 
   function retryAll() {
@@ -39,11 +39,10 @@ export default function AdminDashboard() {
 
   const auditEntries = listItems(auditLogs.data).slice(0, LIST_LIMIT)
   const recentUsers = listItems(users.data).slice(0, LIST_LIMIT)
-  const awaitingReview = summariseLeads(listItems(leads.data)).awaiting
+  const summary = leadSummary.summary
 
   const userTotal = totalOf(users)
   const caseTotal = totalOf(cases)
-  const leadTotal = totalOf(leads)
 
   // Figures come from the same list endpoints the admin pages use, so they match what those pages show.
   const tiles = [
@@ -63,9 +62,9 @@ export default function AdminDashboard() {
     },
     {
       label: 'Enquiries received',
-      value: leadTotal,
-      hint: hasValue(leadTotal) ? `${awaitingReview} awaiting consultant review` : undefined,
-      loading: leads.loading,
+      value: summary?.total ?? null,
+      hint: summary ? `${summary.awaiting} awaiting consultant review` : undefined,
+      loading: leadSummary.loading && !summary,
     },
   ]
 
