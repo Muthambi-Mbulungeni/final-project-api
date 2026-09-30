@@ -7,11 +7,19 @@ import { listItems } from '../../lib/listData'
 import { isUnread, notificationDate, notificationText, unreadCountLabel, unreadTotal } from '../../lib/notifications'
 import { useApi } from '../../lib/useApi'
 
+// On a phone the panel is a full-width sheet under the header (the bell is not at the
+// screen edge, so a dropdown anchored to it would run off the left side).
+// From the sm breakpoint up it is a dropdown anchored to the bell.
+const PANEL_CLASSES =
+  'fixed inset-x-3 top-[4.5rem] z-30 rounded-lg border border-stone-200 bg-white shadow-lg shadow-stone-900/10 ' +
+  'sm:absolute sm:inset-x-auto sm:top-full sm:right-0 sm:mt-2 sm:w-80 sm:shadow-md sm:shadow-stone-900/5'
+
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [readIds, setReadIds] = useState(() => new Set())
   const [actionError, setActionError] = useState('')
   const containerRef = useRef(null)
+  const buttonRef = useRef(null)
 
   const request = useApi('/api/notifications')
   const notifications = listItems(request.data)
@@ -28,8 +36,12 @@ export default function NotificationBell() {
       }
     }
 
+    // Escape closes the panel and puts focus back on the bell, so keyboard users are not lost.
     function handleKeyDown(event) {
-      if (event.key === 'Escape') setOpen(false)
+      if (event.key === 'Escape') {
+        setOpen(false)
+        buttonRef.current?.focus()
+      }
     }
 
     document.addEventListener('mousedown', handlePointerDown)
@@ -66,6 +78,7 @@ export default function NotificationBell() {
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={toggleOpen}
         aria-haspopup="true"
@@ -82,18 +95,14 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div
-          role="dialog"
-          aria-label="Notifications"
-          className="absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-stone-200 bg-white shadow-md shadow-stone-900/5"
-        >
-          <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+        <div role="dialog" aria-label="Notifications" className={PANEL_CLASSES}>
+          <div className="flex items-center justify-between gap-4 border-b border-stone-200 px-4 py-3">
             <p className="text-sm font-semibold text-stone-900">Notifications</p>
             {unread.length > 0 && (
               <button
                 type="button"
                 onClick={() => markRead(unread.map((notification) => notification.id))}
-                className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                className="text-xs font-medium whitespace-nowrap text-brand-700 hover:text-brand-800"
               >
                 Mark all as read
               </button>
@@ -106,7 +115,7 @@ export default function NotificationBell() {
             </p>
           )}
 
-          <div className="max-h-80 overflow-y-auto px-4">
+          <div className="max-h-[min(20rem,calc(100dvh-9rem))] overflow-y-auto px-4">
             <RequestState
               request={request}
               isEmpty={notifications.length === 0}

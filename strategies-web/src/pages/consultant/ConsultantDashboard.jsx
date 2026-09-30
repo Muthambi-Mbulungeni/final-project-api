@@ -96,7 +96,7 @@ export default function ConsultantDashboard() {
         </h2>
         <p className="mt-0.5 text-sm text-stone-500">Every public enquiry is screened before it reaches you.</p>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {tiles.map((tile) => (
             <StatTile
               key={tile.label}
@@ -110,11 +110,12 @@ export default function ConsultantDashboard() {
         </div>
       </section>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      {/* min-w-0 on each panel stops long, truncated text from widening the grid past the screen. */}
+      <div className="mt-8 grid gap-6 *:min-w-0 lg:grid-cols-2">
         <Panel
           title="Waiting for your review"
           action={
-            <Link to="/consultant/leads" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+            <Link to="/consultant/leads" className="text-sm font-medium whitespace-nowrap text-brand-700 hover:text-brand-800">
               View all
             </Link>
           }
@@ -137,7 +138,9 @@ export default function ConsultantDashboard() {
                       {' · '}Submitted {formatDate(lead.submittedAt)}
                     </p>
                   </div>
-                  <StatusBadge type="triageStatus" value={lead.triageStatus} />
+                  <span className="shrink-0">
+                    <StatusBadge type="triageStatus" value={lead.triageStatus} />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -147,7 +150,7 @@ export default function ConsultantDashboard() {
         <Panel
           title="Recent cases"
           action={
-            <Link to="/consultant/cases" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+            <Link to="/consultant/cases" className="text-sm font-medium whitespace-nowrap text-brand-700 hover:text-brand-800">
               View all
             </Link>
           }
@@ -170,7 +173,9 @@ export default function ConsultantDashboard() {
                       {item.lastUpdated ? ` · Updated ${formatDate(item.lastUpdated)}` : ''}
                     </p>
                   </div>
-                  <StatusBadge type="caseStage" value={item.stage} />
+                  <span className="shrink-0">
+                    <StatusBadge type="caseStage" value={item.stage} />
+                  </span>
                 </li>
               ))}
             </ul>
