@@ -73,6 +73,7 @@ function buildColumns(onOpen, sortable) {
     },
     {
       key: 'open',
+      card: false,
       header: <span className="sr-only">Details</span>,
       align: 'right',
       render: () => <ChevronRight className="inline size-4 text-stone-400" strokeWidth={1.75} aria-hidden="true" />,

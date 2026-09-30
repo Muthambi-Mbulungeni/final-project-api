@@ -107,7 +107,7 @@ export default function UsersPage() {
       align: 'right',
       render: (user) =>
         user.isActive === false ? (
-          <span className="text-xs text-stone-400">—</span>
+          null
         ) : (
           <button
             type="button"

@@ -91,10 +91,13 @@ export default function ClientDashboard() {
           emptyMessage="Your consultant will open your case once your enquiry has been reviewed."
           loadingText="Loading your application…"
         >
+          {/* Vertical on phones, horizontal from md up. The connector after each stage turns
+              brand red once that stage is complete, in both layouts. */}
           <ol className="grid gap-5 md:grid-cols-5 md:gap-4">
             {CASE_STAGES.map((stage, index) => {
               const state = stateFor(index)
               const isLast = index === CASE_STAGES.length - 1
+              const connectorColour = currentIndex !== null && index < currentIndex ? 'bg-brand-600' : 'bg-stone-200'
               return (
                 <li
                   key={stage.key}
@@ -102,15 +105,19 @@ export default function ClientDashboard() {
                   aria-current={state === 'current' ? 'step' : undefined}
                 >
                   {!isLast && (
-                    <span
-                      className={`absolute top-[13px] left-9 -right-2 hidden h-0.5 rounded-full md:block ${
-                        currentIndex !== null && index < currentIndex ? 'bg-brand-600' : 'bg-stone-200'
-                      }`}
-                      aria-hidden="true"
-                    />
+                    <>
+                      <span
+                        className={`absolute top-7 -bottom-5 left-[13px] w-0.5 rounded-full md:hidden ${connectorColour}`}
+                        aria-hidden="true"
+                      />
+                      <span
+                        className={`absolute top-[13px] left-9 -right-2 hidden h-0.5 rounded-full md:block ${connectorColour}`}
+                        aria-hidden="true"
+                      />
+                    </>
                   )}
                   <StageMarker index={index} state={state} />
-                  <div>
+                  <div className="min-w-0 pt-1 md:pt-0">
                     <p
                       className={`text-sm ${
                         state === 'current'
@@ -152,10 +159,10 @@ export default function ClientDashboard() {
             </div>
             <dl className="grid grid-cols-2 gap-4 self-start rounded-md bg-stone-50 p-4">
               {details.map((detail) => (
-                <div key={detail.label}>
+                <div key={detail.label} className="min-w-0">
                   <dt className="text-xs text-stone-500">{detail.label}</dt>
                   <dd
-                    className={`mt-0.5 text-sm font-semibold text-stone-900 ${
+                    className={`mt-0.5 text-sm font-semibold break-words text-stone-900 ${
                       detail.mono ? 'font-mono tracking-wider' : 'tabular-nums'
                     }`}
                   >

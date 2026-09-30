@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 
 // Confirmation dialog built on the native <dialog> element, which provides
 // focus handling, Escape to close and a backdrop.
+// On phones it keeps a 1rem margin each side and the two buttons share the width equally.
 export default function ConfirmDialog({
   open,
   title,
@@ -31,9 +32,9 @@ export default function ConfirmDialog({
       ref={dialogRef}
       onCancel={handleCancel}
       aria-labelledby="confirm-dialog-title"
-      className="m-auto w-full max-w-md rounded-lg border border-stone-200 bg-white p-0 text-stone-900 shadow-md shadow-stone-900/10 backdrop:bg-stone-900/40"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-stone-200 bg-white p-0 text-stone-900 shadow-md shadow-stone-900/10 backdrop:bg-stone-900/40"
     >
-      <div className="p-6">
+      <div className="p-5 sm:p-6">
         <h2 id="confirm-dialog-title" className="text-base font-semibold">
           {title}
         </h2>
@@ -45,7 +46,7 @@ export default function ConfirmDialog({
         )}
       </div>
 
-      <div className="flex justify-end gap-2 border-t border-stone-200 bg-stone-50 px-6 py-4">
+      <div className="grid grid-cols-2 gap-2 rounded-b-lg border-t border-stone-200 bg-stone-50 px-5 py-4 sm:flex sm:justify-end sm:px-6">
         <button
           type="button"
           onClick={onCancel}

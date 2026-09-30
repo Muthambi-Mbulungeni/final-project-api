@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, ChevronsUpDown, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronRight, ChevronsUpDown, Search } from 'lucide-react'
 import EmptyState from './EmptyState'
 import Pagination from './Pagination'
 import { matchesFilters, matchesSearch, paginate, sortRows } from '../../lib/table'
@@ -41,24 +41,39 @@ function cellContent(column, row) {
   return column.render ? column.render(row) : row[column.key]
 }
 
+function hasContent(content) {
+  return content !== null && content !== undefined && content !== false
+}
+
 // On a card, a column with a text header becomes a labelled detail.
 // Columns without one (row actions) sit along the bottom of the card instead.
 function hasCardLabel(column) {
   return column.key !== 'actions' && typeof column.header === 'string' && column.header.trim() !== ''
 }
 
+// A row shown as a card on phones. Columns marked `card: false` (e.g. a table-only chevron)
+// are left out; a clickable card shows its own chevron beside the heading instead.
 function RowCard({ row, columns, onRowClick }) {
-  const [primary, ...rest] = columns
+  const [primary, ...rest] = columns.filter((column) => column.card !== false)
   const details = rest.filter(hasCardLabel)
-  const trailing = rest.filter((column) => !hasCardLabel(column))
+  // Actions that render nothing for this row are dropped, so a card never ends in an empty row.
+  const trailing = rest
+    .filter((column) => !hasCardLabel(column))
+    .map((column) => ({ key: column.key, content: cellContent(column, row) }))
+    .filter((cell) => hasContent(cell.content))
 
   return (
     <li
       onClick={onRowClick ? () => onRowClick(row) : undefined}
       className={`px-4 py-4 transition-colors ${onRowClick ? 'cursor-pointer hover:bg-stone-50/70' : ''}`}
     >
-      <div className={`min-w-0 text-sm text-stone-900 ${primary.render ? '' : 'font-medium'}`}>
-        {cellContent(primary, row)}
+      <div className="flex items-start gap-3">
+        <div className={`min-w-0 flex-1 text-sm text-stone-900 ${primary.render ? '' : 'font-medium'}`}>
+          {cellContent(primary, row)}
+        </div>
+        {onRowClick && (
+          <ChevronRight className="mt-0.5 size-4 shrink-0 text-stone-400" strokeWidth={1.75} aria-hidden="true" />
+        )}
       </div>
 
       {details.length > 0 && (
@@ -74,8 +89,8 @@ function RowCard({ row, columns, onRowClick }) {
 
       {trailing.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {trailing.map((column) => (
-            <div key={column.key}>{cellContent(column, row)}</div>
+          {trailing.map((cell) => (
+            <div key={cell.key}>{cell.content}</div>
           ))}
         </div>
       )}
@@ -95,7 +110,7 @@ function RowCard({ row, columns, onRowClick }) {
 // Layout: from the md breakpoint up the rows are a table; below it each row is a card
 // (first column as the heading, the rest as labelled details), so nothing sits off-screen
 // on a phone. The switch is CSS only; the hidden layout is display:none, so screen
-// readers only meet one of them.
+// readers only meet one of them. Set `card: false` on a column to keep it table-only.
 //
 // Loading: placeholders appear only on the first load. When the page or search changes,
 // the current rows stay in place (dimmed) until the new ones arrive, so the list never grows
