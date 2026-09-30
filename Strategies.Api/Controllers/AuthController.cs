@@ -16,10 +16,12 @@ namespace Strategies.Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly IEmailService _emailService;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, IEmailService emailService)
         {
             _authService = authService;
+            _emailService = emailService;
         }
 
         /// <summary>
@@ -50,11 +52,12 @@ namespace Strategies.Api.Controllers
         }
 
         /// <summary>
-        /// POST /api/auth/refresh
+        /// POST /api/auth/refresh (or /api/auth/refresh-token)
         /// Rotates the refresh token. Old token is revoked, new pair is returned.
         /// Accepts the refresh token from the request body (for mobile compatibility).
         /// </summary>
         [HttpPost("refresh")]
+        [HttpPost("refresh-token")]
         [AllowAnonymous]
         public async Task<IActionResult> Refresh([FromBody] RevokeTokenRequest request)
         {
@@ -70,10 +73,11 @@ namespace Strategies.Api.Controllers
         }
 
         /// <summary>
-        /// POST /api/auth/revoke
+        /// POST /api/auth/revoke (or /api/auth/revoke-token)
         /// Signs the user out by revoking their refresh token.
         /// </summary>
         [HttpPost("revoke")]
+        [HttpPost("revoke-token")]
         [AllowAnonymous]
         public async Task<IActionResult> Revoke([FromBody] RevokeTokenRequest request)
         {
@@ -89,7 +93,7 @@ namespace Strategies.Api.Controllers
         /// <summary>
         /// POST /api/auth/forgot-password
         /// Always returns the same response to prevent account enumeration.
-        /// Real email delivery is pending email service integration.
+        /// Sends a password reset email if the user exists.
         /// </summary>
         [HttpPost("forgot-password")]
         [AllowAnonymous]
@@ -99,10 +103,13 @@ namespace Strategies.Api.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(new ApiErrorResponse { Message = "A valid email address is required." });
 
-            // Fire and forget — never reveal whether the account exists.
-            _ = _authService.GetUserByEmailAsync(request.Email);
+            var user = await _authService.GetUserByEmailAsync(request.Email);
+            if (user != null)
+            {
+                var resetLink = $"https://strategies.com/reset-password?email={Uri.EscapeDataString(user.Email)}";
+                await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
+            }
 
-            await Task.CompletedTask;
             return Ok(new { Message = "If an account with that email exists, a reset link has been sent." });
         }
 
