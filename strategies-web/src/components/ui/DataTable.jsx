@@ -5,7 +5,7 @@ import Pagination from './Pagination'
 import { matchesFilters, matchesSearch, paginate, sortRows } from '../../lib/table'
 
 const CONTROL_CLASSES =
-  'block w-full rounded-md border border-stone-300 bg-white text-sm text-stone-900 focus:border-stone-500 focus:ring-2 focus:ring-stone-900/10 focus:outline-none'
+  'block w-full rounded-md border border-stone-300 bg-white text-sm text-stone-900 focus:border-stone-500'
 
 function SortIcon({ direction }) {
   if (direction === 'asc') return <ArrowUp className="size-3.5" strokeWidth={2} aria-hidden="true" />

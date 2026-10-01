@@ -10,6 +10,9 @@ import { useDocumentTitle } from '../lib/useDocumentTitle'
 import { useSession } from '../lib/useSession'
 import { validateSignIn } from '../lib/validation'
 
+// Field ids in on-screen order, used to move focus to the first invalid field.
+const FIELD_ORDER = ['email', 'password']
+
 export default function Login() {
   useDocumentTitle('Sign in')
   const location = useLocation()
@@ -41,7 +44,13 @@ export default function Login() {
     event.preventDefault()
     const found = validateSignIn(values)
     setErrors(found)
-    if (Object.keys(found).length > 0) return
+
+    const firstInvalid = FIELD_ORDER.find((field) => found[field])
+    if (firstInvalid) {
+      // Keyboard and screen-reader users land on the problem, and hear its error via aria-describedby.
+      document.getElementById(firstInvalid)?.focus()
+      return
+    }
 
     setSubmitting(true)
     setFormError('')
@@ -118,7 +127,7 @@ export default function Login() {
               onClick={() => setShowPassword((current) => !current)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
               aria-pressed={showPassword}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-stone-500 hover:text-stone-700"
+              className="absolute inset-y-0 right-0 flex items-center rounded-r-md px-3 text-stone-500 hover:text-stone-700"
             >
               {showPassword ? (
                 <EyeOff className="size-4" strokeWidth={1.75} aria-hidden="true" />
@@ -127,7 +136,10 @@ export default function Login() {
               )}
             </button>
           </div>
-          {capsLockOn && <p className="mt-1.5 text-xs font-medium text-amber-700">Caps Lock is on.</p>}
+          {/* Always rendered so screen readers announce the warning when it appears (WCAG 4.1.3). */}
+          <div aria-live="polite">
+            {capsLockOn && <p className="mt-1.5 text-xs font-medium text-amber-700">Caps Lock is on.</p>}
+          </div>
           {errors.password && (
             <p id={passwordErrorId} className="mt-1.5 text-sm text-brand-700">
               {errors.password}
