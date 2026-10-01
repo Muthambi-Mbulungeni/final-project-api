@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronRight, LogOut, Menu, X } from 'lucide-react'
+import IdleWarningDialog from './IdleWarningDialog'
 import NotificationBell from './NotificationBell'
 import logo from '../../assets/strategies-logo.png'
 import { findCurrentItem, NAVIGATION, WORKSPACE_LABELS } from '../../config/navigation'
 import { signOut } from '../../lib/auth'
 import { getInitials } from '../../lib/format'
 import { ROLES } from '../../lib/session'
-import { useIdleSignOut } from '../../lib/useIdleSignOut'
+import { IDLE_WARNING_MS, STAFF_IDLE_TIMEOUT_MS, useIdleSignOut } from '../../lib/useIdleSignOut'
 import { useSession } from '../../lib/useSession'
 import { isBuilt } from '../../routes/modulePages'
 
 const APP_NAME = 'Strategies Migration Services'
+
+// Development only: VITE_IDLE_TIMEOUT_MS (e.g. 90000) shortens the timeout so the warning can be demonstrated.
+// Production builds ignore it and always use the 30-minute policy.
+const IDLE_TIMEOUT_MS = (import.meta.env.DEV && Number(import.meta.env.VITE_IDLE_TIMEOUT_MS)) || STAFF_IDLE_TIMEOUT_MS
 
 export default function AppShell({ role }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -58,7 +63,9 @@ export default function AppShell({ role }) {
 
   // Real staff sessions only: staff screens show many clients' documents.
   // Development sessions are exempt so a demo is never interrupted.
-  useIdleSignOut(session?.source === 'api' && role !== 'client', () => leave('idle'))
+  const { warningEndsAt, extend } = useIdleSignOut(session?.source === 'api' && role !== 'client', () => leave('idle'), {
+    timeoutMs: IDLE_TIMEOUT_MS,
+  })
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
@@ -191,6 +198,14 @@ export default function AppShell({ role }) {
           </div>
         </main>
       </div>
+
+      {/* Outside the inert wrapper, so the warning always works. */}
+      <IdleWarningDialog
+        endsAt={warningEndsAt}
+        warningMs={IDLE_WARNING_MS}
+        onStay={extend}
+        onSignOut={() => leave('signed-out')}
+      />
     </div>
   )
 }

@@ -57,4 +57,48 @@ describe('createIdleTimer', () => {
 
     expect(onIdle).not.toHaveBeenCalled()
   })
+
+  it('warns before signing out, passing the time the session ends', () => {
+    const onIdle = vi.fn()
+    const onWarn = vi.fn()
+    createIdleTimer(30 * MINUTE, onIdle, { warningMs: MINUTE, onWarn })
+
+    vi.advanceTimersByTime(29 * MINUTE)
+    expect(onWarn).toHaveBeenCalledTimes(1)
+    expect(onWarn).toHaveBeenCalledWith(Date.now() + MINUTE)
+    expect(onIdle).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(MINUTE)
+    expect(onIdle).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores ordinary activity once the warning is showing', () => {
+    const onIdle = vi.fn()
+    const idle = createIdleTimer(30 * MINUTE, onIdle, { warningMs: MINUTE, onWarn: vi.fn() })
+
+    vi.advanceTimersByTime(29 * MINUTE + 5000)
+    idle.touch()
+    vi.advanceTimersByTime(MINUTE - 5000)
+
+    expect(onIdle).toHaveBeenCalledTimes(1)
+  })
+
+  it('extend() restarts the full countdown, warning included', () => {
+    const onIdle = vi.fn()
+    const onWarn = vi.fn()
+    const idle = createIdleTimer(30 * MINUTE, onIdle, { warningMs: MINUTE, onWarn })
+
+    vi.advanceTimersByTime(29 * MINUTE)
+    idle.extend()
+
+    vi.advanceTimersByTime(29 * MINUTE - 1)
+    expect(onWarn).toHaveBeenCalledTimes(1)
+    expect(onIdle).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1)
+    expect(onWarn).toHaveBeenCalledTimes(2)
+
+    vi.advanceTimersByTime(MINUTE)
+    expect(onIdle).toHaveBeenCalledTimes(1)
+  })
 })
