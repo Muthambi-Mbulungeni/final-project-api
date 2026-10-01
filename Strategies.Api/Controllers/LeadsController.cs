@@ -25,8 +25,7 @@ namespace Strategies.Api.Controllers
 
         /// <summary>
         /// GET /api/leads
-        /// Paginated, searchable lead list. Restricted to Admin and Consultant roles.
-        /// Supports filtering by triage status.
+        /// Paginated, searchable lead list. Admin and Consultant only.
         /// </summary>
         [HttpGet]
         [Authorize(Roles = "Admin,Consultant")]
@@ -38,12 +37,13 @@ namespace Strategies.Api.Controllers
         {
             var query = _context.Leads.AsQueryable();
 
-            if (!string.IsNullOrEmpty(search))
+            if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(l =>
                     l.FullName.Contains(search) ||
                     l.Email.Contains(search));
 
-            if (!string.IsNullOrEmpty(status) && Enum.TryParse<TriageStatus>(status, true, out var parsedStatus))
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<TriageStatus>(status, ignoreCase: true, out var parsedStatus))
                 query = query.Where(l => l.TriageStatus == parsedStatus);
 
             var totalRecords = await query.CountAsync();
@@ -55,22 +55,23 @@ namespace Strategies.Api.Controllers
 
             return Ok(new PagedResponse<Lead>
             {
-                Data = leads,
+                Data         = leads,
                 TotalRecords = totalRecords,
-                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                CurrentPage = page
+                TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage  = page
             });
         }
 
         /// <summary>
         /// POST /api/leads
-        /// Public intake form submission — no login required.
-        /// Runs the Gemini AI agent to determine triage status.
-        /// Falls back to Pending if AI is unavailable.
+        /// Public intake form submission. Uses CreateLeadRequest DTO — never the raw entity.
+        /// AI triage runs and sets status. Falls back to NeedsReview if AI is unavailable.
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
-        public async Task<IActionResult> CreateLead([FromBody] Lead newLead, [FromServices] IAgentService agentService)
+        public async Task<IActionResult> CreateLead(
+            [FromBody] CreateLeadRequest dto,
+            [FromServices] IAgentService agentService)
         {
             if (!ModelState.IsValid)
             {
@@ -82,34 +83,34 @@ namespace Strategies.Api.Controllers
             }
 
             var aiResult = await agentService.ProcessLeadAsync(
-                $"Name: {newLead.FullName}, Immigration status: {newLead.ImmigrationStatus}, Needs assistance: {newLead.NeedsAssistance}");
+                $"Name: {dto.FullName}, Immigration status: {dto.ImmigrationStatus}, Needs assistance: {dto.NeedsAssistance}");
 
-            newLead.Id = Guid.NewGuid();
-            newLead.SubmittedAt = DateTime.UtcNow;
-
-            // Map AI result to a meaningful triage status with a reason
-            if (aiResult.Status == RunStatus.Success.ToString())
+            var lead = new Lead
             {
-                // Qualified if the AI processed successfully; consultants can demote if needed
-                newLead.TriageStatus = TriageStatus.Qualified;
-            }
-            else
-            {
-                // AI unavailable — flag for manual consultant review, not a silent Pending
-                newLead.TriageStatus = TriageStatus.NeedsReview;
-            }
+                Id                = Guid.NewGuid(),
+                FullName          = dto.FullName.Trim(),
+                Email             = dto.Email.Trim().ToLowerInvariant(),
+                ImmigrationStatus = dto.ImmigrationStatus,
+                NeedsAssistance   = dto.NeedsAssistance,
+                DesiredStartDate  = dto.DesiredStartDate,
+                VisaCategoryId    = dto.VisaCategoryId,
+                SubmittedAt       = DateTime.UtcNow,
+                TriageStatus      = aiResult.Status == RunStatus.Success.ToString()
+                                        ? TriageStatus.Qualified
+                                        : TriageStatus.NeedsReview
+            };
 
-            _context.Leads.Add(newLead);
+            _context.Leads.Add(lead);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetLeads), new { id = newLead.Id }, new
+            return CreatedAtAction(nameof(GetLeads), new { id = lead.Id }, new
             {
-                Message = "Lead successfully submitted.",
-                LeadId = newLead.Id,
-                TriageStatus = newLead.TriageStatus.ToString(),
-                AiAvailable = aiResult.Status == RunStatus.Success.ToString(),
-                AiAnalysis = aiResult.Status == RunStatus.Success.ToString() ? aiResult.ExtractedData : null,
-                FallbackMessage = aiResult.Status != RunStatus.Success.ToString() ? aiResult.Message : null
+                Message      = "Lead successfully submitted.",
+                LeadId       = lead.Id,
+                TriageStatus = lead.TriageStatus.ToString(),
+                AiAvailable  = aiResult.Status == RunStatus.Success.ToString(),
+                AiAnalysis   = aiResult.Status == RunStatus.Success.ToString() ? aiResult.ExtractedData : null,
+                FallbackNote = aiResult.Status != RunStatus.Success.ToString() ? aiResult.Message : null
             });
         }
     }
