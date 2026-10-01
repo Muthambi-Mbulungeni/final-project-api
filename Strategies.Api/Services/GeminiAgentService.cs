@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Net.Http;
@@ -9,9 +9,6 @@ using Strategies.Api.Data.Enums;
 
 namespace Strategies.Api.Services
 {
-    // The IAgentService interface and AgentResponse class are omitted here 
-    // because they already exist in your IAgentService.cs file.
-
     public class GeminiAgentService : IAgentService
     {
         private readonly HttpClient _httpClient;
@@ -21,30 +18,66 @@ namespace Strategies.Api.Services
         public GeminiAgentService(HttpClient httpClient, IConfiguration config, ILogger<GeminiAgentService> logger)
         {
             _httpClient = httpClient;
-            _config = config;
-            _logger = logger;
+            _config     = config;
+            _logger     = logger;
         }
 
         public async Task<AgentResponse> ProcessLeadAsync(string leadData)
         {
+            var apiKey = _config["Gemini:ApiKey"];
+            var url    = _config["Gemini:Url"];
+
+            // Fail fast with a clear fallback rather than making a pointless HTTP call
+            // to a URL that will just return 400 from Google due to a missing key.
+            if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(url))
+            {
+                _logger.LogWarning("Gemini:ApiKey or Gemini:Url is not configured. Returning fallback response.");
+                return new AgentResponse
+                {
+                    Status        = RunStatus.Fallback.ToString(),
+                    Message       = "AI assistance unavailable. Please complete manual intake.",
+                    ExtractedData = null!
+                };
+            }
+
             try
             {
-                var apiKey = _config["Gemini:ApiKey"];
-                var url = $"{_config["Gemini:Url"]}?key={apiKey}";
+                var requestUrl = $"{url}?key={apiKey}";
+                var payload    = new
+                {
+                    contents = new[]
+                    {
+                        new
+                        {
+                            parts = new[]
+                            {
+                                new { text = $"Extract immigration status from this lead: {leadData}" }
+                            }
+                        }
+                    }
+                };
 
-                var payload = new { contents = new[] { new { parts = new[] { new { text = $"Extract immigration status from this lead: {leadData}" } } } } };
-                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-
-                var response = await _httpClient.PostAsync(url, content);
+                var content  = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(requestUrl, content);
                 response.EnsureSuccessStatusCode();
-                var responseString = await response.Content.ReadAsStringAsync();
 
-                return new AgentResponse { Status = RunStatus.Success.ToString(), Message = "AI Processed successfully.", ExtractedData = responseString };
+                var responseString = await response.Content.ReadAsStringAsync();
+                return new AgentResponse
+                {
+                    Status        = RunStatus.Success.ToString(),
+                    Message       = "AI processed successfully.",
+                    ExtractedData = responseString
+                };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Gemini API failed. Triggering graceful fallback.");
-                return new AgentResponse { Status = RunStatus.Fallback.ToString(), Message = "AI assistance unavailable. Please complete manual intake." };
+                _logger.LogError(ex, "Gemini API call failed. Triggering graceful fallback.");
+                return new AgentResponse
+                {
+                    Status        = RunStatus.Fallback.ToString(),
+                    Message       = "AI assistance unavailable. Please complete manual intake.",
+                    ExtractedData = null!
+                };
             }
         }
     }
