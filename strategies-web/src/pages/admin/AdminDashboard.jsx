@@ -6,9 +6,9 @@ import RequestState from '../../components/ui/RequestState'
 import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { formatDateTime, getInitials } from '../../lib/format'
-import { summariseLeads } from '../../lib/leads'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
+import { useLeadSummary } from '../../lib/useLeadSummary'
 
 const LIST_LIMIT = 5
 
@@ -26,11 +26,11 @@ function totalOf(request) {
 export default function AdminDashboard() {
   const users = useApi(`/api/admin/users?page=1&pageSize=${LIST_LIMIT}`)
   const cases = useApi('/api/cases?page=1&pageSize=1')
-  const leads = useApi('/api/leads')
   const auditLogs = useApi('/api/admin/audit-logs')
+  const leadSummary = useLeadSummary()
 
   // When every request fails (e.g. the API is down), show one banner instead of several.
-  const requests = [users, cases, leads, auditLogs]
+  const requests = [users, cases, auditLogs, leadSummary]
   const allFailed = requests.every((request) => request.error)
 
   function retryAll() {
@@ -39,13 +39,13 @@ export default function AdminDashboard() {
 
   const auditEntries = listItems(auditLogs.data).slice(0, LIST_LIMIT)
   const recentUsers = listItems(users.data).slice(0, LIST_LIMIT)
-  const awaitingReview = summariseLeads(listItems(leads.data)).awaiting
+  const summary = leadSummary.summary
 
   const userTotal = totalOf(users)
   const caseTotal = totalOf(cases)
-  const leadTotal = totalOf(leads)
 
   // Figures come from the same list endpoints the admin pages use, so they match what those pages show.
+  // On a phone the tiles sit two-up, so the third spans the full width rather than leaving a gap.
   const tiles = [
     {
       label: 'User accounts',
@@ -63,9 +63,10 @@ export default function AdminDashboard() {
     },
     {
       label: 'Enquiries received',
-      value: leadTotal,
-      hint: hasValue(leadTotal) ? `${awaitingReview} awaiting consultant review` : undefined,
-      loading: leads.loading,
+      value: summary?.total ?? null,
+      hint: summary ? `${summary.awaiting} awaiting consultant review` : undefined,
+      loading: leadSummary.loading && !summary,
+      className: 'col-span-2 sm:col-span-1',
     },
   ]
 
@@ -79,7 +80,7 @@ export default function AdminDashboard() {
 
       {allFailed && <ErrorNotice className="mt-8" message={users.error.message} onRetry={retryAll} />}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         {tiles.map((tile) => (
           <StatTile
             key={tile.label}
@@ -88,16 +89,18 @@ export default function AdminDashboard() {
             hint={tile.hint}
             to={tile.to}
             loading={tile.loading}
+            className={tile.className}
           />
         ))}
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+      {/* min-w-0 on each panel stops long, truncated text from widening the grid past the screen. */}
+      <div className="mt-8 grid gap-6 *:min-w-0 lg:grid-cols-3">
         <Panel
           title="Recent activity"
           className="lg:col-span-2"
           action={
-            <Link to="/admin/audit-log" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+            <Link to="/admin/audit-log" className="text-sm font-medium whitespace-nowrap text-brand-700 hover:text-brand-800">
               View audit log
             </Link>
           }
@@ -115,7 +118,7 @@ export default function AdminDashboard() {
                 <li key={entry.id ?? index} className="flex items-center justify-between gap-4 py-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-stone-900">{entry.action}</p>
-                    {entry.entityType && <p className="text-xs text-stone-500">{entry.entityType} record</p>}
+                    {entry.entityType && <p className="truncate text-xs text-stone-500">{entry.entityType} record</p>}
                   </div>
                   <span className="shrink-0 text-xs text-stone-500 tabular-nums">{formatDateTime(entry.createdAt)}</span>
                 </li>
@@ -127,7 +130,7 @@ export default function AdminDashboard() {
         <Panel
           title="Recent users"
           action={
-            <Link to="/admin/users" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+            <Link to="/admin/users" className="text-sm font-medium whitespace-nowrap text-brand-700 hover:text-brand-800">
               View all
             </Link>
           }

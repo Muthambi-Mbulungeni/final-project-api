@@ -14,7 +14,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat('en-ZA', {
 
 // .NET sends up to 7 fractional-second digits (e.g. 08:25:13.5513727Z).
 // JavaScript only guarantees parsing of 3, so extra digits are trimmed first.
-function toDate(value) {
+export function toDate(value) {
   if (!value) return null
   const normalised = typeof value === 'string' ? value.replace(/(\.\d{3})\d+/, '$1') : value
   const date = new Date(normalised)

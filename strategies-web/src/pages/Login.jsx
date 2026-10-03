@@ -1,22 +1,31 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import AuthLayout from '../components/layout/AuthLayout'
 import { inputClasses } from '../components/ui/fieldStyles'
 import TextField from '../components/ui/TextField'
-import { apiPost } from '../lib/api'
+import { destinationFor, signIn, signInNotice } from '../lib/auth'
 import { signInErrorMessage } from '../lib/authMessages'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
+import { useSession } from '../lib/useSession'
 import { validateSignIn } from '../lib/validation'
+
+// Field ids in on-screen order, used to move focus to the first invalid field.
+const FIELD_ORDER = ['email', 'password']
 
 export default function Login() {
   useDocumentTitle('Sign in')
+  const location = useLocation()
+  const session = useSession()
   const [values, setValues] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [capsLockOn, setCapsLockOn] = useState(false)
+
+  const from = location.state?.from
+  const notice = signInNotice(location.state?.reason)
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -35,21 +44,29 @@ export default function Login() {
     event.preventDefault()
     const found = validateSignIn(values)
     setErrors(found)
-    if (Object.keys(found).length > 0) return
+
+    const firstInvalid = FIELD_ORDER.find((field) => found[field])
+    if (firstInvalid) {
+      // Keyboard and screen-reader users land on the problem, and hear its error via aria-describedby.
+      document.getElementById(firstInvalid)?.focus()
+      return
+    }
 
     setSubmitting(true)
     setFormError('')
 
     try {
-      await apiPost('/api/auth/login', { email: values.email.trim(), password: values.password })
-      // The login response contract (token, expiry, role) has not been published yet,
-      // so a successful response cannot start a session. Finish this once it is.
-      setFormError(signInErrorMessage({ status: 501 }))
+      // On success the session changes and this page redirects below.
+      await signIn(values.email.trim(), values.password)
     } catch (error) {
       setFormError(signInErrorMessage(error))
-    } finally {
       setSubmitting(false)
     }
+  }
+
+  // Signed in (just now, or already): go to the page they wanted, inside their own workspace.
+  if (session) {
+    return <Navigate to={destinationFor(session, from)} replace />
   }
 
   const passwordErrorId = 'password-error'
@@ -60,10 +77,16 @@ export default function Login() {
       <p className="mt-1.5 text-center text-sm text-stone-600">Strategies Migration Services portal</p>
 
       <form noValidate onSubmit={handleSubmit} className="mt-8 space-y-5">
-        {formError && (
+        {formError ? (
           <div role="alert" className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2.5 text-sm text-brand-800">
             {formError}
           </div>
+        ) : (
+          notice && (
+            <div role="status" className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-700">
+              {notice}
+            </div>
+          )
         )}
 
         <TextField
@@ -104,7 +127,7 @@ export default function Login() {
               onClick={() => setShowPassword((current) => !current)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
               aria-pressed={showPassword}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-stone-400 hover:text-stone-700"
+              className="absolute inset-y-0 right-0 flex items-center rounded-r-md px-3 text-stone-500 hover:text-stone-700"
             >
               {showPassword ? (
                 <EyeOff className="size-4" strokeWidth={1.75} aria-hidden="true" />
@@ -113,7 +136,10 @@ export default function Login() {
               )}
             </button>
           </div>
-          {capsLockOn && <p className="mt-1.5 text-xs font-medium text-amber-700">Caps Lock is on.</p>}
+          {/* Always rendered so screen readers announce the warning when it appears (WCAG 4.1.3). */}
+          <div aria-live="polite">
+            {capsLockOn && <p className="mt-1.5 text-xs font-medium text-amber-700">Caps Lock is on.</p>}
+          </div>
           {errors.password && (
             <p id={passwordErrorId} className="mt-1.5 text-sm text-brand-700">
               {errors.password}

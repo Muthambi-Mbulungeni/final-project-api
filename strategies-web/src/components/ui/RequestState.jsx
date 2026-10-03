@@ -16,7 +16,7 @@ export default function RequestState({
 }) {
   if (request.error) {
     if (hideError) {
-      return <p className="py-6 text-center text-sm text-stone-400">Unavailable</p>
+      return <p className="py-6 text-center text-sm text-stone-500">Unavailable</p>
     }
     return <ErrorNotice message={request.error.message} onRetry={request.reload} />
   }

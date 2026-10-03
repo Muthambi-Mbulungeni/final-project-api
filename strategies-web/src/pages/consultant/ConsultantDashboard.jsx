@@ -7,9 +7,10 @@ import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { resolveEnum } from '../../config/enums'
 import { formatDate } from '../../lib/format'
-import { isAwaitingReview, percentOf, summariseLeads } from '../../lib/leads'
+import { isAwaitingReview, leadsPath, percentOf } from '../../lib/leads'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
+import { useLeadSummary } from '../../lib/useLeadSummary'
 
 const LIST_LIMIT = 5
 
@@ -17,34 +18,66 @@ function newestFirst(a, b) {
   return String(b.submittedAt).localeCompare(String(a.submittedAt))
 }
 
+// The API filters one status at a time, so the review queue merges two responses.
+function mergeLeads(...responses) {
+  // The mock API ignores the status filter and returns every lead (with new IDs each time),
+  // so a plain array already holds the whole list: use it once instead of merging.
+  const fullList = responses.find((response) => Array.isArray(response))
+  if (fullList) return fullList
+  const seen = new Set()
+  return responses
+    .flatMap((response) => listItems(response))
+    .filter((lead) => {
+      if (seen.has(lead.id)) return false
+      seen.add(lead.id)
+      return true
+    })
+}
+
 export default function ConsultantDashboard() {
-  const leadsRequest = useApi('/api/leads')
+  const leadSummary = useLeadSummary()
+  const needsReview = useApi(leadsPath({ pageSize: LIST_LIMIT, status: 'NeedsReview' }))
+  const pending = useApi(leadsPath({ pageSize: LIST_LIMIT, status: 'Pending' }))
   const casesRequest = useApi(`/api/cases?page=1&pageSize=${LIST_LIMIT}`)
 
-  const leads = listItems(leadsRequest.data)
-  const summary = summariseLeads(leads)
-  const queue = leads.filter(isAwaitingReview).sort(newestFirst).slice(0, LIST_LIMIT)
+  const summary = leadSummary.summary
+  const queue = mergeLeads(needsReview.data, pending.data)
+    .filter(isAwaitingReview)
+    .sort(newestFirst)
+    .slice(0, LIST_LIMIT)
+  const queueRequest = {
+    loading: needsReview.loading || pending.loading,
+    error: needsReview.error && pending.error ? needsReview.error : null,
+    reload: () => {
+      needsReview.reload()
+      pending.reload()
+    },
+  }
   const recentCases = listItems(casesRequest.data).slice(0, LIST_LIMIT)
 
-  const allFailed = Boolean(leadsRequest.error && casesRequest.error)
-  const leadsReady = !leadsRequest.loading && !leadsRequest.error
+  const allFailed = Boolean(leadSummary.error && queueRequest.error && casesRequest.error)
 
   function retryAll() {
-    leadsRequest.reload()
+    leadSummary.reload()
+    queueRequest.reload()
     casesRequest.reload()
   }
 
-  // Every figure is counted from the same lead list shown below, so the tiles and the queue always agree.
+  // Counted by the API per verdict, so the figures stay correct however many leads there are.
   const tiles = [
-    { label: 'Enquiries screened', value: summary.total, hint: 'Assessed by the AI intake agent' },
+    { label: 'Enquiries screened', value: summary?.total, hint: 'Assessed by the AI intake agent' },
     {
       label: 'Awaiting your review',
-      value: summary.awaiting,
-      hint: summary.awaiting === 0 ? 'Your queue is clear' : 'Not qualified automatically',
+      value: summary?.awaiting,
+      hint: summary?.awaiting === 0 ? 'Your queue is clear' : 'Not qualified automatically',
       to: '/consultant/leads',
     },
-    { label: 'Qualified', value: summary.qualified, hint: `${percentOf(summary.qualified, summary.total)}% of enquiries` },
-    { label: 'Filtered out', value: summary.unqualified, hint: 'Kept out of your queue' },
+    {
+      label: 'Qualified',
+      value: summary?.qualified,
+      hint: summary ? `${percentOf(summary.qualified, summary.total)}% of enquiries` : undefined,
+    },
+    { label: 'Filtered out', value: summary?.unqualified, hint: 'Kept out of your queue' },
   ]
 
   return (
@@ -55,7 +88,7 @@ export default function ConsultantDashboard() {
         description="What the intake agent screened, the leads waiting for you, and the latest movement on your cases."
       />
 
-      {allFailed && <ErrorNotice className="mt-8" message={leadsRequest.error.message} onRetry={retryAll} />}
+      {allFailed && <ErrorNotice className="mt-8" message={leadSummary.error.message} onRetry={retryAll} />}
 
       <section className="mt-8" aria-labelledby="intake-heading">
         <h2 id="intake-heading" className="text-sm font-semibold text-stone-900">
@@ -63,31 +96,32 @@ export default function ConsultantDashboard() {
         </h2>
         <p className="mt-0.5 text-sm text-stone-500">Every public enquiry is screened before it reaches you.</p>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {tiles.map((tile) => (
             <StatTile
               key={tile.label}
               label={tile.label}
-              value={leadsReady ? tile.value : null}
-              hint={leadsReady ? tile.hint : undefined}
+              value={summary ? tile.value : null}
+              hint={summary ? tile.hint : undefined}
               to={tile.to}
-              loading={leadsRequest.loading}
+              loading={leadSummary.loading && !summary}
             />
           ))}
         </div>
       </section>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+      {/* min-w-0 on each panel stops long, truncated text from widening the grid past the screen. */}
+      <div className="mt-8 grid gap-6 *:min-w-0 lg:grid-cols-2">
         <Panel
           title="Waiting for your review"
           action={
-            <Link to="/consultant/leads" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+            <Link to="/consultant/leads" className="text-sm font-medium whitespace-nowrap text-brand-700 hover:text-brand-800">
               View all
             </Link>
           }
         >
           <RequestState
-            request={leadsRequest}
+            request={queueRequest}
             isEmpty={queue.length === 0}
             emptyTitle="Queue is clear"
             emptyMessage="The intake agent has qualified every enquiry so far."
@@ -104,7 +138,9 @@ export default function ConsultantDashboard() {
                       {' · '}Submitted {formatDate(lead.submittedAt)}
                     </p>
                   </div>
-                  <StatusBadge type="triageStatus" value={lead.triageStatus} />
+                  <span className="shrink-0">
+                    <StatusBadge type="triageStatus" value={lead.triageStatus} />
+                  </span>
                 </li>
               ))}
             </ul>
@@ -114,7 +150,7 @@ export default function ConsultantDashboard() {
         <Panel
           title="Recent cases"
           action={
-            <Link to="/consultant/cases" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+            <Link to="/consultant/cases" className="text-sm font-medium whitespace-nowrap text-brand-700 hover:text-brand-800">
               View all
             </Link>
           }
@@ -137,7 +173,9 @@ export default function ConsultantDashboard() {
                       {item.lastUpdated ? ` · Updated ${formatDate(item.lastUpdated)}` : ''}
                     </p>
                   </div>
-                  <StatusBadge type="caseStage" value={item.stage} />
+                  <span className="shrink-0">
+                    <StatusBadge type="caseStage" value={item.stage} />
+                  </span>
                 </li>
               ))}
             </ul>
