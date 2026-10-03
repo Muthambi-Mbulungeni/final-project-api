@@ -60,6 +60,18 @@ export default function AppShell({ role }) {
     return () => document.removeEventListener('keydown', handleKey)
   }, [menuOpen])
 
+  // The drawer only exists below lg. If the viewport widens while it is open (a tablet rotated, a window
+  // resized), close it, or the page would stay inert behind what is now the ordinary sidebar.
+  useEffect(() => {
+    if (!menuOpen) return undefined
+    const desktop = window.matchMedia('(min-width: 64rem)')
+    function handleWidth(event) {
+      if (event.matches) setMenuOpen(false)
+    }
+    desktop.addEventListener('change', handleWidth)
+    return () => desktop.removeEventListener('change', handleWidth)
+  }, [menuOpen])
+
   function closeMenu(returnFocusTo) {
     focusAfterCloseRef.current = returnFocusTo
     setMenuOpen(false)
