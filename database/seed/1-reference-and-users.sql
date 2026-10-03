@@ -1,4 +1,4 @@
--- LOCAL TEST DATA ONLY (smp-postgres container). Never commit. Safe to re-run: wipes and reloads every table.
+-- DEMO DATA ONLY: never load into a database holding real client data. Safe to re-run: wipes and reloads every application table. See database/seed/README.md.
 -- Enums are stored as integers. UserRole: Admin=0 Consultant=1 Client=2.
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;

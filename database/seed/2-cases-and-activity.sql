@@ -1,4 +1,4 @@
--- LOCAL TEST DATA ONLY. Run after 1-reference-and-users.sql.
+-- DEMO DATA ONLY. Run after 1-reference-and-users.sql. See database/seed/README.md.
 -- ImmigrationStatus: Citizen=0 PermanentResident=1 TemporaryResident=2 Foreigner=3
 -- TriageStatus: Pending=0 Qualified=1 Unqualified=2 NeedsReview=3
 -- CaseStage: InitialIntake=0 DocumentGathering=1 UnderReview=2 SubmittedToAuthority=3 FinalDecision=4
