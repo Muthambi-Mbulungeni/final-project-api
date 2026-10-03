@@ -22,10 +22,6 @@ namespace Strategies.Api.Controllers
             _context = context;
         }
 
-        /// <summary>
-        /// GET /api/admin/users
-        /// Paginated user list with optional search.
-        /// </summary>
         [HttpGet("users")]
         public async Task<IActionResult> GetUsers(
             [FromQuery] int page = 1,
@@ -33,6 +29,7 @@ namespace Strategies.Api.Controllers
             [FromQuery] string? search = null)
         {
             var query = _context.Users.AsQueryable();
+
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
 
@@ -43,27 +40,23 @@ namespace Strategies.Api.Controllers
                 .Take(pageSize)
                 .Select(u => new UserDto
                 {
-                    Id       = u.Id,
+                    Id = u.Id,
                     FullName = u.FullName,
-                    Email    = u.Email,
-                    Role     = u.Role.ToString(),
+                    Email = u.Email,
+                    Role = u.Role.ToString(),
                     IsActive = u.IsActive
                 })
                 .ToListAsync();
 
             return Ok(new PagedResponse<UserDto>
             {
-                Data         = users,
+                Data = users,
                 TotalRecords = totalRecords,
-                TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                CurrentPage  = page
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage = page
             });
         }
 
-        /// <summary>
-        /// PATCH /api/admin/users/{id}/suspend
-        /// Soft-suspends a user. Their data and case history is preserved.
-        /// </summary>
         [HttpPatch("users/{id}/suspend")]
         public async Task<IActionResult> SuspendUser(Guid id)
         {
@@ -79,10 +72,6 @@ namespace Strategies.Api.Controllers
             return Ok(new { Message = "User account has been suspended." });
         }
 
-        /// <summary>
-        /// PATCH /api/admin/users/{id}/reinstate
-        /// Reinstates a previously suspended user.
-        /// </summary>
         [HttpPatch("users/{id}/reinstate")]
         public async Task<IActionResult> ReinstateUser(Guid id)
         {
@@ -98,19 +87,13 @@ namespace Strategies.Api.Controllers
             return Ok(new { Message = "User account has been reinstated." });
         }
 
-        /// <summary>
-        /// DELETE /api/admin/users/{id}
-        /// Permanent deletion is not permitted. User records must be retained for
-        /// POPIA compliance and case audit trail integrity.
-        /// Use PATCH /suspend to deactivate accounts instead.
-        /// </summary>
         [HttpDelete("users/{id}")]
         public IActionResult DeleteUser(Guid id)
         {
             return StatusCode(405, new ApiErrorResponse
             {
                 Message = "Permanent user deletion is not permitted.",
-                Errors  = new System.Collections.Generic.List<string>
+                Errors = new System.Collections.Generic.List<string>
                 {
                     "User records must be retained for POPIA compliance and case audit trail integrity.",
                     "Use PATCH /api/admin/users/{id}/suspend to deactivate an account."
@@ -118,10 +101,6 @@ namespace Strategies.Api.Controllers
             });
         }
 
-        /// <summary>
-        /// GET /api/admin/audit-logs
-        /// Paginated audit log with optional user filter.
-        /// </summary>
         [HttpGet("audit-logs")]
         public async Task<IActionResult> GetAuditLogs(
             [FromQuery] int page = 1,
@@ -129,22 +108,34 @@ namespace Strategies.Api.Controllers
             [FromQuery] Guid? userId = null)
         {
             var query = _context.AuditLogs.AsQueryable();
+
             if (userId.HasValue)
                 query = query.Where(a => a.UserId == userId.Value);
 
             var totalRecords = await query.CountAsync();
-            var logs = await query
-                .OrderByDescending(a => a.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
 
-            return Ok(new PagedResponse<AuditLog>
+            var logs = await query
+                 .OrderByDescending(a => a.CreatedAt)
+                 .Skip((page - 1) * pageSize)
+                 .Take(pageSize)
+                 .Select(a => new
+                 {
+                     a.Id,
+                     a.UserId,
+                     UserName = _context.Users.Where(u => u.Id == a.UserId).Select(u => u.FullName).FirstOrDefault() ?? "System/Unknown",
+                     a.Action,
+                     a.EntityType,
+                     a.EntityId,
+                     a.CreatedAt
+                 })
+                 .ToListAsync();
+
+            return Ok(new
             {
-                Data         = logs,
+                Data = logs,
                 TotalRecords = totalRecords,
-                TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                CurrentPage  = page
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage = page
             });
         }
     }

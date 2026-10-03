@@ -55,10 +55,10 @@ namespace Strategies.Api.Controllers
 
             return Ok(new PagedResponse<Lead>
             {
-                Data         = leads,
+                Data = leads,
                 TotalRecords = totalRecords,
-                TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                CurrentPage  = page
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage = page
             });
         }
 
@@ -87,15 +87,15 @@ namespace Strategies.Api.Controllers
 
             var lead = new Lead
             {
-                Id                = Guid.NewGuid(),
-                FullName          = dto.FullName.Trim(),
-                Email             = dto.Email.Trim().ToLowerInvariant(),
+                Id = Guid.NewGuid(),
+                FullName = dto.FullName.Trim(),
+                Email = dto.Email.Trim().ToLowerInvariant(),
                 ImmigrationStatus = dto.ImmigrationStatus,
-                NeedsAssistance   = dto.NeedsAssistance,
-                DesiredStartDate  = dto.DesiredStartDate,
-                VisaCategoryId    = dto.VisaCategoryId,
-                SubmittedAt       = DateTime.UtcNow,
-                TriageStatus      = aiResult.Status == RunStatus.Success.ToString()
+                NeedsAssistance = dto.NeedsAssistance,
+                DesiredStartDate = dto.DesiredStartDate,
+                VisaCategoryId = dto.VisaCategoryId,
+                SubmittedAt = DateTime.UtcNow,
+                TriageStatus = aiResult.Status == RunStatus.Success.ToString()
                                         ? TriageStatus.Qualified
                                         : TriageStatus.NeedsReview
             };
@@ -105,11 +105,11 @@ namespace Strategies.Api.Controllers
 
             return CreatedAtAction(nameof(GetLeads), new { id = lead.Id }, new
             {
-                Message      = "Lead successfully submitted.",
-                LeadId       = lead.Id,
+                Message = "Lead successfully submitted.",
+                LeadId = lead.Id,
                 TriageStatus = lead.TriageStatus.ToString(),
-                AiAvailable  = aiResult.Status == RunStatus.Success.ToString(),
-                AiAnalysis   = aiResult.Status == RunStatus.Success.ToString() ? aiResult.ExtractedData : null,
+                AiAvailable = aiResult.Status == RunStatus.Success.ToString(),
+                AiAnalysis = aiResult.Status == RunStatus.Success.ToString() ? aiResult.ExtractedData : null,
                 FallbackNote = aiResult.Status != RunStatus.Success.ToString() ? aiResult.Message : null
             });
         }
