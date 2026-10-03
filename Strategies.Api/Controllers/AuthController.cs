@@ -1,15 +1,143 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Strategies.Api.DTOs;
+using Strategies.Api.DTOs.Auth;
+using Strategies.Api.Services;
 
 namespace Strategies.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/auth")]
     public class AuthController : ControllerBase
     {
-        [HttpPost("forgot-password")]
-        public IActionResult ForgotPassword([FromBody] object email) => Ok(new { Message = "Reset link sent." });
+        private readonly IAuthService _authService;
+        private readonly IEmailService _emailService;
 
-        [HttpPost("confirm-email")]
-        public IActionResult ConfirmEmail([FromQuery] string token) => Ok(new { Message = "Email confirmed." });
+        public AuthController(IAuthService authService, IEmailService emailService)
+        {
+            _authService = authService;
+            _emailService = emailService;
+        }
+
+        /// <summary>
+        /// POST /api/auth/login
+        /// Rate-limited to 5 requests/min per IP.
+        /// Returns an AuthResponse with access token, refresh token, role, and display name.
+        /// </summary>
+        [HttpPost("login")]
+        [AllowAnonymous]
+        [EnableRateLimiting("auth-strict")]
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
+                return BadRequest(new ApiErrorResponse { Message = "Validation failed.", Errors = errors });
+            }
+
+            var result = await _authService.LoginAsync(request);
+
+            if (result == null)
+                return Unauthorized(new ApiErrorResponse { Message = "Invalid email or password." });
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// POST /api/auth/refresh (or /api/auth/refresh-token)
+        /// Rotates the refresh token. Old token is revoked, new pair is returned.
+        /// Accepts the refresh token from the request body (for mobile compatibility).
+        /// </summary>
+        [HttpPost("refresh")]
+        [HttpPost("refresh-token")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Refresh([FromBody] RevokeTokenRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+                return BadRequest(new ApiErrorResponse { Message = "Refresh token is required." });
+
+            var result = await _authService.RefreshTokenAsync(request.RefreshToken);
+
+            if (result == null)
+                return Unauthorized(new ApiErrorResponse { Message = "Refresh token is invalid or has expired. Please sign in again." });
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// POST /api/auth/revoke (or /api/auth/revoke-token)
+        /// Signs the user out by revoking their refresh token.
+        /// </summary>
+        [HttpPost("revoke")]
+        [HttpPost("revoke-token")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Revoke([FromBody] RevokeTokenRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+                return BadRequest(new ApiErrorResponse { Message = "Refresh token is required." });
+
+            await _authService.RevokeTokenAsync(request.RefreshToken);
+
+            // Always 200 — don't reveal whether the token existed or not.
+            return Ok(new { Message = "Signed out successfully." });
+        }
+
+        /// <summary>
+        /// POST /api/auth/forgot-password
+        /// Always returns the same response to prevent account enumeration.
+        /// Sends a password reset email if the user exists.
+        /// </summary>
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        [EnableRateLimiting("auth-strict")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiErrorResponse { Message = "A valid email address is required." });
+
+            var user = await _authService.GetUserByEmailAsync(request.Email);
+            if (user != null)
+            {
+                var resetLink = $"https://strategies.com/reset-password?email={Uri.EscapeDataString(user.Email)}";
+                await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
+            }
+
+            return Ok(new { Message = "If an account with that email exists, a reset link has been sent." });
+        }
+
+        /// <summary>
+        /// GET /api/auth/me
+        /// Returns the current user's profile from their JWT claims.
+        /// Requires a valid Bearer token.
+        /// </summary>
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> Me()
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(new ApiErrorResponse { Message = "Invalid token." });
+
+            var user = await _authService.GetUserByIdAsync(userId);
+            if (user == null || !user.IsActive)
+                return Unauthorized(new ApiErrorResponse { Message = "User account not found or is suspended." });
+
+            return Ok(new
+            {
+                UserId = user.Id,
+                DisplayName = user.FullName,
+                Email = user.Email,
+                Role = user.Role.ToString(),
+                EmailConfirmed = user.EmailConfirmed
+            });
+        }
     }
 }

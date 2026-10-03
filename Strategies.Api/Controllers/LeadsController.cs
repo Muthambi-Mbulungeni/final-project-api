@@ -1,8 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
-using System;
-using System.Collections.Generic;
+using Strategies.Api.DTOs;
+using Strategies.Api.Services;
 
 namespace Strategies.Api.Controllers
 {
@@ -10,50 +16,101 @@ namespace Strategies.Api.Controllers
     [Route("api/[controller]")]
     public class LeadsController : ControllerBase
     {
-        // GET: api/leads
-        // Unblocks Riaad: Consultant Dashboard Lead View
-        [HttpGet]
-        public IActionResult GetLeads()
-        {
-            var mockLeads = new List<Lead>
-            {
-                new Lead
-                {
-                    Id = Guid.NewGuid(),
-                    FullName = "John Doe",
-                    Email = "john.doe@example.com",
-                    ImmigrationStatus = ImmigrationStatus.Foreigner,
-                    TriageStatus = TriageStatus.Pending,
-                    DesiredStartDate = DateTime.UtcNow.AddMonths(2),
-                    SubmittedAt = DateTime.UtcNow
-                },
-                new Lead
-                {
-                    Id = Guid.NewGuid(),
-                    FullName = "Jane Smith",
-                    Email = "jane.smith@example.com",
-                    ImmigrationStatus = ImmigrationStatus.TemporaryResident,
-                    TriageStatus = TriageStatus.Qualified,
-                    DesiredStartDate = DateTime.UtcNow.AddMonths(1),
-                    SubmittedAt = DateTime.UtcNow.AddDays(-2)
-                }
-            };
+        private readonly ApplicationDbContext _context;
 
-            return Ok(mockLeads);
+        public LeadsController(ApplicationDbContext context)
+        {
+            _context = context;
         }
 
-        // POST: api/leads
-        // Unblocks Riaad: Public Intake Form Submission
-        [HttpPost]
-        public IActionResult CreateLead([FromBody] Lead newLead)
+        /// <summary>
+        /// GET /api/leads
+        /// Paginated, searchable lead list. Admin and Consultant only.
+        /// </summary>
+        [HttpGet]
+        [Authorize(Roles = "Admin,Consultant")]
+        public async Task<IActionResult> GetLeads(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? search = null,
+            [FromQuery] string? status = null)
         {
-            // Simulate a successful save and return a 201 Created status
-            // In a real scenario, the AI triage agent would run here.
-            return CreatedAtAction(nameof(GetLeads), new { id = Guid.NewGuid() }, new
+            var query = _context.Leads.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(l =>
+                    l.FullName.Contains(search) ||
+                    l.Email.Contains(search));
+
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<TriageStatus>(status, ignoreCase: true, out var parsedStatus))
+                query = query.Where(l => l.TriageStatus == parsedStatus);
+
+            var totalRecords = await query.CountAsync();
+            var leads = await query
+                .OrderByDescending(l => l.SubmittedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return Ok(new PagedResponse<Lead>
             {
-                Message = "Lead successfully submitted.",
-                LeadId = Guid.NewGuid(),
-                Status = TriageStatus.Pending.ToString()
+                Data         = leads,
+                TotalRecords = totalRecords,
+                TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage  = page
+            });
+        }
+
+        /// <summary>
+        /// POST /api/leads
+        /// Public intake form submission. Uses CreateLeadRequest DTO — never the raw entity.
+        /// AI triage runs and sets status. Falls back to NeedsReview if AI is unavailable.
+        /// </summary>
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> CreateLead(
+            [FromBody] CreateLeadRequest dto,
+            [FromServices] IAgentService agentService)
+        {
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .ToList();
+                return BadRequest(new ApiErrorResponse { Message = "Validation failed.", Errors = errors });
+            }
+
+            var aiResult = await agentService.ProcessLeadAsync(
+                $"Name: {dto.FullName}, Immigration status: {dto.ImmigrationStatus}, Needs assistance: {dto.NeedsAssistance}");
+
+            var lead = new Lead
+            {
+                Id                = Guid.NewGuid(),
+                FullName          = dto.FullName.Trim(),
+                Email             = dto.Email.Trim().ToLowerInvariant(),
+                ImmigrationStatus = dto.ImmigrationStatus,
+                NeedsAssistance   = dto.NeedsAssistance,
+                DesiredStartDate  = dto.DesiredStartDate,
+                VisaCategoryId    = dto.VisaCategoryId,
+                SubmittedAt       = DateTime.UtcNow,
+                TriageStatus      = aiResult.Status == RunStatus.Success.ToString()
+                                        ? TriageStatus.Qualified
+                                        : TriageStatus.NeedsReview
+            };
+
+            _context.Leads.Add(lead);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetLeads), new { id = lead.Id }, new
+            {
+                Message      = "Lead successfully submitted.",
+                LeadId       = lead.Id,
+                TriageStatus = lead.TriageStatus.ToString(),
+                AiAvailable  = aiResult.Status == RunStatus.Success.ToString(),
+                AiAnalysis   = aiResult.Status == RunStatus.Success.ToString() ? aiResult.ExtractedData : null,
+                FallbackNote = aiResult.Status != RunStatus.Success.ToString() ? aiResult.Message : null
             });
         }
     }
