@@ -1,6 +1,7 @@
 import AuditLogPage from '../pages/admin/AuditLogPage'
 import UsersPage from '../pages/admin/UsersPage'
 import { AdminCasesPage, ConsultantCasesPage } from '../pages/cases/CasesPage'
+import ClientDocumentsPage from '../pages/client/ClientDocumentsPage'
 import LeadTriage from '../pages/consultant/LeadTriage'
 
 // Pages that have been built, keyed by navigation path.
@@ -11,6 +12,7 @@ export const MODULE_PAGES = {
   '/admin/audit-log': AuditLogPage,
   '/consultant/leads': LeadTriage,
   '/consultant/cases': ConsultantCasesPage,
+  '/client/documents': ClientDocumentsPage,
 }
 
 // Overview items (end: true) are always built; other items only when they have a page.
