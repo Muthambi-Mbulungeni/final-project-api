@@ -23,6 +23,9 @@ export default function AppShell({ role }) {
   const [signingOut, setSigningOut] = useState(false)
   const openButtonRef = useRef(null)
   const closeButtonRef = useRef(null)
+  const mainRef = useRef(null)
+  // Where focus goes when the drawer closes: the menu button (Escape, close, backdrop) or the page (a link).
+  const focusAfterCloseRef = useRef(null)
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const session = useSession()
@@ -34,15 +37,22 @@ export default function AppShell({ role }) {
     document.title = current ? `${current.label} · ${workspace} · ${APP_NAME}` : APP_NAME
   }, [current, workspace])
 
-  // Mobile drawer: focus moves into it on open; Escape closes it and returns focus to the menu button.
+  // Mobile drawer focus management. The page behind the drawer is inert while it is open, and browsers
+  // refuse to focus inert elements, so focus can only return once this render has removed inert.
   useEffect(() => {
-    if (!menuOpen) return undefined
+    if (!menuOpen) {
+      const target = focusAfterCloseRef.current
+      focusAfterCloseRef.current = null
+      target?.current?.focus()
+      return undefined
+    }
+
     closeButtonRef.current?.focus()
 
     function handleKey(event) {
       if (event.key === 'Escape') {
+        focusAfterCloseRef.current = openButtonRef
         setMenuOpen(false)
-        openButtonRef.current?.focus()
       }
     }
 
@@ -50,9 +60,9 @@ export default function AppShell({ role }) {
     return () => document.removeEventListener('keydown', handleKey)
   }, [menuOpen])
 
-  function closeMenu() {
+  function closeMenu(returnFocusTo) {
+    focusAfterCloseRef.current = returnFocusTo
     setMenuOpen(false)
-    openButtonRef.current?.focus()
   }
 
   async function leave(reason) {
@@ -69,23 +79,29 @@ export default function AppShell({ role }) {
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
-      {/* Fixed and off-screen until focused, so it never takes a grid cell (WCAG 2.4.1). */}
+      {/* Fixed and off-screen until focused, so it never takes a grid cell (WCAG 2.4.1).
+          Inert while the drawer is open: its target is behind the drawer, and Tab must stay in the drawer. */}
       <a
         href="#main-content"
+        inert={menuOpen}
         className="fixed top-3 left-3 z-50 -translate-y-24 rounded-md bg-white px-4 py-2 text-sm font-medium text-stone-900 shadow-md focus:translate-y-0"
       >
         Skip to main content
       </a>
 
       {menuOpen && (
-        <div className="fixed inset-0 z-30 bg-stone-900/40 lg:hidden" onClick={closeMenu} aria-hidden="true" />
+        <div
+          className="fixed inset-0 z-30 bg-stone-900/40 lg:hidden"
+          onClick={() => closeMenu(openButtonRef)}
+          aria-hidden="true"
+        />
       )}
 
       {/* Below lg the closed drawer is invisible as well as off-screen, which removes its links from the
-          Tab order. Visibility transitions with transform, so the slide-out still animates. */}
+          Tab order. Visibility transitions with transform, so the slide-out still animates. Opening transitions transform only: a hidden element cannot take focus, so visibility must flip at once for the close button to receive it. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-stone-200 bg-white transition-[transform,visibility] duration-200 lg:sticky lg:top-0 lg:bottom-auto lg:h-screen lg:translate-x-0 ${
-          menuOpen ? 'translate-x-0' : '-translate-x-full max-lg:invisible'
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-stone-200 bg-white duration-200 lg:sticky lg:top-0 lg:bottom-auto lg:h-screen lg:translate-x-0 ${
+          menuOpen ? 'translate-x-0 transition-transform' : '-translate-x-full transition-[transform,visibility] max-lg:invisible'
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-stone-200 px-5">
@@ -93,7 +109,7 @@ export default function AppShell({ role }) {
           <button
             ref={closeButtonRef}
             type="button"
-            onClick={closeMenu}
+            onClick={() => closeMenu(openButtonRef)}
             className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100 hover:text-stone-900 lg:hidden"
             aria-label="Close navigation"
           >
@@ -107,7 +123,7 @@ export default function AppShell({ role }) {
               key={to}
               to={to}
               end={end}
-              onClick={() => setMenuOpen(false)}
+              onClick={() => closeMenu(mainRef)}
               className={({ isActive }) =>
                 `group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
@@ -191,8 +207,13 @@ export default function AppShell({ role }) {
           </div>
         </header>
 
-        {/* tabIndex -1 lets the skip link move focus here; no outline because <main> is not a control. */}
-        <main id="main-content" tabIndex={-1} className="flex-1 px-4 py-8 outline-none sm:px-6 lg:px-10">
+        {/* tabIndex -1 lets the skip link (and a drawer link) move focus here; no outline because <main> is not a control. */}
+        <main
+          ref={mainRef}
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 px-4 py-8 outline-none sm:px-6 lg:px-10"
+        >
           <div className="mx-auto w-full max-w-7xl">
             <Outlet />
           </div>
