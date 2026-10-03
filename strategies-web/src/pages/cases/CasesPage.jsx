@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Download } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronRight, Download } from 'lucide-react'
 import DataTable from '../../components/ui/DataTable'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import PageHeader from '../../components/ui/PageHeader'
@@ -12,48 +12,67 @@ import { listItems } from '../../lib/listData'
 import { casesPath } from '../../lib/listPaths'
 import { useApi } from '../../lib/useApi'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import CaseDocumentsPanel from './CaseDocumentsPanel'
 
 const PAGE_SIZE = 10
 const EXPORT_PATH = '/api/cases/export?format=csv'
 
 // GET /api/cases returns { data: [{ id, clientName, visaCategoryName, stage, isArchived, createdAt, lastUpdated }],
 // totalRecords, totalPages, currentPage } and supports page, pageSize, search and stage.
-const COLUMNS = [
-  {
-    key: 'clientName',
-    header: 'Client',
-    render: (item) => (
-      <div className="flex items-center gap-2">
-        <span className="font-medium text-stone-900">{item.clientName ?? '—'}</span>
-        {item.isArchived && (
-          <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs font-medium text-stone-600">Archived</span>
-        )}
-      </div>
-    ),
-  },
-  {
-    key: 'visaCategoryName',
-    header: 'Visa category',
-    render: (item) => item.visaCategoryName ?? '—',
-  },
-  {
-    key: 'stage',
-    header: 'Stage',
-    render: (item) => <StatusBadge type="caseStage" value={item.stage} />,
-  },
-  {
-    key: 'createdAt',
-    header: 'Opened',
-    className: 'whitespace-nowrap tabular-nums',
-    render: (item) => formatDate(item.createdAt),
-  },
-  {
-    key: 'lastUpdated',
-    header: 'Last updated',
-    className: 'whitespace-nowrap tabular-nums',
-    render: (item) => formatDate(item.lastUpdated),
-  },
-]
+// The client's name is a real button that opens the case's documents, so keyboard users can reach it too.
+function buildColumns(onOpen) {
+  return [
+    {
+      key: 'clientName',
+      header: 'Client',
+      render: (item) => (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onOpen(item.id)}
+            aria-haspopup="dialog"
+            aria-label={`${item.clientName ?? 'Client'}, open case documents`}
+            className="text-left font-medium text-stone-900 hover:text-brand-700 hover:underline"
+          >
+            {item.clientName ?? '—'}
+          </button>
+          {item.isArchived && (
+            <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-xs font-medium text-stone-600">Archived</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'visaCategoryName',
+      header: 'Visa category',
+      render: (item) => item.visaCategoryName ?? '—',
+    },
+    {
+      key: 'stage',
+      header: 'Stage',
+      render: (item) => <StatusBadge type="caseStage" value={item.stage} />,
+    },
+    {
+      key: 'createdAt',
+      header: 'Opened',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (item) => formatDate(item.createdAt),
+    },
+    {
+      key: 'lastUpdated',
+      header: 'Last updated',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (item) => formatDate(item.lastUpdated),
+    },
+    {
+      key: 'open',
+      card: false,
+      header: <span className="sr-only">Documents</span>,
+      align: 'right',
+      render: () => <ChevronRight className="inline size-4 text-stone-400" strokeWidth={1.75} aria-hidden="true" />,
+    },
+  ]
+}
 
 // The stage filter is sent to the API, which filters across every page.
 const FILTERS = [enumFilter('caseStage', 'stage', 'Stage')]
@@ -63,12 +82,15 @@ function CasesPage({ eyebrow, title, description }) {
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [stage, setStage] = useState('')
+  const [selectedId, setSelectedId] = useState(null)
   const [exportState, setExportState] = useState({ busy: false, error: null })
   const search = useDebouncedValue(searchInput, 400)
 
   const request = useApi(casesPath({ page, pageSize: PAGE_SIZE, search, stage }))
   const response = request.data
   const rows = listItems(response)
+  const columns = useMemo(() => buildColumns(setSelectedId), [])
+  const selectedCase = rows.find((item) => item.id === selectedId) ?? null
 
   function handleSearchChange(value) {
     setSearchInput(value)
@@ -118,11 +140,12 @@ function CasesPage({ eyebrow, title, description }) {
       <div className="mt-8">
         <DataTable
           caption="Cases"
-          columns={COLUMNS}
+          columns={columns}
           rows={rows}
           loading={request.loading}
           error={request.error?.message}
           onRetry={request.reload}
+          onRowClick={(item) => setSelectedId(item.id)}
           searchPlaceholder="Search by client or visa"
           searchValue={searchInput}
           onSearchChange={handleSearchChange}
@@ -140,6 +163,8 @@ function CasesPage({ eyebrow, title, description }) {
           emptyMessage="Cases appear here once leads are converted."
         />
       </div>
+
+      <CaseDocumentsPanel caseItem={selectedCase} onClose={() => setSelectedId(null)} />
     </>
   )
 }
@@ -149,11 +174,17 @@ export function AdminCasesPage() {
     <CasesPage
       eyebrow="Administration"
       title="Cases"
-      description="Every case across the practice and its current stage."
+      description="Every case across the practice and its current stage. Select a client to review their documents."
     />
   )
 }
 
 export function ConsultantCasesPage() {
-  return <CasesPage eyebrow="Consultant" title="My cases" description="Cases and their current stage in the lifecycle." />
+  return (
+    <CasesPage
+      eyebrow="Consultant"
+      title="My cases"
+      description="Cases assigned to you and their current stage. Select a client to review their documents."
+    />
+  )
 }
