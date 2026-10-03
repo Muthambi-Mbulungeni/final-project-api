@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Clock, Upload } from 'lucide-react'
+import { AlertCircle, Check, Clock, Mail } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
@@ -28,7 +28,7 @@ const UNKNOWN_STYLE = { icon: Clock, chip: 'bg-stone-100 text-stone-500', bar: '
 const GUIDE = [
   { status: 'Pending', text: 'Your consultant checks each document you upload.' },
   { status: 'Approved', text: 'Accepted for your application. Nothing more to do.' },
-  { status: 'Rejected', text: 'Your consultant explains what to fix. Upload a new copy.' },
+  { status: 'Rejected', text: 'Your consultant explains what to fix, so you can send a new copy.' },
 ]
 
 function StatusIcon({ status }) {
@@ -80,8 +80,8 @@ function ActionNeeded({ documents }) {
       </ul>
 
       <p className="flex items-start gap-2 border-t border-stone-100 bg-stone-50 px-5 py-3 text-sm text-stone-600 sm:px-6">
-        <Upload className="mt-0.5 size-4 shrink-0 text-stone-500" strokeWidth={1.75} aria-hidden="true" />
-        Upload a new copy in the mobile app. It is reviewed again once received.
+        <Mail className="mt-0.5 size-4 shrink-0 text-stone-500" strokeWidth={1.75} aria-hidden="true" />
+        Send a new copy to your consultant, who adds it to your case. It is reviewed again once received.
       </p>
     </section>
   )
@@ -158,12 +158,12 @@ function ReviewGuide() {
           className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600"
           aria-hidden="true"
         >
-          <Upload className="size-4" strokeWidth={1.75} />
+          <Mail className="size-4" strokeWidth={1.75} />
         </span>
         <div>
-          <p className="text-sm font-medium text-stone-900">Uploading documents</p>
+          <p className="text-sm font-medium text-stone-900">Sending documents</p>
           <p className="mt-0.5 text-sm text-stone-600">
-            Photograph and upload documents in the mobile app. New uploads appear here once received.
+            Send documents to your consultant, who adds them to your case. They appear here once added.
           </p>
         </div>
       </div>
@@ -184,7 +184,7 @@ function DocumentsOverview({ caseId }) {
           request={request}
           isEmpty={documents.length === 0}
           emptyTitle="No documents received yet"
-          emptyMessage="Documents you upload in the mobile app appear here, together with your consultant’s review."
+          emptyMessage="Documents your consultant adds to your case appear here, with their review."
           loadingText="Loading your documents…"
         >
           {null}
@@ -223,7 +223,7 @@ function DocumentsOverview({ caseId }) {
 }
 
 // Clients see what needs their attention, their progress, and each document's review status.
-// Uploads happen in the mobile app, so this page has no upload control.
+// Clients cannot upload documents yet (the API has no file upload), so this page has no upload control.
 export default function ClientDocumentsPage() {
   const session = getSession()
   const casesRequest = useApi(`/api/cases/client/${session?.id}`)
