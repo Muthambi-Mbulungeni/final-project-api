@@ -56,6 +56,13 @@ namespace Strategies.Api.Controllers
                 Enum.TryParse<CaseStage>(stage, ignoreCase: true, out var parsedStage))
                 baseQuery = baseQuery.Where(x => x.c.Stage == parsedStage);
 
+            if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid.TryParse(userIdStr, out var currentUserId);
+                baseQuery = baseQuery.Where(x => x.c.ConsultantId == currentUserId);
+            }
+
             var totalRecords = await baseQuery.CountAsync();
 
             var cases = await baseQuery
@@ -115,6 +122,14 @@ namespace Strategies.Api.Controllers
 
             if (caseRecord == null)
                 return NotFound(new ApiErrorResponse { Message = "Case not found." });
+
+            if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid.TryParse(userIdStr, out var currentUserId);
+                var owns = await _context.Cases.AnyAsync(c => c.Id == id && c.ConsultantId == currentUserId);
+                if (!owns) return Forbid();
+            }
 
             return Ok(caseRecord);
         }

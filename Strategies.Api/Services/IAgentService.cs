@@ -12,5 +12,6 @@ namespace Strategies.Api.Services
         public string Status { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
         public string? ExtractedData { get; set; }
+        public string? Reason { get; set; } // Added Reason extraction
     }
 }

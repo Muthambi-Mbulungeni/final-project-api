@@ -42,14 +42,20 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime>("RanAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.ToTable("AgentRuns");
+                    b.HasIndex("CaseId");
+
+                    b.HasIndex("LeadId");
+
+                    b.ToTable("AgentRun", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.AuditLog", b =>
@@ -63,7 +69,9 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("EntityId")
                         .HasColumnType("uuid");
@@ -77,7 +85,9 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AuditLogs");
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AuditLog", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Case", b =>
@@ -93,10 +103,14 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<bool>("IsArchived")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<Guid?>("LeadId")
                         .HasColumnType("uuid");
@@ -105,14 +119,24 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("VisaCategoryId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Cases");
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("ConsultantId");
+
+                    b.HasIndex("LeadId");
+
+                    b.HasIndex("VisaCategoryId");
+
+                    b.ToTable("Case", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.CaseStageHistory", b =>
@@ -125,7 +149,9 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("ChangedById")
                         .HasColumnType("uuid");
@@ -138,7 +164,11 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("CaseStageHistories");
+                    b.HasIndex("CaseId");
+
+                    b.HasIndex("ChangedById");
+
+                    b.ToTable("CaseStageHistory", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.ChecklistTemplate", b =>
@@ -151,14 +181,20 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsMandatory")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<Guid>("VisaCategoryId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.ToTable("ChecklistTemplates");
+                    b.HasIndex("DocumentTypeId");
+
+                    b.HasIndex("VisaCategoryId");
+
+                    b.ToTable("ChecklistTemplate", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Document", b =>
@@ -182,10 +218,11 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<bool>("IsArchived")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("ReviewComment")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<Guid?>("ReviewedById")
@@ -195,11 +232,19 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Documents");
+                    b.HasIndex("CaseId");
+
+                    b.HasIndex("DocumentTypeId");
+
+                    b.HasIndex("ReviewedById");
+
+                    b.ToTable("Document", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.DocumentType", b =>
@@ -209,7 +254,6 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Description")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
@@ -218,7 +262,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DocumentTypes");
+                    b.ToTable("DocumentType", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Lead", b =>
@@ -242,13 +286,18 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<bool>("NeedsAssistance")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<Guid?>("ReviewedById")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("SubmittedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TriageReason")
+                        .HasColumnType("text");
 
                     b.Property<int>("TriageStatus")
                         .HasColumnType("integer");
@@ -258,7 +307,11 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Leads");
+                    b.HasIndex("ReviewedById");
+
+                    b.HasIndex("VisaCategoryId");
+
+                    b.ToTable("Lead", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Message", b =>
@@ -275,17 +328,25 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsRead")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<Guid>("SenderId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("SentAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Messages");
+                    b.HasIndex("CaseId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("Message", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.User", b =>
@@ -295,21 +356,27 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -320,7 +387,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("User", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.VisaCategory", b =>
@@ -330,11 +397,12 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Description")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -342,7 +410,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("VisaCategories");
+                    b.ToTable("VisaCategory", (string)null);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.VisaRecord", b =>
@@ -361,7 +429,9 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("RenewalFlagged")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("VisaType")
                         .IsRequired()
@@ -369,7 +439,143 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("VisaRecords");
+                    b.HasIndex("CaseId");
+
+                    b.ToTable("VisaRecord", (string)null);
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.AgentRun", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.Case", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Strategies.Api.Data.Models.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.AuditLog", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.Case", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .IsRequired();
+
+                    b.HasOne("Strategies.Api.Data.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ConsultantId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Strategies.Api.Data.Models.Lead", null)
+                        .WithMany()
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Strategies.Api.Data.Models.VisaCategory", null)
+                        .WithMany()
+                        .HasForeignKey("VisaCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.CaseStageHistory", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.Case", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Strategies.Api.Data.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedById")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.ChecklistTemplate", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.DocumentType", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Strategies.Api.Data.Models.VisaCategory", null)
+                        .WithMany()
+                        .HasForeignKey("VisaCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.Document", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.Case", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Strategies.Api.Data.Models.DocumentType", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Strategies.Api.Data.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.Lead", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Strategies.Api.Data.Models.VisaCategory", null)
+                        .WithMany()
+                        .HasForeignKey("VisaCategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.Message", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.Case", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Strategies.Api.Data.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Strategies.Api.Data.Models.VisaRecord", b =>
+                {
+                    b.HasOne("Strategies.Api.Data.Models.Case", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

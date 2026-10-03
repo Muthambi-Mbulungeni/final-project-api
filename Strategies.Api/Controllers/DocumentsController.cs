@@ -50,6 +50,13 @@ namespace Strategies.Api.Controllers
                 if (!owns)
                     return Forbid();
             }
+            else if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid.TryParse(userIdStr, out var currentUserId);
+                var owns = await _context.Cases.AnyAsync(c => c.Id == caseId && c.ConsultantId == currentUserId);
+                if (!owns) return Forbid();
+            }
 
             var query = from d in _context.Documents
                         join dt in _context.DocumentTypes on d.DocumentTypeId equals dt.Id into dtGroup
@@ -71,16 +78,16 @@ namespace Strategies.Api.Controllers
             var totalRecords = await query.CountAsync();
             var documents = await query
                 .OrderByDescending(d => d.UploadedAt)
-                .Skip((page - 1) * page)
+                .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
             return Ok(new
             {
                 TotalRecords = totalRecords,
-                TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                CurrentPage  = page,
-                Data         = documents
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage = page,
+                Data = documents
             });
         }
 
@@ -122,8 +129,56 @@ namespace Strategies.Api.Controllers
                 if (!owns)
                     return Forbid();
             }
+            else if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid.TryParse(userIdStr, out var currentUserId);
+                var owns = await _context.Cases.AnyAsync(c => c.Id == doc.CaseId && c.ConsultantId == currentUserId);
+                if (!owns) return Forbid();
+            }
 
             return Ok(doc);
+        }
+
+        /// <summary>
+        /// POST /api/documents/upload
+        /// Uploads a physical file to local storage. Enforces 5MB size limit and PDF/JPG/PNG types.
+        /// </summary>
+        [HttpPost("upload")]
+        [Authorize(Roles = "Admin,Consultant,Client")]
+        public async Task<IActionResult> UploadDocument(Microsoft.AspNetCore.Http.IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new ApiErrorResponse { Message = "No file uploaded." });
+
+            const long maxFileSize = 5 * 1024 * 1024; // 5MB limit
+            if (file.Length > maxFileSize)
+                return BadRequest(new ApiErrorResponse { Message = "File size exceeds the 5MB limit." });
+
+            var allowedExtensions = new[] { ".pdf", ".jpg", ".jpeg", ".png" };
+            var extension = System.IO.Path.GetExtension(file.FileName).ToLowerInvariant();
+
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest(new ApiErrorResponse { Message = "Invalid file type. Only PDF, JPG, and PNG are allowed." });
+
+            var uploadsFolder = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+            if (!System.IO.Directory.Exists(uploadsFolder))
+                System.IO.Directory.CreateDirectory(uploadsFolder);
+
+            var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+            var physicalPath = System.IO.Path.Combine(uploadsFolder, uniqueFileName);
+
+            using (var stream = new System.IO.FileStream(physicalPath, System.IO.FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            return Ok(new
+            {
+                Message = "File uploaded successfully.",
+                FileName = file.FileName,
+                FilePath = $"/uploads/{uniqueFileName}"
+            });
         }
 
         /// <summary>
@@ -156,6 +211,13 @@ namespace Strategies.Api.Controllers
                 if (!owns)
                     return Forbid();
             }
+            else if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid.TryParse(userIdStr, out var currentUserId);
+                var owns = await _context.Cases.AnyAsync(c => c.Id == dto.CaseId && c.ConsultantId == currentUserId);
+                if (!owns) return Forbid();
+            }
 
             var caseExists = await _context.Cases.AnyAsync(c => c.Id == dto.CaseId);
             if (!caseExists)
@@ -167,14 +229,14 @@ namespace Strategies.Api.Controllers
 
             var document = new Document
             {
-                Id             = Guid.NewGuid(),
-                CaseId         = dto.CaseId,
+                Id = Guid.NewGuid(),
+                CaseId = dto.CaseId,
                 DocumentTypeId = dto.DocumentTypeId,
-                FileName       = dto.FileName.Trim(),
-                FilePath       = dto.FilePath.Trim(),
-                Status         = DocumentStatus.Pending,
-                UploadedAt     = DateTime.UtcNow,
-                IsArchived     = false
+                FileName = dto.FileName.Trim(),
+                FilePath = dto.FilePath.Trim(),
+                Status = DocumentStatus.Pending,
+                UploadedAt = DateTime.UtcNow,
+                IsArchived = false
             };
 
             _context.Documents.Add(document);
@@ -201,15 +263,19 @@ namespace Strategies.Api.Controllers
         public async Task<IActionResult> UpdateDocumentStatus(Guid id, [FromBody] UpdateDocumentStatusRequest dto)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            if (!Enum.TryParse<DocumentStatus>(dto.Status, ignoreCase: true, out var parsedStatus))
             {
-                var validValues = string.Join(", ", Enum.GetNames<DocumentStatus>());
-                return BadRequest(new ApiErrorResponse
-                {
-                    Message = $"Invalid status. Valid values: {validValues}."
-                });
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+                return BadRequest(new ApiErrorResponse { Message = "Validation failed.", Errors = errors });
+            }
+
+            if (!Enum.TryParse<DocumentStatus>(dto.Status, true, out var parsedStatus))
+            {
+                return BadRequest(new ApiErrorResponse { Message = "Invalid status." });
+            }
+
+            if (parsedStatus == DocumentStatus.Rejected && string.IsNullOrWhiteSpace(dto.ReviewComment))
+            {
+                return BadRequest(new ApiErrorResponse { Message = "A review comment is required when rejecting a document." });
             }
 
             var document = await _context.Documents.FindAsync(id);
@@ -219,9 +285,19 @@ namespace Strategies.Api.Controllers
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
             Guid.TryParse(userIdStr, out var reviewerId);
 
-            document.Status        = parsedStatus;
+            document.Status = parsedStatus;
             document.ReviewComment = dto.ReviewComment?.Trim();
-            document.ReviewedById  = reviewerId;
+            document.ReviewedById = reviewerId;
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = reviewerId,
+                Action = $"{parsedStatus} document",
+                EntityType = "Document",
+                EntityId = document.Id,
+                CreatedAt = DateTime.UtcNow
+            });
 
             await _context.SaveChangesAsync();
             return Ok(new { Message = "Document status updated.", document.Id, Status = document.Status.ToString() });

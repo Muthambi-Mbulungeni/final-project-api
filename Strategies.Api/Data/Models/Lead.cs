@@ -5,6 +5,7 @@ namespace Strategies.Api.Data.Models
 {
     public class Lead
     {
+        public string? TriageReason { get; set; }
         public Guid Id { get; set; }
         public Guid? ReviewedById { get; set; }
         public Guid? VisaCategoryId { get; set; }
