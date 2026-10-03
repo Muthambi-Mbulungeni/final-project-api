@@ -20,6 +20,12 @@ const STATUS_OPTIONS = [
 
 const STEP_TITLES = { 1: 'About you', 2: 'Your plans' }
 
+// Fields in on-screen order per step: after a failed submit, focus goes to the first one with an error.
+const STEP_FIELDS = {
+  1: ['fullName', 'email', 'immigrationStatus'],
+  2: ['desiredStartDate', 'consent'],
+}
+
 const INITIAL_VALUES = {
   fullName: '',
   email: '',
@@ -74,7 +80,11 @@ export default function EnquiryPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(null)
   const stepHeadingRef = useRef(null)
+  const successHeadingRef = useRef(null)
+  const formRef = useRef(null)
   const isFirstRender = useRef(true)
+  // Name of the field to focus once the errors from a failed submit have rendered.
+  const pendingFocusRef = useRef(null)
 
   // Move focus to the step heading when the step changes, so screen readers announce it.
   useEffect(() => {
@@ -84,6 +94,23 @@ export default function EnquiryPage() {
     }
     stepHeadingRef.current?.focus()
   }, [step])
+
+  // Focus the first invalid field after its error message and aria-describedby are in the DOM,
+  // so a screen reader announces the field together with what is wrong (WCAG 3.3.1).
+  useEffect(() => {
+    const name = pendingFocusRef.current
+    if (!name) return
+    pendingFocusRef.current = null
+    const target = formRef.current?.elements.namedItem(name)
+    // A radio group comes back as a list of its inputs rather than an element: focus its first option.
+    const field = target && !target.tagName ? target[0] : target
+    field?.focus()
+  }, [errors])
+
+  // The submit button disappears on success, so move focus to the confirmation instead of losing it.
+  useEffect(() => {
+    if (submitted) successHeadingRef.current?.focus()
+  }, [submitted])
 
   function updateValue(name, value) {
     setValues((previous) => ({ ...previous, [name]: value }))
@@ -98,10 +125,15 @@ export default function EnquiryPage() {
     updateValue(event.target.name, event.target.value)
   }
 
+  function showErrors(found, fields) {
+    pendingFocusRef.current = fields.find((name) => found[name]) ?? null
+    setErrors(found)
+  }
+
   function handleContinue(event) {
     event.preventDefault()
     const found = validateEnquiryDetails(values)
-    setErrors(found)
+    showErrors(found, STEP_FIELDS[1])
     if (Object.keys(found).length === 0) setStep(2)
   }
 
@@ -115,7 +147,7 @@ export default function EnquiryPage() {
   async function handleSubmit(event) {
     event.preventDefault()
     const found = validateEnquiryPlans(values)
-    setErrors(found)
+    showErrors(found, STEP_FIELDS[2])
     if (Object.keys(found).length > 0) return
 
     setSubmitting(true)
@@ -154,7 +186,14 @@ export default function EnquiryPage() {
   if (submitted) {
     return (
       <AuthLayout wide>
-        <h1 className="text-center text-xl font-semibold tracking-tight text-stone-900">Enquiry received</h1>
+        {/* tabIndex -1 so focus can move here on success; no outline because a heading is not a control. */}
+        <h1
+          ref={successHeadingRef}
+          tabIndex={-1}
+          className="text-center text-xl font-semibold tracking-tight text-stone-900 focus:outline-none"
+        >
+          Enquiry received
+        </h1>
         <p className="mt-3 text-center text-sm leading-relaxed text-stone-600">
           Thank you, {submitted.firstName}. A consultant will review your enquiry and contact you at{' '}
           <span className="font-medium text-stone-900">{submitted.email}</span>.
@@ -204,7 +243,7 @@ export default function EnquiryPage() {
       <ProgressIndicator step={step} />
 
       {step === 1 ? (
-        <form noValidate onSubmit={handleContinue} className="mt-8 space-y-6">
+        <form ref={formRef} noValidate onSubmit={handleContinue} className="mt-8 space-y-6">
           <h2 ref={stepHeadingRef} tabIndex={-1} className="text-base font-semibold text-stone-900 focus:outline-none">
             About you
           </h2>
@@ -267,7 +306,7 @@ export default function EnquiryPage() {
           </button>
         </form>
       ) : (
-        <form noValidate onSubmit={handleSubmit} className="mt-8 space-y-6">
+        <form ref={formRef} noValidate onSubmit={handleSubmit} className="mt-8 space-y-6">
           <h2 ref={stepHeadingRef} tabIndex={-1} className="text-base font-semibold text-stone-900 focus:outline-none">
             Your plans
           </h2>
@@ -310,6 +349,8 @@ export default function EnquiryPage() {
           <div>
             <label className="flex cursor-pointer items-start gap-3">
               <input
+                id="consent"
+                name="consent"
                 type="checkbox"
                 checked={values.consent}
                 onChange={(event) => updateValue('consent', event.target.checked)}
