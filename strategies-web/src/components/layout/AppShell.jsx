@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronRight, LogOut, Menu, X } from 'lucide-react'
 import IdleWarningDialog from './IdleWarningDialog'
+import ErrorBoundary from '../ErrorBoundary'
+import ErrorNotice from '../ui/ErrorNotice'
 import NotificationBell from './NotificationBell'
 import logo from '../../assets/strategies-logo.png'
 import { findCurrentItem, NAVIGATION, WORKSPACE_LABELS } from '../../config/navigation'
@@ -227,7 +229,17 @@ export default function AppShell({ role }) {
           className="flex-1 px-4 py-8 outline-none sm:px-6 lg:px-10"
         >
           <div className="mx-auto w-full max-w-7xl">
-            <Outlet />
+            <ErrorBoundary
+              resetKey={pathname}
+              fallback={({ reset }) => (
+                <ErrorNotice
+                  message="This page ran into a problem. Try again, or choose another page from the menu."
+                  onRetry={reset}
+                />
+              )}
+            >
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>
