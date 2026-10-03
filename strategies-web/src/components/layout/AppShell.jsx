@@ -112,7 +112,7 @@ export default function AppShell({ role }) {
       {/* Below lg the closed drawer is invisible as well as off-screen, which removes its links from the
           Tab order. Visibility transitions with transform, so the slide-out still animates. Opening transitions transform only: a hidden element cannot take focus, so visibility must flip at once for the close button to receive it. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-stone-200 bg-white duration-200 lg:sticky lg:top-0 lg:bottom-auto lg:h-screen lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-stone-200 bg-white duration-200 motion-reduce:transition-none lg:sticky lg:top-0 lg:bottom-auto lg:h-screen lg:translate-x-0 ${
           menuOpen ? 'translate-x-0 transition-transform' : '-translate-x-full transition-[transform,visibility] max-lg:invisible'
         }`}
       >
