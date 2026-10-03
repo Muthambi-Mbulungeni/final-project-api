@@ -51,7 +51,7 @@ namespace Strategies.Api.Services
                         {
                             parts = new[]
                             {
-                                new { text = $"Extract immigration status from this lead: {leadData}" }
+                                new { text = $"Evaluate this immigration lead: {leadData}. Respond STRICTLY in JSON format without markdown blocks: {{ \"status\": \"Qualified\" or \"Unqualified\", \"reason\": \"One sentence explaining why.\" }}" }
                             }
                         }
                     }
