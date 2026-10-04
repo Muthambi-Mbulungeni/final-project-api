@@ -53,9 +53,15 @@ function hasCardLabel(column) {
 
 // A row shown as a card on phones. Columns marked `card: false` (e.g. a table-only chevron)
 // are left out; a clickable card shows its own chevron beside the heading instead.
+// Columns marked `cardInline: true` (self-explanatory badges) skip their label and share one
+// line with the row actions, so a card with badges and actions stays short.
 function RowCard({ row, columns, onRowClick }) {
   const [primary, ...rest] = columns.filter((column) => column.card !== false)
-  const details = rest.filter(hasCardLabel)
+  const details = rest.filter((column) => hasCardLabel(column) && !column.cardInline)
+  const inline = rest
+    .filter((column) => hasCardLabel(column) && column.cardInline)
+    .map((column) => ({ key: column.key, content: cellContent(column, row) }))
+    .filter((cell) => hasContent(cell.content))
   // Actions that render nothing for this row are dropped, so a card never ends in an empty row.
   const trailing = rest
     .filter((column) => !hasCardLabel(column))
@@ -87,12 +93,30 @@ function RowCard({ row, columns, onRowClick }) {
         </dl>
       )}
 
-      {trailing.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {trailing.map((cell) => (
-            <div key={cell.key}>{cell.content}</div>
-          ))}
+      {inline.length > 0 ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {inline.map((cell) => (
+              <div key={cell.key}>{cell.content}</div>
+            ))}
+          </div>
+          {/* ml-auto keeps the actions on the right even when long badges push them onto a new line. */}
+          {trailing.length > 0 && (
+            <div className="ml-auto flex items-center gap-2">
+              {trailing.map((cell) => (
+                <div key={cell.key}>{cell.content}</div>
+              ))}
+            </div>
+          )}
         </div>
+      ) : (
+        trailing.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {trailing.map((cell) => (
+              <div key={cell.key}>{cell.content}</div>
+            ))}
+          </div>
+        )
       )}
     </li>
   )

@@ -111,11 +111,13 @@ export default function UsersPage() {
     {
       key: 'role',
       header: 'Role',
+      cardInline: true,
       render: (user) => (user.role === undefined || user.role === null ? '—' : <StatusBadge type="userRole" value={user.role} />),
     },
     {
       key: 'isActive',
       header: 'Status',
+      cardInline: true,
       render: (user) =>
         user.isActive === false ? (
           <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200 ring-inset">
