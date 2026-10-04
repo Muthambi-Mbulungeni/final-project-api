@@ -1,8 +1,11 @@
 # Seed data (demo)
 
 Demo data for the Strategies Migration Platform. It matches the schema created by the EF Core
-migrations in `Strategies.Api` (`InitialCreate` + `AddTriageReason`): singular table names in the
-`public` schema. Apply the migrations first, then run the two files in order.
+migrations in `Strategies.Api` (`InitialCreate`, `AddTriageReason`, `FixDeleteBehaviors`): singular
+table names in the `public` schema. Apply the migrations first, then run the two files in order.
+
+Ids are fixed, so re-running gives the same rows. The four dev accounts keep the API's built-in ids;
+every other id is distinct, so the 8-character references the portal shows differ between records.
 
 > **Warning:** file 1 starts with `TRUNCATE ... CASCADE` on every application table. Running it
 > wipes all existing data in those tables. Use it on demo databases only.
@@ -52,4 +55,4 @@ SELECT "MigrationId" FROM public."__EFMigrationsHistory" ORDER BY 1;
 SELECT count(*) FROM public."User";
 ```
 
-Expected: two migrations and 11 users.
+Expected: three migrations and 11 users.
