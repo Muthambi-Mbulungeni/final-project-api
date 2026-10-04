@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiGet, apiPost, filenameFromDisposition, onSessionExpired, refreshSession } from './api'
+import { apiGet, apiPost, apiUpload, filenameFromDisposition, onSessionExpired, refreshSession } from './api'
 import { endSession, getAccessToken, getSession, startSession } from './session'
 
 function createStorage() {
@@ -142,6 +142,34 @@ describe('authorised requests', () => {
     startSession({ ...AUTH, refreshToken: 'refresh-1' })
     await refreshSession()
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ refreshToken: 'refresh-1' })
+  })
+
+  it('uploads a file as multipart form data, leaving the boundary header to the browser', async () => {
+    startSession(AUTH)
+    fetchMock.mockImplementation(async () => json({ fileName: 'passport.pdf', filePath: '/uploads/a.pdf' }))
+    const file = new File(['%PDF'], 'passport.pdf', { type: 'application/pdf' })
+
+    await expect(apiUpload('/api/documents/upload', file)).resolves.toEqual({
+      fileName: 'passport.pdf',
+      filePath: '/uploads/a.pdf',
+    })
+
+    const [path, options] = fetchMock.mock.calls[0]
+    expect(path).toBe('/api/documents/upload')
+    expect(options.method).toBe('POST')
+    expect(options.body.get('file')).toBeInstanceOf(File)
+    expect(options.headers['Content-Type']).toBeUndefined()
+    expect(authHeader(options)).toBe('Bearer old-token')
+  })
+
+  it('shows the API’s own message when it refuses an upload', async () => {
+    startSession(AUTH)
+    fetchMock.mockImplementation(async () => json({ message: 'File size exceeds the 5MB limit.' }, 400))
+
+    await expect(apiUpload('/api/documents/upload', new File(['x'], 'big.pdf'))).rejects.toMatchObject({
+      status: 400,
+      message: 'File size exceeds the 5MB limit.',
+    })
   })
 })
 

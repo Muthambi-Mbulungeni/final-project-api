@@ -166,6 +166,19 @@ export function apiPatch(path, data) {
   return sendJson('PATCH', path, data)
 }
 
+// Sends one file as multipart/form-data in the field the API reads ("file").
+// Content-Type is deliberately left unset: the browser adds it with the multipart boundary.
+// FormData can be sent again, so the refresh-and-retry above still works.
+export async function apiUpload(path, file) {
+  const body = new FormData()
+  body.append('file', file)
+
+  const response = await authorizedFetch(path, { method: 'POST', headers: { Accept: 'application/json' }, body })
+  const result = await readBody(response)
+  if (!response.ok) throw toApiError(response, result)
+  return result
+}
+
 // Reads the filename from a Content-Disposition header, preferring the UTF-8 form.
 export function filenameFromDisposition(header, fallback) {
   if (!header) return fallback

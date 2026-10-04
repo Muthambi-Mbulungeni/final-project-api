@@ -3,7 +3,15 @@ import { Mail, X } from 'lucide-react'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { resolveEnum } from '../../config/enums'
 import { formatDate, formatDateTime } from '../../lib/format'
-import { enquiryMailto, enquiryReference, startTimingLabel, verdictExplanation } from '../../lib/leads'
+import {
+  agentReason,
+  enquiryMailto,
+  enquiryReference,
+  isReviewed,
+  startTimingLabel,
+  verdictExplanation,
+} from '../../lib/leads'
+import LeadDecisionSection from './LeadDecisionSection'
 
 function Detail({ label, children, hint }) {
   return (
@@ -19,8 +27,9 @@ function Detail({ label, children, hint }) {
 // Built on the native <dialog> element (like ConfirmDialog): focus is moved into the
 // panel, Escape closes it, and focus returns to the row that opened it.
 // Full screen on phones; the footer buttons share the width and clear the home-bar area.
-export default function LeadDetailPanel({ lead, onClose }) {
+export default function LeadDetailPanel({ lead, onClose, onDecided }) {
   const dialogRef = useRef(null)
+  const verdictHeadingRef = useRef(null)
   const open = lead !== null
 
   useEffect(() => {
@@ -29,6 +38,12 @@ export default function LeadDetailPanel({ lead, onClose }) {
     if (open && !dialog.open) dialog.showModal()
     if (!open && dialog.open) dialog.close()
   }, [open])
+
+  // The clicked button can disappear after a decision, so focus moves to the updated verdict.
+  function handleDecided(status) {
+    onDecided(lead.id, status)
+    requestAnimationFrame(() => verdictHeadingRef.current?.focus())
+  }
 
   function handleCancel(event) {
     event.preventDefault()
@@ -41,6 +56,7 @@ export default function LeadDetailPanel({ lead, onClose }) {
   }
 
   const verdict = lead ? verdictExplanation(lead) : null
+  const reason = agentReason(lead)
   const mailto = lead ? enquiryMailto(lead) : null
   const reference = enquiryReference(lead)
   const firstName = String(lead?.fullName ?? '').trim().split(' ')[0]
@@ -76,15 +92,31 @@ export default function LeadDetailPanel({ lead, onClose }) {
 
           <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-6">
             <section aria-labelledby="lead-verdict-heading">
-              <h3 id="lead-verdict-heading" className="text-sm font-semibold text-stone-900">
-                Intake agent verdict
+              {/* tabIndex -1: focus lands here after a decision; not a control, so no outline. */}
+              <h3
+                id="lead-verdict-heading"
+                ref={verdictHeadingRef}
+                tabIndex={-1}
+                className="text-sm font-semibold text-stone-900 outline-none"
+              >
+                Verdict
               </h3>
               <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-4">
                 <StatusBadge type="triageStatus" value={lead.triageStatus} />
                 <p className="mt-3 text-sm font-medium text-stone-900">{verdict.title}</p>
                 <p className="mt-1 text-sm leading-relaxed text-stone-600">{verdict.body}</p>
+                {reason && (
+                  <figure className="mt-4 border-t border-stone-200 pt-3">
+                    <figcaption className="text-xs text-stone-500">The agent’s reason, given at intake</figcaption>
+                    <blockquote className="mt-1 border-l-2 border-stone-300 pl-3 text-sm leading-relaxed break-words whitespace-pre-line text-stone-800">
+                      {reason}
+                    </blockquote>
+                  </figure>
+                )}
               </div>
             </section>
+
+            {onDecided && <LeadDecisionSection key={lead.id} lead={lead} onDecided={handleDecided} />}
 
             <section aria-labelledby="lead-details-heading">
               <h3 id="lead-details-heading" className="text-sm font-semibold text-stone-900">
@@ -104,7 +136,7 @@ export default function LeadDetailPanel({ lead, onClose }) {
                 <Detail label="Reference" hint="Matches the client’s confirmation">
                   <span className="font-mono tracking-wider">{reference ?? '—'}</span>
                 </Detail>
-                <Detail label="Consultant review">{lead.reviewedById ? 'Reviewed' : 'Not yet reviewed'}</Detail>
+                <Detail label="Consultant review">{isReviewed(lead) ? 'Reviewed' : 'Not yet reviewed'}</Detail>
               </dl>
             </section>
           </div>

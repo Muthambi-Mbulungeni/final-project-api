@@ -5,11 +5,12 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { enumFilter, enumOrder, resolveEnum } from '../../config/enums'
 import { formatDate } from '../../lib/format'
-import { leadsPath } from '../../lib/leads'
+import { applyDecision, leadsPath } from '../../lib/leads'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { useLeadSummary } from '../../lib/useLeadSummary'
+import { useSession } from '../../lib/useSession'
 import LeadDetailPanel from './LeadDetailPanel'
 
 const PAGE_SIZE = 10
@@ -27,7 +28,7 @@ function buildColumns(onOpen, sortable) {
         <div>
           <button
             type="button"
-            onClick={() => onOpen(lead.id)}
+            onClick={() => onOpen(lead)}
             aria-haspopup="dialog"
             className="text-left font-medium text-stone-900 hover:text-brand-700 hover:underline"
           >
@@ -66,7 +67,7 @@ function buildColumns(onOpen, sortable) {
     },
     {
       key: 'triageStatus',
-      header: 'Agent verdict',
+      header: 'Verdict',
       sortable,
       sortValue: (lead) => enumOrder('triageStatus', lead.triageStatus),
       render: (lead) => <StatusBadge type="triageStatus" value={lead.triageStatus} />,
@@ -82,7 +83,7 @@ function buildColumns(onOpen, sortable) {
 }
 
 const FILTERS = [
-  enumFilter('triageStatus', 'triageStatus', 'Agent verdict'),
+  enumFilter('triageStatus', 'triageStatus', 'Verdict'),
   enumFilter('immigrationStatus', 'immigrationStatus', 'Immigration status'),
 ]
 
@@ -94,7 +95,7 @@ function TriageSummary({ summary, loading }) {
     { label: 'Screened by the intake agent', value: summary?.total },
     { label: 'Awaiting review', value: summary?.awaiting },
     { label: 'Qualified', value: summary?.qualified },
-    { label: 'Filtered out', value: summary?.unqualified },
+    { label: 'Unqualified', value: summary?.unqualified },
   ]
 
   return (
@@ -111,12 +112,13 @@ function TriageSummary({ summary, loading }) {
   )
 }
 
-export default function LeadTriage() {
+function LeadTriage({ eyebrow, title, description }) {
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [status, setStatus] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedLead, setSelectedLead] = useState(null)
   const search = useDebouncedValue(searchInput, 400)
+  const session = useSession()
 
   const request = useApi(leadsPath({ page, pageSize: PAGE_SIZE, search, status }))
   const leadSummary = useLeadSummary()
@@ -126,10 +128,15 @@ export default function LeadTriage() {
   // The real API pages, searches and filters by verdict on the server. The mock API returns
   // every lead as a plain array; then the table does all of that in the browser.
   const serverMode = !Array.isArray(response)
-  const columns = useMemo(() => buildColumns(setSelectedId, !serverMode), [serverMode])
+  const columns = useMemo(() => buildColumns(setSelectedLead, !serverMode), [serverMode])
 
-  // Looked up by ID so the panel always shows the latest data after a reload.
-  const selectedLead = leads.find((lead) => lead.id === selectedId) ?? null
+  // Called after the API accepted the decision (200). The panel keeps its own copy of the lead,
+  // so it stays open even when the decision moves the lead out of the filtered list.
+  function handleDecided(leadId, status) {
+    setSelectedLead((current) => (current?.id === leadId ? applyDecision(current, status, session?.id) : current))
+    request.reload()
+    leadSummary.reload()
+  }
 
   function handleSearchChange(value) {
     setSearchInput(value)
@@ -144,11 +151,7 @@ export default function LeadTriage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Consultant"
-        title="Lead triage"
-        description="Every public enquiry is screened by the AI intake agent. Leads it could not qualify on its own wait here for your review. Select a lead to see the full enquiry."
-      />
+      <PageHeader eyebrow={eyebrow} title={title} description={description} />
 
       {!leadSummary.error && (
         <div className="mt-8">
@@ -164,7 +167,7 @@ export default function LeadTriage() {
           loading={request.loading}
           error={request.error?.message}
           onRetry={request.reload}
-          onRowClick={(lead) => setSelectedId(lead.id)}
+          onRowClick={setSelectedLead}
           searchKeys={SEARCH_KEYS}
           searchPlaceholder="Search by name or email"
           searchValue={serverMode ? searchInput : undefined}
@@ -189,7 +192,29 @@ export default function LeadTriage() {
         />
       </div>
 
-      <LeadDetailPanel lead={selectedLead} onClose={() => setSelectedId(null)} />
+      <LeadDetailPanel lead={selectedLead} onClose={() => setSelectedLead(null)} onDecided={handleDecided} />
     </>
+  )
+}
+
+// GET /api/leads and PATCH /api/leads/{id}/status allow Admin and Consultant and treat both alike,
+// so the two pages differ only in their wording.
+export function AdminLeadsPage() {
+  return (
+    <LeadTriage
+      eyebrow="Administration"
+      title="Leads"
+      description="Every public enquiry and the AI intake agent's verdict on it. Select a lead to see the full enquiry."
+    />
+  )
+}
+
+export function ConsultantLeadsPage() {
+  return (
+    <LeadTriage
+      eyebrow="Consultant"
+      title="Lead triage"
+      description="Every public enquiry is screened by the AI intake agent. Leads it could not qualify on its own wait here for your review. Select a lead to see the full enquiry."
+    />
   )
 }

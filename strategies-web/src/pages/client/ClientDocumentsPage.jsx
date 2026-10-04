@@ -1,17 +1,24 @@
-import { AlertCircle, Check, Clock, Mail } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { AlertCircle, Check, Clock, Mail, Paperclip, Upload } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
 import StatusBadge from '../../components/ui/StatusBadge'
+import { useToast } from '../../components/ui/toastContext'
+import { apiPost, apiUpload } from '../../lib/api'
 import { latestCase } from '../../lib/cases'
 import {
   CLIENT_STATUS_LABELS,
+  UPLOAD_ACCEPT,
+  UPLOAD_PATH,
   documentStatus,
   documentSummary,
   documentsForClient,
   documentsPath,
+  replacementBody,
+  uploadFileError,
 } from '../../lib/documents'
-import { formatDate } from '../../lib/format'
+import { formatDate, formatFileSize } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
@@ -28,7 +35,7 @@ const UNKNOWN_STYLE = { icon: Clock, chip: 'bg-stone-100 text-stone-500', bar: '
 const GUIDE = [
   { status: 'Pending', text: 'Your consultant checks each document you upload.' },
   { status: 'Approved', text: 'Accepted for your application. Nothing more to do.' },
-  { status: 'Rejected', text: 'Your consultant explains what to fix, so you can send a new copy.' },
+  { status: 'Rejected', text: 'Your consultant explains what to fix, so you can upload a new copy.' },
 ]
 
 function StatusIcon({ status }) {
@@ -46,8 +53,115 @@ function legendText(status, count) {
   return `${count} ${CLIENT_STATUS_LABELS[status].toLowerCase()}`
 }
 
+// Uploads a new copy of one rejected document: the file first (POST /api/documents/upload), then
+// the document record with the same case and type (POST /api/documents). If the second call fails,
+// the uploaded file stays on the server unregistered; trying again uploads it afresh.
+function ReplaceForm({ document, onReplaced }) {
+  const toast = useToast()
+  const inputRef = useRef(null)
+  const [file, setFile] = useState(null)
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const name = document.documentTypeName
+  const inputId = `replace-file-${document.id}`
+  const hintId = `replace-hint-${document.id}`
+  const errorId = `replace-error-${document.id}`
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    const problem = uploadFileError(file)
+    if (problem) {
+      setError(problem)
+      inputRef.current?.focus()
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+    try {
+      const uploaded = await apiUpload(UPLOAD_PATH, file)
+      await apiPost('/api/documents', replacementBody(document, file, uploaded))
+      toast.show(`New copy of ${name} sent. Your consultant will review it.`)
+      setFile(null)
+      if (inputRef.current) inputRef.current.value = ''
+      onReplaced()
+    } catch (uploadError) {
+      setError(uploadError.message)
+      requestAnimationFrame(() => inputRef.current?.focus())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-2">
+      <label htmlFor={inputId} className="block text-sm font-medium text-stone-900">
+        Upload a new copy<span className="sr-only"> of {name}</span>
+      </label>
+      <p id={hintId} className="text-xs text-stone-500">
+        PDF, JPG or PNG, up to 5 MB.
+      </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {/* The real file input stays in the page (keyboard, screen readers, form behaviour) but is
+            visually hidden; the label below is its visible button and shows its focus ring. That
+            label is aria-hidden so the input's accessible name stays "Upload a new copy of …". */}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <input
+            ref={inputRef}
+            id={inputId}
+            type="file"
+            accept={UPLOAD_ACCEPT}
+            disabled={busy}
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null)
+              setError(null)
+            }}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${hintId} ${errorId}` : hintId}
+            className="peer sr-only"
+          />
+          <label
+            htmlFor={inputId}
+            aria-hidden="true"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 peer-disabled:cursor-wait peer-disabled:opacity-60 peer-aria-[invalid=true]:border-brand-600 hover:bg-stone-50"
+          >
+            <Paperclip className="size-4 text-stone-500" strokeWidth={1.75} />
+            {file ? 'Change file' : 'Choose file'}
+          </label>
+          {/* A long name is shortened; the size always stays visible. */}
+          <p className="flex min-w-0 items-baseline gap-1 text-sm text-stone-600" aria-hidden="true">
+            {file ? (
+              <>
+                <span className="truncate font-medium text-stone-900">{file.name}</span>
+                <span className="shrink-0 text-stone-500">· {formatFileSize(file.size)}</span>
+              </>
+            ) : (
+              'No file chosen'
+            )}
+          </p>
+        </div>
+        <button
+          type="submit"
+          disabled={busy}
+          aria-label={busy ? undefined : `Send new copy of ${name}`}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
+        >
+          <Upload className="size-4" strokeWidth={1.75} aria-hidden="true" />
+          {busy ? 'Uploading…' : 'Send new copy'}
+        </button>
+      </div>
+      {error && (
+        <p id={errorId} role="alert" className="text-sm text-brand-700">
+          {error}
+        </p>
+      )}
+    </form>
+  )
+}
+
 // The one thing the client has to do, shown first and only when there is something to do.
-function ActionNeeded({ documents }) {
+function ActionNeeded({ documents, onReplaced }) {
   const count = documents.length
 
   return (
@@ -74,14 +188,15 @@ function ActionNeeded({ documents }) {
               ) : (
                 <p className="mt-3 text-sm text-stone-600">Your consultant will contact you about this document.</p>
               )}
+              <ReplaceForm document={document} onReplaced={onReplaced} />
             </li>
           )
         })}
       </ul>
 
       <p className="flex items-start gap-2 border-t border-stone-100 bg-stone-50 px-5 py-3 text-sm text-stone-600 sm:px-6">
-        <Mail className="mt-0.5 size-4 shrink-0 text-stone-500" strokeWidth={1.75} aria-hidden="true" />
-        Send a new copy to your consultant, who adds it to your case. It is reviewed again once received.
+        <Upload className="mt-0.5 size-4 shrink-0 text-stone-500" strokeWidth={1.75} aria-hidden="true" />
+        Each new copy is reviewed again once it arrives.
       </p>
     </section>
   )
@@ -163,7 +278,8 @@ function ReviewGuide() {
         <div>
           <p className="text-sm font-medium text-stone-900">Sending documents</p>
           <p className="mt-0.5 text-sm text-stone-600">
-            Send documents to your consultant, who adds them to your case. They appear here once added.
+            If a document needs replacing, upload a new copy on this page. Your consultant adds your other
+            documents to your case, and they appear here once added.
           </p>
         </div>
       </div>
@@ -172,10 +288,18 @@ function ReviewGuide() {
 }
 
 // Rendered only once the case is known, because the documents request needs its id.
+// While reloading after an upload, the previous list stays on screen so the page does not flash.
 function DocumentsOverview({ caseId }) {
   const request = useApi(documentsPath(caseId))
   const documents = documentsForClient(listItems(request.data))
-  const ready = !request.loading && !request.error && documents.length > 0
+  const ready = !request.error && documents.length > 0
+  const summaryRef = useRef(null)
+
+  // The replaced document leaves "Action needed", taking its form with it, so focus moves to the summary.
+  function handleReplaced() {
+    request.reload()
+    requestAnimationFrame(() => summaryRef.current?.focus())
+  }
 
   if (!ready) {
     return (
@@ -200,10 +324,13 @@ function DocumentsOverview({ caseId }) {
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
       <div className="min-w-0 space-y-6">
-        {toReplace.length > 0 && <ActionNeeded documents={toReplace} />}
+        {toReplace.length > 0 && <ActionNeeded documents={toReplace} onReplaced={handleReplaced} />}
 
         <Panel title="Your documents">
-          <Progress summary={summary} total={total} />
+          {/* tabIndex -1: focus lands here after an upload; not a control, so no outline. */}
+          <div ref={summaryRef} tabIndex={-1} className="outline-none">
+            <Progress summary={summary} total={total} />
+          </div>
           {summary.approved === total && (
             <p className="mt-4 text-sm text-stone-600">
               All your documents are approved. Nothing more is needed from you right now.
@@ -223,7 +350,8 @@ function DocumentsOverview({ caseId }) {
 }
 
 // Clients see what needs their attention, their progress, and each document's review status.
-// Clients cannot upload documents yet (the API has no file upload), so this page has no upload control.
+// Clients can upload a new copy of a rejected document. A general upload (choosing a type from
+// GET /api/documenttypes) is not built yet; consultants add the other documents to the case.
 export default function ClientDocumentsPage() {
   const session = getSession()
   const casesRequest = useApi(`/api/cases/client/${session?.id}`)

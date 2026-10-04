@@ -19,7 +19,7 @@ const EXPORT_PATH = '/api/cases/export?format=csv'
 
 // GET /api/cases returns { data: [{ id, clientName, visaCategoryName, stage, isArchived, createdAt, lastUpdated }],
 // totalRecords, totalPages, currentPage } and supports page, pageSize, search and stage.
-// The client's name is a real button that opens the case's documents, so keyboard users can reach it too.
+// The client's name is a real button that opens the case panel, so keyboard users can reach it too.
 function buildColumns(onOpen) {
   return [
     {
@@ -29,9 +29,9 @@ function buildColumns(onOpen) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onOpen(item.id)}
+            onClick={() => onOpen(item)}
             aria-haspopup="dialog"
-            aria-label={`${item.clientName ?? 'Client'}, open case documents`}
+            aria-label={`${item.clientName ?? 'Client'}, open case`}
             className="text-left font-medium text-stone-900 hover:text-brand-700 hover:underline"
           >
             {item.clientName ?? '—'}
@@ -67,7 +67,7 @@ function buildColumns(onOpen) {
     {
       key: 'open',
       card: false,
-      header: <span className="sr-only">Documents</span>,
+      header: <span className="sr-only">Open case</span>,
       align: 'right',
       render: () => <ChevronRight className="inline size-4 text-stone-400" strokeWidth={1.75} aria-hidden="true" />,
     },
@@ -82,15 +82,22 @@ function CasesPage({ eyebrow, title, description }) {
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [stage, setStage] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
+  // The opened case is kept here, not looked up in the rows: after a stage change under a
+  // stage filter, the case leaves the list but its panel must stay open.
+  const [selectedCase, setSelectedCase] = useState(null)
   const [exportState, setExportState] = useState({ busy: false, error: null })
   const search = useDebouncedValue(searchInput, 400)
 
   const request = useApi(casesPath({ page, pageSize: PAGE_SIZE, search, stage }))
   const response = request.data
   const rows = listItems(response)
-  const columns = useMemo(() => buildColumns(setSelectedId), [])
-  const selectedCase = rows.find((item) => item.id === selectedId) ?? null
+  const columns = useMemo(() => buildColumns(setSelectedCase), [])
+
+  // Called after the API confirmed the change (200), so the panel shows the saved stage; the list reloads.
+  function handleStageChanged(caseId, newStage) {
+    setSelectedCase((current) => (current?.id === caseId ? { ...current, stage: newStage } : current))
+    request.reload()
+  }
 
   function handleSearchChange(value) {
     setSearchInput(value)
@@ -145,7 +152,7 @@ function CasesPage({ eyebrow, title, description }) {
           loading={request.loading}
           error={request.error?.message}
           onRetry={request.reload}
-          onRowClick={(item) => setSelectedId(item.id)}
+          onRowClick={setSelectedCase}
           searchPlaceholder="Search by client or visa"
           searchValue={searchInput}
           onSearchChange={handleSearchChange}
@@ -164,7 +171,11 @@ function CasesPage({ eyebrow, title, description }) {
         />
       </div>
 
-      <CaseDocumentsPanel caseItem={selectedCase} onClose={() => setSelectedId(null)} />
+      <CaseDocumentsPanel
+        caseItem={selectedCase}
+        onClose={() => setSelectedCase(null)}
+        onStageChanged={handleStageChanged}
+      />
     </>
   )
 }
@@ -174,7 +185,7 @@ export function AdminCasesPage() {
     <CasesPage
       eyebrow="Administration"
       title="Cases"
-      description="Every case across the practice and its current stage. Select a client to review their documents."
+      description="Every case across the practice and its current stage. Select a client to update the stage or review documents."
     />
   )
 }
@@ -184,7 +195,7 @@ export function ConsultantCasesPage() {
     <CasesPage
       eyebrow="Consultant"
       title="My cases"
-      description="Cases assigned to you and their current stage. Select a client to review their documents."
+      description="Cases assigned to you and their current stage. Select a client to update the stage or review documents."
     />
   )
 }

@@ -42,8 +42,17 @@ export function getInitials(name) {
     .toUpperCase()
 }
 
-// First 8 characters of an ID (e.g. a GUID) for compact display.
+// A file size in the units people expect: "820 KB", "1.4 MB".
+export function formatFileSize(bytes) {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// First 8 characters of an ID (e.g. a GUID) for compact display, in capitals everywhere, so
+// staff see the same reference a client quotes from their confirmation or dashboard.
 export function shortId(id) {
   if (id === null || id === undefined || id === '') return '—'
-  return String(id).slice(0, 8)
+  return String(id).slice(0, 8).toUpperCase()
 }

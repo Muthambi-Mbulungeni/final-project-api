@@ -2,7 +2,15 @@
 // Token storage and renewal live in session.js and api.js.
 
 import { ApiError, apiPost, refreshSession } from './api'
-import { endSession, getAccessToken, getSession, getStoredRefreshToken, ROLES, startSession } from './session'
+import {
+  endSession,
+  getAccessToken,
+  getSession,
+  getStoredRefreshToken,
+  mayRestoreSession,
+  ROLES,
+  startSession,
+} from './session'
 
 let restoreAttempt = null
 let restoreFinished = false
@@ -31,12 +39,19 @@ export async function signOut() {
 }
 
 // On page load or in a new tab, silently asks for a new access token.
-// The browser sends the httpOnly refresh cookie by itself. Tried once per page load.
+// The browser sends the httpOnly refresh cookie by itself. Tried once per page load, and only
+// when there may be a session: a first-time visitor's request could only fail (a console error).
+// A failed restore clears what is left, so a stale session costs at most one request.
 export function restoreSession() {
   if (getSession()) return Promise.resolve(true)
   if (!restoreAttempt) {
-    restoreAttempt = refreshSession()
+    const attempt = mayRestoreSession() ? refreshSession() : Promise.resolve(false)
+    restoreAttempt = attempt
       .catch(() => false)
+      .then((restored) => {
+        if (!restored) endSession()
+        return restored
+      })
       .finally(() => {
         restoreFinished = true
       })

@@ -4,6 +4,7 @@ import {
   getAccessToken,
   getSession,
   getStoredRefreshToken,
+  mayRestoreSession,
   roleKeyFromApi,
   startDevSession,
   startSession,
@@ -69,6 +70,21 @@ describe('sessions', () => {
 
     endSession()
     expect(getStoredRefreshToken()).toBeNull()
+  })
+
+  it('knows whether a session may be restored, without storing anything secret', () => {
+    expect(mayRestoreSession()).toBe(false)
+
+    startSession(AUTH)
+    expect(mayRestoreSession()).toBe(true)
+    expect(local.contents()).toBe('1')
+
+    endSession()
+    expect(mayRestoreSession()).toBe(false)
+
+    startSession({ ...AUTH, refreshToken: 'refresh-1' })
+    expect(mayRestoreSession()).toBe(true)
+    expect(local.contents()).toBe('')
   })
 
   it('rejects a response without a token or with an unknown role', () => {

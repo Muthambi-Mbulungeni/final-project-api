@@ -77,7 +77,7 @@ export default function ConsultantDashboard() {
       value: summary?.qualified,
       hint: summary ? `${percentOf(summary.qualified, summary.total)}% of enquiries` : undefined,
     },
-    { label: 'Filtered out', value: summary?.unqualified, hint: 'Kept out of your queue' },
+    { label: 'Unqualified', value: summary?.unqualified, hint: 'Kept out of your queue' },
   ]
 
   return (

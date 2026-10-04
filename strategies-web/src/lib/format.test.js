@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatDateTime, getInitials, shortId } from './format'
+import { formatDate, formatDateTime, formatFileSize, getInitials, shortId } from './format'
+
+describe('formatFileSize', () => {
+  it('uses B, KB and MB', () => {
+    expect(formatFileSize(512)).toBe('512 B')
+    expect(formatFileSize(820 * 1024)).toBe('820 KB')
+    expect(formatFileSize(1.4 * 1024 * 1024)).toBe('1.4 MB')
+  })
+
+  it('returns nothing for a missing or invalid size', () => {
+    expect(formatFileSize(undefined)).toBe('')
+    expect(formatFileSize(-1)).toBe('')
+    expect(formatFileSize(Number.NaN)).toBe('')
+  })
+})
 
 describe('formatDate', () => {
   it('returns a dash for empty or invalid values', () => {
@@ -46,6 +60,7 @@ describe('getInitials', () => {
 describe('shortId', () => {
   it('returns the first 8 characters of an ID', () => {
     expect(shortId('33333333-3333-3333-3333-333333333333')).toBe('33333333')
+    expect(shortId('6adcbe68-1f2e-4c3d-8b9a-0123456789ab')).toBe('6ADCBE68')
   })
 
   it('returns a dash when there is no ID', () => {

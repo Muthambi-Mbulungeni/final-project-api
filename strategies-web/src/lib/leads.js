@@ -80,8 +80,20 @@ const VERDICTS = {
     body: 'The agent assessed this enquiry as complete and eligible to proceed. It does not need to wait in the review queue.',
   },
   Unqualified: {
-    title: 'Filtered out by the intake agent',
-    body: 'The agent assessed this enquiry as not viable, so it was kept out of the review queue.',
+    title: 'Unqualified by the intake agent',
+    body: 'The agent assessed this enquiry as not eligible to proceed, so it was kept out of the review queue.',
+  },
+}
+
+// Once a consultant has decided, the status is theirs, not the agent's.
+const REVIEWED_VERDICTS = {
+  Qualified: {
+    title: 'Qualified by a consultant',
+    body: 'A consultant reviewed this enquiry and confirmed it can proceed.',
+  },
+  Unqualified: {
+    title: 'Unqualified by a consultant',
+    body: 'A consultant reviewed this enquiry and decided it cannot proceed.',
   },
 }
 
@@ -90,8 +102,62 @@ const NO_VERDICT = {
   body: 'No triage outcome has been recorded for this enquiry yet.',
 }
 
+export function isReviewed(lead) {
+  return Boolean(lead?.reviewedById)
+}
+
 export function verdictExplanation(lead) {
-  return VERDICTS[triageValue(lead)] ?? NO_VERDICT
+  const value = triageValue(lead)
+  if (isReviewed(lead) && REVIEWED_VERDICTS[value]) return REVIEWED_VERDICTS[value]
+  return VERDICTS[value] ?? NO_VERDICT
+}
+
+// PATCH /api/leads/{id}/status takes { status } as the enum name and records the reviewer.
+// The API turns a missing or unknown status into Pending or a raw 400, so only these two
+// decisions are ever sent: Pending and NeedsReview would mark a lead reviewed yet leave it queued.
+const DECISIONS = ['Qualified', 'Unqualified']
+
+export function leadStatusPath(leadId) {
+  return `/api/leads/${encodeURIComponent(leadId)}/status`
+}
+
+export function leadStatusBody(status) {
+  return { status }
+}
+
+// Before review both are offered: confirming the agent's verdict also counts as a review.
+// After review only the other decision is offered, so a click always changes something.
+export function decisionChoices(lead) {
+  if (!lead) return []
+  if (!isReviewed(lead)) return DECISIONS
+  return DECISIONS.filter((status) => status !== triageValue(lead))
+}
+
+export function decisionLabel(lead, status) {
+  const label = resolveEnum('triageStatus', status)?.label.toLowerCase() ?? status
+  return `${isReviewed(lead) ? 'Change to' : 'Mark'} ${label}`
+}
+
+// The lead as the panel should show it once the API has accepted the decision.
+export function applyDecision(lead, status, reviewerId) {
+  return { ...lead, triageStatus: status, reviewedById: reviewerId ?? lead.reviewedById }
+}
+
+// The API's 400 is the framework's raw validation body, so it is replaced with plain language.
+export function decisionErrorMessage(error) {
+  if (error?.status === 403) return 'Your account isn’t allowed to review leads.'
+  if (error?.status === 404) return 'This lead no longer exists. Close the panel and refresh the list.'
+  if (error?.status === 400) return 'That decision wasn’t accepted. Refresh the page and try again.'
+  return error?.message || 'The decision could not be saved. Please try again.'
+}
+
+// The intake agent's own explanation, saved when the enquiry arrived. Null when the
+// agent gave none (AI unavailable, unparseable reply, or older seeded leads).
+export function agentReason(lead) {
+  const reason = lead?.triageReason
+  if (typeof reason !== 'string') return null
+  const trimmed = reason.trim()
+  return trimmed || null
 }
 
 // How far away the desired start date is, in plain words.
@@ -113,7 +179,7 @@ export function startTimingLabel(value, now = new Date()) {
 
 // The same reference the public sees on their enquiry confirmation.
 export function enquiryReference(lead) {
-  return lead?.id ? shortId(lead.id).toUpperCase() : null
+  return lead?.id ? shortId(lead.id) : null
 }
 
 // A mailto link that opens the consultant's email app, addressed to the lead.
