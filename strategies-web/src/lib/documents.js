@@ -52,6 +52,11 @@ export function documentsForClient(documents) {
     )
 }
 
+// What the client still has to replace: rejected documents with no newer copy (same rule as above).
+export function documentsToReplace(documents) {
+  return documentsForClient(documents).filter((document) => documentStatus(document) === 'Rejected')
+}
+
 // POST /api/documents/upload accepts PDF, JPG and PNG files up to 5 MB. Checked here first so the
 // client hears straight away; the API checks again and its message is shown if it disagrees.
 export const UPLOAD_PATH = '/api/documents/upload'

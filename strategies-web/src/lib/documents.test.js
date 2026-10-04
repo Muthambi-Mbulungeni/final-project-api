@@ -5,9 +5,24 @@ import {
   documentSummary,
   documentsForClient,
   documentsPath,
+  documentsToReplace,
   replacementBody,
   uploadFileError,
 } from './documents'
+
+describe('documentsToReplace', () => {
+  it('lists rejected documents the client has not yet replaced, ignoring archived ones', () => {
+    const documents = [
+      { id: 'medical-old', status: 'Rejected', documentTypeId: 't-med', uploadedAt: '2026-09-01T10:00:00Z' },
+      { id: 'medical-new', status: 'Pending', documentTypeId: 't-med', uploadedAt: '2026-09-05T10:00:00Z' },
+      { id: 'police', status: 2, documentTypeId: 't-police', uploadedAt: '2026-09-02T10:00:00Z' },
+      { id: 'archived', status: 'Rejected', documentTypeId: 't-pass', isArchived: true, uploadedAt: '2026-09-03' },
+      { id: 'passport', status: 'Approved', documentTypeId: 't-pass', uploadedAt: '2026-09-04' },
+    ]
+    expect(documentsToReplace(documents).map((document) => document.id)).toEqual(['police'])
+    expect(documentsToReplace([])).toEqual([])
+  })
+})
 
 describe('documentsPath', () => {
   it('asks for one case’s documents in a single page', () => {
