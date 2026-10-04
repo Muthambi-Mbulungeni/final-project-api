@@ -111,7 +111,7 @@ function TriageSummary({ summary, loading }) {
   )
 }
 
-export default function LeadTriage() {
+function LeadTriage({ eyebrow, title, description }) {
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [status, setStatus] = useState('')
@@ -144,11 +144,7 @@ export default function LeadTriage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Consultant"
-        title="Lead triage"
-        description="Every public enquiry is screened by the AI intake agent. Leads it could not qualify on its own wait here for your review. Select a lead to see the full enquiry."
-      />
+      <PageHeader eyebrow={eyebrow} title={title} description={description} />
 
       {!leadSummary.error && (
         <div className="mt-8">
@@ -191,5 +187,27 @@ export default function LeadTriage() {
 
       <LeadDetailPanel lead={selectedLead} onClose={() => setSelectedId(null)} />
     </>
+  )
+}
+
+// GET /api/leads allows Admin and Consultant and returns every lead to both, so the two pages
+// differ only in their wording. The lead panel has no consultant-only actions.
+export function AdminLeadsPage() {
+  return (
+    <LeadTriage
+      eyebrow="Administration"
+      title="Leads"
+      description="Every public enquiry and the AI intake agent's verdict on it. Select a lead to see the full enquiry."
+    />
+  )
+}
+
+export function ConsultantLeadsPage() {
+  return (
+    <LeadTriage
+      eyebrow="Consultant"
+      title="Lead triage"
+      description="Every public enquiry is screened by the AI intake agent. Leads it could not qualify on its own wait here for your review. Select a lead to see the full enquiry."
+    />
   )
 }
