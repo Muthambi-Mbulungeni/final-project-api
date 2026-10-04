@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AlertCircle, Check, Clock, Mail, Upload } from 'lucide-react'
+import { AlertCircle, Check, Clock, Mail, Paperclip, Upload } from 'lucide-react'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
@@ -18,7 +18,7 @@ import {
   replacementBody,
   uploadFileError,
 } from '../../lib/documents'
-import { formatDate } from '../../lib/format'
+import { formatDate, formatFileSize } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
@@ -103,20 +103,44 @@ function ReplaceForm({ document, onReplaced }) {
         PDF, JPG or PNG, up to 5 MB.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <input
-          ref={inputRef}
-          id={inputId}
-          type="file"
-          accept={UPLOAD_ACCEPT}
-          disabled={busy}
-          onChange={(event) => {
-            setFile(event.target.files?.[0] ?? null)
-            setError(null)
-          }}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? `${hintId} ${errorId}` : hintId}
-          className="block w-full min-w-0 text-sm text-stone-700 file:mr-3 file:rounded-md file:border file:border-stone-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-800 hover:file:bg-stone-50"
-        />
+        {/* The real file input stays in the page (keyboard, screen readers, form behaviour) but is
+            visually hidden; the label below is its visible button and shows its focus ring. That
+            label is aria-hidden so the input's accessible name stays "Upload a new copy of …". */}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <input
+            ref={inputRef}
+            id={inputId}
+            type="file"
+            accept={UPLOAD_ACCEPT}
+            disabled={busy}
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null)
+              setError(null)
+            }}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${hintId} ${errorId}` : hintId}
+            className="peer sr-only"
+          />
+          <label
+            htmlFor={inputId}
+            aria-hidden="true"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 peer-disabled:cursor-wait peer-disabled:opacity-60 peer-aria-[invalid=true]:border-brand-600 hover:bg-stone-50"
+          >
+            <Paperclip className="size-4 text-stone-500" strokeWidth={1.75} />
+            {file ? 'Change file' : 'Choose file'}
+          </label>
+          {/* A long name is shortened; the size always stays visible. */}
+          <p className="flex min-w-0 items-baseline gap-1 text-sm text-stone-600" aria-hidden="true">
+            {file ? (
+              <>
+                <span className="truncate font-medium text-stone-900">{file.name}</span>
+                <span className="shrink-0 text-stone-500">· {formatFileSize(file.size)}</span>
+              </>
+            ) : (
+              'No file chosen'
+            )}
+          </p>
+        </div>
         <button
           type="submit"
           disabled={busy}
