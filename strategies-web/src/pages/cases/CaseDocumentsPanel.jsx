@@ -5,6 +5,7 @@ import StatusBadge from '../../components/ui/StatusBadge'
 import { useToast } from '../../components/ui/toastContext'
 import { apiOpenFile, apiPatch } from '../../lib/api'
 import {
+  awaitingDecisionCount,
   canReview,
   documentFileErrorMessage,
   documentFilePath,
@@ -15,7 +16,7 @@ import {
   reviewPath,
 } from '../../lib/documentReview'
 import { documentSummary, documentsPath } from '../../lib/documents'
-import { formatDate } from '../../lib/format'
+import { formatDate, shortId } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 import CaseConsultantSection from './CaseConsultantSection'
@@ -27,11 +28,10 @@ function documentName(document) {
   return document.documentTypeName || document.fileName || 'Document'
 }
 
-// Loads and reviews one case's documents. Mounted per case (keyed by id), so a newly opened
-// case never shows the previous case's documents while its own load.
-function DocumentsBody({ caseItem }) {
+// Reviews one case's documents. The request is owned by CasePanelBody, so the decision summary
+// at the top of the panel and this list always come from the same response.
+function DocumentsBody({ caseItem, request, headingRef }) {
   const toast = useToast()
-  const request = useApi(documentsPath(caseItem.id))
   const documents = documentsForReview(listItems(request.data))
   const summary = documentSummary(documents)
 
@@ -254,9 +254,10 @@ function DocumentsBody({ caseItem }) {
   }
 
   return (
-    <section aria-labelledby="case-docs-heading" className="mt-6">
+    <section aria-labelledby="case-docs-heading" className="mt-6 scroll-mt-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id="case-docs-heading" className="text-sm font-semibold text-stone-900">
+        {/* tabIndex -1: the summary's "Review" button moves focus here; not a control, so no outline. */}
+        <h3 id="case-docs-heading" ref={headingRef} tabIndex={-1} className="text-sm font-semibold text-stone-900 outline-none">
           Documents
         </h3>
         {documents.length > 0 && (
@@ -267,6 +268,51 @@ function DocumentsBody({ caseItem }) {
       </div>
       {content}
     </section>
+  )
+}
+
+// What the panel shows for one case. Mounted per case (keyed by id), so a newly opened case never
+// shows the previous case's documents while its own load. Owns the documents request so the
+// "needs your decision" summary and the document list cannot disagree.
+function CasePanelBody({ caseItem, onStageChanged, onAssigned }) {
+  const request = useApi(documentsPath(caseItem.id))
+  const documentsHeadingRef = useRef(null)
+  const awaiting = awaitingDecisionCount(documentsForReview(listItems(request.data)), caseItem.isArchived)
+
+  function goToDocuments() {
+    const heading = documentsHeadingRef.current
+    heading?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    heading?.focus({ preventScroll: true })
+  }
+
+  return (
+    <>
+      {awaiting > 0 && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-800">Needs your decision</p>
+            <p className="mt-0.5 text-sm font-medium text-stone-900">
+              {awaiting === 1 ? '1 document is awaiting review' : `${awaiting} documents are awaiting review`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={goToDocuments}
+            className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100"
+          >
+            Review
+          </button>
+        </div>
+      )}
+      {caseItem.isArchived && (
+        <p className="mb-4 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+          This case is archived, so its stage and documents are read-only.
+        </p>
+      )}
+      <CaseStageSection caseItem={caseItem} onStageChanged={onStageChanged} />
+      {onAssigned && <CaseConsultantSection caseItem={caseItem} onAssigned={onAssigned} />}
+      <DocumentsBody caseItem={caseItem} request={request} headingRef={documentsHeadingRef} />
+    </>
   )
 }
 
@@ -307,7 +353,9 @@ export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged, 
         <div className="flex h-full flex-col">
           <header className="flex items-start justify-between gap-4 border-b border-stone-200 px-5 py-5 sm:px-6">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-700">Case</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-700">
+                Case <span className="font-mono tracking-wider">{shortId(caseItem.id)}</span>
+              </p>
               <h2 id="case-docs-title" className="mt-1 truncate text-lg font-semibold tracking-tight">
                 {caseItem.clientName ?? 'Client'}
               </h2>
@@ -327,16 +375,12 @@ export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged, 
           </header>
 
           <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-            {caseItem.isArchived && (
-              <p className="mb-4 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
-                This case is archived, so its stage and documents are read-only.
-              </p>
-            )}
-            <CaseStageSection key={`stage-${caseItem.id}`} caseItem={caseItem} onStageChanged={onStageChanged} />
-            {onAssigned && (
-              <CaseConsultantSection key={`consultant-${caseItem.id}`} caseItem={caseItem} onAssigned={onAssigned} />
-            )}
-            <DocumentsBody key={caseItem.id} caseItem={caseItem} />
+            <CasePanelBody
+              key={caseItem.id}
+              caseItem={caseItem}
+              onStageChanged={onStageChanged}
+              onAssigned={onAssigned}
+            />
           </div>
 
           <footer className="grid grid-cols-1 border-t border-stone-200 bg-stone-50 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:px-6">

@@ -13,12 +13,16 @@ import {
 } from '../../lib/leads'
 import LeadDecisionSection from './LeadDecisionSection'
 
+// One label / value row: the label on the left, the value (and any hint) on the right, so the
+// details scan straight down a narrow panel.
 function Detail({ label, children, hint }) {
   return (
-    <div className="min-w-0">
-      <dt className="text-xs text-stone-500">{label}</dt>
-      <dd className="mt-0.5 text-sm font-medium break-words text-stone-900">{children}</dd>
-      {hint && <dd className="mt-0.5 text-xs text-stone-500">{hint}</dd>}
+    <div className="flex items-start justify-between gap-4 py-2.5">
+      <dt className="shrink-0 text-sm text-stone-500">{label}</dt>
+      <dd className="min-w-0 text-right">
+        <span className="block text-sm font-medium break-words text-stone-900">{children}</span>
+        {hint && <span className="mt-0.5 block text-xs text-stone-500">{hint}</span>}
+      </dd>
     </div>
   )
 }
@@ -122,7 +126,7 @@ export default function LeadDetailPanel({ lead, onClose, onDecided }) {
               <h3 id="lead-details-heading" className="text-sm font-semibold text-stone-900">
                 Enquiry details
               </h3>
-              <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-5">
+              <dl className="mt-3 divide-y divide-stone-100 rounded-lg border border-stone-200 px-4">
                 <Detail label="Immigration status">
                   {resolveEnum('immigrationStatus', lead.immigrationStatus)?.label ?? 'Not given'}
                 </Detail>

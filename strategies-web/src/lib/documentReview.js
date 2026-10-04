@@ -26,6 +26,12 @@ export function reviewErrorMessage(error) {
   return error?.message || 'The review could not be saved. Please try again.'
 }
 
+// How many documents on this case still need a staff decision: the same rule as the
+// Approve / Reject buttons, so the summary and the buttons can never disagree.
+export function awaitingDecisionCount(documents, caseArchived) {
+  return documents.filter((document) => canReview(document, caseArchived)).length
+}
+
 // GET /api/documents/{id}/file streams the stored file. Clients only reach their own cases and
 // consultants only their assigned ones (403 otherwise). The API answers 404 both for an unknown
 // document and for a record whose file is not on the server (e.g. demo rows with no upload).

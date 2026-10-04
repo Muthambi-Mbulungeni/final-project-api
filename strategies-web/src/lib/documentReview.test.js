@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  awaitingDecisionCount,
   canReview,
   documentFileErrorMessage,
   documentFilePath,
@@ -9,6 +10,21 @@ import {
   reviewErrorMessage,
   reviewPath,
 } from './documentReview'
+
+describe('awaitingDecisionCount', () => {
+  it('counts pending documents on an open case, like the review buttons', () => {
+    const documents = [
+      { status: 'Pending' },
+      { status: 0 },
+      { status: 'Pending', isArchived: true },
+      { status: 'Approved' },
+      { status: 'Rejected' },
+    ]
+    expect(awaitingDecisionCount(documents, false)).toBe(2)
+    expect(awaitingDecisionCount(documents, true)).toBe(0)
+    expect(awaitingDecisionCount([], false)).toBe(0)
+  })
+})
 
 describe('opening a document file', () => {
   it('builds the file path for one document', () => {

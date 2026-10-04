@@ -26,6 +26,7 @@ function buildColumns(onOpen, showConsultant) {
   const consultantColumn = {
     key: 'consultantName',
     header: 'Consultant',
+    className: 'whitespace-nowrap',
     render: (item) => assignedConsultantName(item) ?? <span className="text-brand-700">Unassigned</span>,
   }
 
@@ -40,7 +41,7 @@ function buildColumns(onOpen, showConsultant) {
             onClick={() => onOpen(item)}
             aria-haspopup="dialog"
             aria-label={`${item.clientName ?? 'Client'}, open case`}
-            className="text-left font-medium text-stone-900 hover:text-brand-700 hover:underline"
+            className="text-left font-medium whitespace-nowrap text-stone-900 hover:text-brand-700 hover:underline"
           >
             {item.clientName ?? '—'}
           </button>

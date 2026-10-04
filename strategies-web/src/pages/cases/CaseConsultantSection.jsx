@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import { useToast } from '../../components/ui/toastContext'
 import { apiPatch } from '../../lib/api'
+import { getInitials } from '../../lib/format'
 import {
   STAFF_LOOKUP_PATH,
   assignBody,
@@ -68,9 +69,22 @@ export default function CaseConsultantSection({ caseItem, onAssigned }) {
       >
         Consultant
       </h3>
-      <p className="mt-1 text-sm text-stone-700">
-        {assignedName ?? <span className="text-brand-700">Not assigned yet</span>}
-      </p>
+      {assignedName ? (
+        <p className="mt-3 flex items-center gap-3 text-sm font-medium text-stone-900">
+          <span
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs font-semibold text-stone-700"
+            aria-hidden="true"
+          >
+            {getInitials(assignedName)}
+          </span>
+          {assignedName}
+        </p>
+      ) : (
+        <p className="mt-3 flex items-center gap-3 text-sm font-medium text-brand-700">
+          <span className="size-8 shrink-0 rounded-full border border-dashed border-brand-200" aria-hidden="true" />
+          Not assigned yet
+        </p>
+      )}
 
       {editable && staff.error && (
         <ErrorNotice
@@ -109,7 +123,7 @@ export default function CaseConsultantSection({ caseItem, onAssigned }) {
             <button
               type="submit"
               disabled={busy || staff.loading}
-              className="shrink-0 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
+              className="shrink-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60"
             >
               {busy ? 'Saving…' : assignedName ? 'Reassign' : 'Assign'}
             </button>
