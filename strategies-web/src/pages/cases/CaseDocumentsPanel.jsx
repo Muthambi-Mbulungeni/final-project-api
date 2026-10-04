@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { useToast } from '../../components/ui/toastContext'
-import { apiPatch } from '../../lib/api'
+import { apiOpenFile, apiPatch } from '../../lib/api'
 import {
   canReview,
+  documentFileErrorMessage,
+  documentFilePath,
   documentsForReview,
   rejectionCommentError,
   reviewBody,
@@ -16,6 +18,7 @@ import { documentSummary, documentsPath } from '../../lib/documents'
 import { formatDate } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
+import CaseConsultantSection from './CaseConsultantSection'
 import CaseStageSection from './CaseStageSection'
 
 const NO_REJECTION = { id: null, comment: '', error: null }
@@ -37,8 +40,24 @@ function DocumentsBody({ caseItem }) {
   const [rowError, setRowError] = useState({ id: null, message: null })
   // Reviewed here but not yet reloaded: their buttons are hidden so nothing is submitted twice.
   const [reviewedIds, setReviewedIds] = useState(() => new Set())
+  const [openingId, setOpeningId] = useState(null)
+  const [fileError, setFileError] = useState({ id: null, message: null })
   const headingRefs = useRef(new Map())
   const commentRef = useRef(null)
+
+  // Staff read the actual file before approving or rejecting it.
+  async function openFile(document) {
+    setOpeningId(document.id)
+    setFileError({ id: null, message: null })
+    try {
+      const result = await apiOpenFile(documentFilePath(document.id), document.fileName || 'document')
+      if (result === 'saved') toast.show(`${documentName(document)} downloaded. Your browser blocked the new tab.`)
+    } catch (error) {
+      setFileError({ id: document.id, message: documentFileErrorMessage(error) })
+    } finally {
+      setOpeningId(null)
+    }
+  }
 
   function focusHeading(id) {
     requestAnimationFrame(() => headingRefs.current.get(id)?.focus())
@@ -125,9 +144,25 @@ function DocumentsBody({ caseItem }) {
                   <p className="truncate text-xs text-stone-500">
                     {document.fileName || 'No file name'} · Uploaded {formatDate(document.uploadedAt)}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => openFile(document)}
+                    disabled={openingId === document.id}
+                    aria-label={`Open the ${name} file in a new tab`}
+                    className="mt-1.5 inline-flex items-center gap-1.5 rounded text-sm font-medium text-brand-700 hover:text-brand-800 hover:underline disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <ExternalLink className="size-3.5" strokeWidth={2} aria-hidden="true" />
+                    {openingId === document.id ? 'Opening…' : 'Open file'}
+                  </button>
                 </div>
                 <StatusBadge type="documentStatus" value={document.status} />
               </div>
+
+              {fileError.id === document.id && (
+                <p role="alert" className="mt-2 text-sm text-brand-700">
+                  {fileError.message}
+                </p>
+              )}
 
               {document.reviewComment && (
                 <p className="mt-2 rounded-md bg-stone-50 px-3 py-2 text-sm text-stone-700">
@@ -219,30 +254,27 @@ function DocumentsBody({ caseItem }) {
   }
 
   return (
-    <>
-      <section aria-labelledby="case-docs-heading" className="mt-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h3 id="case-docs-heading" className="text-sm font-semibold text-stone-900">
-            Documents
-          </h3>
-          {documents.length > 0 && (
-            <p className="text-xs text-stone-500">
-              {summary.pending} awaiting review · {summary.approved} approved · {summary.rejected} rejected
-            </p>
-          )}
-        </div>
-        {content}
-      </section>
-      <p className="mt-6 text-xs text-stone-500">Opening files from the portal isn’t available yet.</p>
-    </>
+    <section aria-labelledby="case-docs-heading" className="mt-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 id="case-docs-heading" className="text-sm font-semibold text-stone-900">
+          Documents
+        </h3>
+        {documents.length > 0 && (
+          <p className="text-xs text-stone-500">
+            {summary.pending} awaiting review · {summary.approved} approved · {summary.rejected} rejected
+          </p>
+        )}
+      </div>
+      {content}
+    </section>
   )
 }
 
-// Side panel for one case: its stage (staff can move it) and its documents, with
-// approve / reject for pending ones.
+// Side panel for one case: its stage (staff can move it), its consultant (administrators can
+// assign one; pass onAssigned only for them) and its documents, with approve / reject for pending ones.
 // Same native <dialog> pattern as LeadDetailPanel: focus moves in, Escape closes,
 // focus returns to the client name that opened it. Full screen on phones.
-export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged }) {
+export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged, onAssigned }) {
   const dialogRef = useRef(null)
   const open = caseItem !== null
 
@@ -301,6 +333,9 @@ export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged }
               </p>
             )}
             <CaseStageSection key={`stage-${caseItem.id}`} caseItem={caseItem} onStageChanged={onStageChanged} />
+            {onAssigned && (
+              <CaseConsultantSection key={`consultant-${caseItem.id}`} caseItem={caseItem} onAssigned={onAssigned} />
+            )}
             <DocumentsBody key={caseItem.id} caseItem={caseItem} />
           </div>
 

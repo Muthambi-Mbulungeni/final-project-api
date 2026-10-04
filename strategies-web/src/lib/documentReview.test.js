@@ -1,12 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import {
   canReview,
+  documentFileErrorMessage,
+  documentFilePath,
   documentsForReview,
   rejectionCommentError,
   reviewBody,
   reviewErrorMessage,
   reviewPath,
 } from './documentReview'
+
+describe('opening a document file', () => {
+  it('builds the file path for one document', () => {
+    expect(documentFilePath('a b')).toBe('/api/documents/a%20b/file')
+  })
+
+  it('explains why a file could not be opened', () => {
+    expect(documentFileErrorMessage({ status: 404, message: 'Physical file not found.' })).toMatch(
+      /isn’t stored on the server/,
+    )
+    expect(documentFileErrorMessage({ status: 403 })).toMatch(/isn’t assigned to you/)
+    expect(documentFileErrorMessage({ status: 500, message: 'Server error' })).toBe('Server error')
+    expect(documentFileErrorMessage(null)).toMatch(/could not be opened/)
+  })
+})
 
 describe('reviewPath and reviewBody', () => {
   it('builds the status path for one document', () => {
