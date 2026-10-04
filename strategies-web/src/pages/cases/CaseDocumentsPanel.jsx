@@ -16,6 +16,7 @@ import { documentSummary, documentsPath } from '../../lib/documents'
 import { formatDate } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
+import CaseStageSection from './CaseStageSection'
 
 const NO_REJECTION = { id: null, comment: '', error: null }
 
@@ -218,13 +219,8 @@ function DocumentsBody({ caseItem }) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-      {caseItem.isArchived && (
-        <p className="mb-4 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
-          This case is archived, so its documents are read-only.
-        </p>
-      )}
-      <section aria-labelledby="case-docs-heading">
+    <>
+      <section aria-labelledby="case-docs-heading" className="mt-6">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h3 id="case-docs-heading" className="text-sm font-semibold text-stone-900">
             Documents
@@ -238,14 +234,15 @@ function DocumentsBody({ caseItem }) {
         {content}
       </section>
       <p className="mt-6 text-xs text-stone-500">Opening files from the portal isn’t available yet.</p>
-    </div>
+    </>
   )
 }
 
-// Side panel listing one case's documents with approve / reject for pending ones.
+// Side panel for one case: its stage (staff can move it) and its documents, with
+// approve / reject for pending ones.
 // Same native <dialog> pattern as LeadDetailPanel: focus moves in, Escape closes,
 // focus returns to the client name that opened it. Full screen on phones.
-export default function CaseDocumentsPanel({ caseItem, onClose }) {
+export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged }) {
   const dialogRef = useRef(null)
   const open = caseItem !== null
 
@@ -278,7 +275,7 @@ export default function CaseDocumentsPanel({ caseItem, onClose }) {
         <div className="flex h-full flex-col">
           <header className="flex items-start justify-between gap-4 border-b border-stone-200 px-5 py-5 sm:px-6">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-700">Case documents</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-700">Case</p>
               <h2 id="case-docs-title" className="mt-1 truncate text-lg font-semibold tracking-tight">
                 {caseItem.clientName ?? 'Client'}
               </h2>
@@ -291,13 +288,21 @@ export default function CaseDocumentsPanel({ caseItem, onClose }) {
               type="button"
               onClick={onClose}
               className="-mr-1.5 rounded-md p-1.5 text-stone-500 hover:bg-stone-100 hover:text-stone-900"
-              aria-label="Close case documents"
+              aria-label="Close case"
             >
               <X className="size-5" strokeWidth={1.75} aria-hidden="true" />
             </button>
           </header>
 
-          <DocumentsBody key={caseItem.id} caseItem={caseItem} />
+          <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+            {caseItem.isArchived && (
+              <p className="mb-4 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+                This case is archived, so its stage and documents are read-only.
+              </p>
+            )}
+            <CaseStageSection key={`stage-${caseItem.id}`} caseItem={caseItem} onStageChanged={onStageChanged} />
+            <DocumentsBody key={caseItem.id} caseItem={caseItem} />
+          </div>
 
           <footer className="grid grid-cols-1 border-t border-stone-200 bg-stone-50 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:px-6">
             <button
