@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { actionLabel, actorName } from './audit'
+import { actionLabel, activityContext, actorName, sharedNames } from './audit'
+
+describe('sharedNames', () => {
+  it('finds names used by more than one user, so only those need the id', () => {
+    const entries = [
+      { userId: 'u1', userName: 'Consultant User' },
+      { userId: 'u1', userName: 'Consultant User' },
+      { userId: 'u2', userName: 'Sam Smith' },
+      { userId: 'u3', userName: 'Sam Smith' },
+      { userId: 'u4', userName: 'System/Unknown' },
+      { userId: 'u5', userName: 'System/Unknown' },
+    ]
+    expect([...sharedNames(entries)]).toEqual(['Sam Smith'])
+    expect(sharedNames().size).toBe(0)
+  })
+})
+
+describe('activityContext', () => {
+  it('says who acted and on what kind of record', () => {
+    expect(activityContext({ userName: 'Consultant User', entityType: 'Document' })).toBe('Consultant User · Document')
+    expect(activityContext({ userName: 'System/Unknown', entityType: 'Case' })).toBe('Case record')
+    expect(activityContext({ userName: 'Riaad' })).toBe('Riaad')
+    expect(activityContext({})).toBeNull()
+  })
+})
 
 describe('actionLabel', () => {
   it('turns the API code names into the same sentences the rest of the log uses', () => {

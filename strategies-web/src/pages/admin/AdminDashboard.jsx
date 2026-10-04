@@ -5,7 +5,7 @@ import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
 import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
-import { actionLabel } from '../../lib/audit'
+import { actionLabel, activityContext } from '../../lib/audit'
 import { formatDateTime, getInitials } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
@@ -46,7 +46,7 @@ export default function AdminDashboard() {
   const caseTotal = totalOf(cases)
 
   // Figures come from the same list endpoints the admin pages use, so they match what those pages show.
-  // On a phone the tiles sit two-up, so the third spans the full width rather than leaving a gap.
+  // Three tiles cannot sit evenly two-up, so on a phone they stack as compact rows instead.
   const tiles = [
     {
       label: 'User accounts',
@@ -67,7 +67,6 @@ export default function AdminDashboard() {
       value: summary?.total ?? null,
       hint: summary ? `${summary.awaiting} awaiting consultant review` : undefined,
       loading: leadSummary.loading && !summary,
-      className: 'col-span-2 sm:col-span-1',
     },
   ]
 
@@ -81,7 +80,7 @@ export default function AdminDashboard() {
 
       {allFailed && <ErrorNotice className="mt-8" message={users.error.message} onRetry={retryAll} />}
 
-      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+      <div className="mt-8 grid gap-3 sm:grid-cols-3 sm:gap-4">
         {tiles.map((tile) => (
           <StatTile
             key={tile.label}
@@ -90,7 +89,7 @@ export default function AdminDashboard() {
             hint={tile.hint}
             to={tile.to}
             loading={tile.loading}
-            className={tile.className}
+            compactOnPhone
           />
         ))}
       </div>
@@ -115,15 +114,20 @@ export default function AdminDashboard() {
             hideError={allFailed}
           >
             <ul className="-my-3 divide-y divide-stone-100">
-              {auditEntries.map((entry, index) => (
-                <li key={entry.id ?? index} className="flex items-center justify-between gap-4 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-stone-900">{actionLabel(entry.action)}</p>
-                    {entry.entityType && <p className="truncate text-xs text-stone-500">{entry.entityType} record</p>}
-                  </div>
-                  <span className="shrink-0 text-xs text-stone-500 tabular-nums">{formatDateTime(entry.createdAt)}</span>
-                </li>
-              ))}
+              {auditEntries.map((entry, index) => {
+                const context = activityContext(entry)
+                return (
+                  <li key={entry.id ?? index} className="flex items-center justify-between gap-4 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-stone-900">{actionLabel(entry.action)}</p>
+                      {context && <p className="truncate text-xs text-stone-500">{context}</p>}
+                    </div>
+                    <span className="shrink-0 text-xs text-stone-500 tabular-nums">
+                      {formatDateTime(entry.createdAt)}
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           </RequestState>
         </Panel>

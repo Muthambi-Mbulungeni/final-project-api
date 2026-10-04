@@ -3,7 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 import { X } from 'lucide-react'
 import DataTable from '../../components/ui/DataTable'
 import PageHeader from '../../components/ui/PageHeader'
-import { actionLabel, actorName } from '../../lib/audit'
+import { actionLabel, actorName, sharedNames } from '../../lib/audit'
 import { formatDateTime, shortId } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
@@ -46,6 +46,7 @@ export default function AuditLogPage() {
   const request = useApi(buildAuditPath(page, userId))
   const response = request.data
   const rows = listItems(response)
+  const ambiguousNames = sharedNames(rows)
 
   // Name for the filter chip: router state (Users page or a row click), else the first loaded row,
   // but only if that row belongs to this user (stale rows from the previous list must not name the wrong person).
@@ -92,12 +93,16 @@ export default function AuditLogPage() {
       render: (entry) => {
         if (!entry.userId) return '—'
         const name = actorName(entry)
-        // Names are not unique, so the short id stays visible under the name as the audit evidence.
+        // Names are not unique. When two users on this page share one, the short id under each
+        // name tells them apart; otherwise it is only noise, and the full id stays in the tooltip.
+        const showId = name !== null && ambiguousNames.has(name)
         if (userId) {
           return name ? (
             <div>
-              <p className="text-stone-800">{name}</p>
-              <IdText value={entry.userId} />
+              <p className="text-stone-800" title={entry.userId}>
+                {name}
+              </p>
+              {showId && <IdText value={entry.userId} />}
             </div>
           ) : (
             <IdText value={entry.userId} />
@@ -108,7 +113,7 @@ export default function AuditLogPage() {
             <button
               type="button"
               onClick={() => filterByUser(entry.userId, name)}
-              title="Show only this user's actions"
+              title={`Show only this user's actions (user ${entry.userId})`}
               aria-label={`${name ?? shortId(entry.userId)}: show only this user's actions`}
               className={
                 name
@@ -118,7 +123,7 @@ export default function AuditLogPage() {
             >
               {name ?? shortId(entry.userId)}
             </button>
-            {name && <IdText value={entry.userId} />}
+            {showId && <IdText value={entry.userId} />}
           </div>
         )
       },
