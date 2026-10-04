@@ -11,6 +11,8 @@
 
 const DEV_SESSION_KEY = 'smp.devSession'
 const REFRESH_TOKEN_KEY = 'smp.refreshToken'
+// Not a secret: only remembers that a sign-in used the cookie, so a restore is worth trying.
+const COOKIE_HINT_KEY = 'smp.cookieSession'
 
 export const ROLES = {
   admin: { key: 'admin', label: 'Administrator', home: '/admin' },
@@ -91,6 +93,7 @@ export function startSession(auth) {
 
   // Fallback B: only when the API put the refresh token in the body.
   if (auth.refreshToken) writeItem('sessionStorage', REFRESH_TOKEN_KEY, auth.refreshToken)
+  else writeItem('localStorage', COOKIE_HINT_KEY, '1')
 
   removeItem('localStorage', DEV_SESSION_KEY)
   notify()
@@ -103,6 +106,12 @@ export function getAccessToken() {
 
 export function getStoredRefreshToken() {
   return readItem('sessionStorage', REFRESH_TOKEN_KEY)
+}
+
+// True when this browser may still hold a session to restore: a refresh token in this tab, or an
+// earlier sign-in that used the cookie. A first-time visitor has neither, so no request is made.
+export function mayRestoreSession() {
+  return Boolean(getStoredRefreshToken() || readItem('localStorage', COOKIE_HINT_KEY))
 }
 
 function devSession() {
@@ -129,6 +138,7 @@ export function startDevSession(role) {
   if (!ROLES[role]) return null
   current = null
   removeItem('sessionStorage', REFRESH_TOKEN_KEY)
+  removeItem('localStorage', COOKIE_HINT_KEY)
   writeItem('localStorage', DEV_SESSION_KEY, JSON.stringify({ role, ...DEMO_USERS[role] }))
   notify()
   return getSession()
@@ -138,6 +148,7 @@ export function startDevSession(role) {
 export function endSession() {
   current = null
   removeItem('sessionStorage', REFRESH_TOKEN_KEY)
+  removeItem('localStorage', COOKIE_HINT_KEY)
   removeItem('localStorage', DEV_SESSION_KEY)
   notify()
 }

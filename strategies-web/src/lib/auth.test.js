@@ -82,6 +82,7 @@ describe('signing in, out and restoring', () => {
 
   it('restores a session from the refresh cookie, trying only once per page load', async () => {
     fetchMock.mockImplementation(async () => json(AUTH))
+    localStorage.setItem('smp.cookieSession', '1')
 
     await expect(restoreSession()).resolves.toBe(true)
     expect(getSession()).toMatchObject({ role: 'consultant', source: 'api' })
