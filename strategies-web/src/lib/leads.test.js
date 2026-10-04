@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  agentReason,
   countFromLeadsResponse,
   enquiryMailto,
   isAwaitingReview,
@@ -99,6 +100,22 @@ describe('verdictExplanation', () => {
   it('falls back when no verdict is recorded', () => {
     expect(verdictExplanation({}).title).toBe('No verdict recorded')
     expect(verdictExplanation(null).title).toBe('No verdict recorded')
+  })
+})
+
+describe('agentReason', () => {
+  it('returns the trimmed reason the agent gave', () => {
+    expect(agentReason({ triageReason: '  Valid work permit and wants help.\n' })).toBe(
+      'Valid work permit and wants help.',
+    )
+  })
+
+  it('returns null when the agent gave no usable reason', () => {
+    expect(agentReason({ triageReason: null })).toBeNull()
+    expect(agentReason({ triageReason: '   ' })).toBeNull()
+    expect(agentReason({ triageReason: 42 })).toBeNull()
+    expect(agentReason({})).toBeNull()
+    expect(agentReason(null)).toBeNull()
   })
 })
 

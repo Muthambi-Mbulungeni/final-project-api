@@ -3,7 +3,7 @@ import { Mail, X } from 'lucide-react'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { resolveEnum } from '../../config/enums'
 import { formatDate, formatDateTime } from '../../lib/format'
-import { enquiryMailto, enquiryReference, startTimingLabel, verdictExplanation } from '../../lib/leads'
+import { agentReason, enquiryMailto, enquiryReference, startTimingLabel, verdictExplanation } from '../../lib/leads'
 
 function Detail({ label, children, hint }) {
   return (
@@ -41,6 +41,7 @@ export default function LeadDetailPanel({ lead, onClose }) {
   }
 
   const verdict = lead ? verdictExplanation(lead) : null
+  const reason = agentReason(lead)
   const mailto = lead ? enquiryMailto(lead) : null
   const reference = enquiryReference(lead)
   const firstName = String(lead?.fullName ?? '').trim().split(' ')[0]
@@ -83,6 +84,14 @@ export default function LeadDetailPanel({ lead, onClose }) {
                 <StatusBadge type="triageStatus" value={lead.triageStatus} />
                 <p className="mt-3 text-sm font-medium text-stone-900">{verdict.title}</p>
                 <p className="mt-1 text-sm leading-relaxed text-stone-600">{verdict.body}</p>
+                {reason && (
+                  <figure className="mt-4 border-t border-stone-200 pt-3">
+                    <figcaption className="text-xs text-stone-500">The agent’s reason, given at intake</figcaption>
+                    <blockquote className="mt-1 border-l-2 border-stone-300 pl-3 text-sm leading-relaxed break-words whitespace-pre-line text-stone-800">
+                      {reason}
+                    </blockquote>
+                  </figure>
+                )}
               </div>
             </section>
 

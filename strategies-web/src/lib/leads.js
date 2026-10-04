@@ -94,6 +94,15 @@ export function verdictExplanation(lead) {
   return VERDICTS[triageValue(lead)] ?? NO_VERDICT
 }
 
+// The intake agent's own explanation, saved when the enquiry arrived. Null when the
+// agent gave none (AI unavailable, unparseable reply, or older seeded leads).
+export function agentReason(lead) {
+  const reason = lead?.triageReason
+  if (typeof reason !== 'string') return null
+  const trimmed = reason.trim()
+  return trimmed || null
+}
+
 // How far away the desired start date is, in plain words.
 export function startTimingLabel(value, now = new Date()) {
   const date = toDate(value)
