@@ -160,7 +160,7 @@ namespace Strategies.Api.Services
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
             var user = await GetUserByEmailAsync(request.Email);
-            if (user == null || !user.IsActive)
+            if (user == null || !user.IsActive || !user.EmailConfirmed)
                 return null;
 
             if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
@@ -241,6 +241,50 @@ namespace Strategies.Api.Services
 
             await _refreshTokenStore.RevokeTokenAsync(refreshTokenString);
             return true;
+        }
+
+        public async Task<bool> RegisterAsync(RegisterRequest request)
+        {
+            var existingUser = await GetUserByEmailAsync(request.Email);
+            if (existingUser != null) return false;
+
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = request.Email.Trim().ToLowerInvariant(),
+                FullName = $"{request.FirstName.Trim()} {request.LastName.Trim()}",
+                PasswordHash = _passwordHasher.HashPassword(request.Password),
+                Role = UserRole.Client,
+                IsActive = true,
+                EmailConfirmed = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            if (await IsDbAvailableAsync())
+            {
+                _dbContext.Users.Add(user);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<bool> ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            var user = await GetUserByEmailAsync(request.Email);
+            if (user == null) return false;
+            
+            if (string.IsNullOrWhiteSpace(request.Token)) return false;
+
+            user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
+
+            if (await IsDbAvailableAsync())
+            {
+                _dbContext.Users.Update(user);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            return false;
         }
     }
 }

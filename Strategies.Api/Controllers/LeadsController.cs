@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -85,6 +86,33 @@ namespace Strategies.Api.Controllers
             var aiResult = await agentService.ProcessLeadAsync(
                 $"Name: {dto.FullName}, Immigration status: {dto.ImmigrationStatus}, Needs assistance: {dto.NeedsAssistance}");
 
+            var triageStatus = TriageStatus.NeedsReview;
+            string? triageReason = null;
+
+            if (aiResult.Status == RunStatus.Success.ToString() && !string.IsNullOrWhiteSpace(aiResult.ExtractedData))
+            {
+                try
+                {
+                    using var jsonDoc = System.Text.Json.JsonDocument.Parse(aiResult.ExtractedData);
+                    if (jsonDoc.RootElement.TryGetProperty("status", out var statusElement))
+                    {
+                        var statusStr = statusElement.GetString();
+                        if (Enum.TryParse<TriageStatus>(statusStr, true, out var parsedStatus))
+                        {
+                            triageStatus = parsedStatus;
+                        }
+                    }
+                    if (jsonDoc.RootElement.TryGetProperty("reason", out var reasonElement))
+                    {
+                        triageReason = reasonElement.GetString();
+                    }
+                }
+                catch
+                {
+                    // Fall back to NeedsReview if parsing fails
+                }
+            }
+
             var lead = new Lead
             {
                 Id = Guid.NewGuid(),
@@ -95,9 +123,8 @@ namespace Strategies.Api.Controllers
                 DesiredStartDate = dto.DesiredStartDate,
                 VisaCategoryId = dto.VisaCategoryId,
                 SubmittedAt = DateTime.UtcNow,
-                TriageStatus = aiResult.Status == RunStatus.Success.ToString()
-                                        ? TriageStatus.Qualified
-                                        : TriageStatus.NeedsReview
+                TriageStatus = triageStatus,
+                TriageReason = triageReason
             };
 
             _context.Leads.Add(lead);
@@ -112,6 +139,35 @@ namespace Strategies.Api.Controllers
                 AiAnalysis = aiResult.Status == RunStatus.Success.ToString() ? aiResult.ExtractedData : null,
                 FallbackNote = aiResult.Status != RunStatus.Success.ToString() ? aiResult.Message : null
             });
+        }
+
+        [HttpPatch("{id}/status")]
+        [Authorize(Roles = "Admin,Consultant")]
+        public async Task<IActionResult> UpdateLeadStatus(Guid id, [FromBody] UpdateLeadStatusRequest request)
+        {
+            var lead = await _context.Leads.FindAsync(id);
+            if (lead == null) return NotFound(new ApiErrorResponse { Message = "Lead not found." });
+
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid.TryParse(userIdStr, out var currentUserId);
+
+            var oldStatus = lead.TriageStatus;
+            lead.TriageStatus = request.Status;
+            lead.ReviewedById = currentUserId;
+
+            var audit = new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = currentUserId,
+                Action = "UpdateLeadStatus",
+                EntityType = "Lead",
+                EntityId = id,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.AuditLogs.Add(audit);
+
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Lead status updated." });
         }
     }
 }

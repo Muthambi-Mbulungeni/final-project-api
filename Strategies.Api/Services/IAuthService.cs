@@ -12,5 +12,7 @@ namespace Strategies.Api.Services
         Task<bool> RevokeTokenAsync(string refreshToken);
         Task<User?> GetUserByIdAsync(Guid userId);
         Task<User?> GetUserByEmailAsync(string email);
+        Task<bool> RegisterAsync(RegisterRequest request);
+        Task<bool> ResetPasswordAsync(ResetPasswordRequest request);
     }
 }

@@ -17,11 +17,13 @@ namespace Strategies.Api.Controllers
     {
         private readonly IAuthService _authService;
         private readonly IEmailService _emailService;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
-        public AuthController(IAuthService authService, IEmailService emailService)
+        public AuthController(IAuthService authService, IEmailService emailService, Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             _authService = authService;
             _emailService = emailService;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -106,11 +108,42 @@ namespace Strategies.Api.Controllers
             var user = await _authService.GetUserByEmailAsync(request.Email);
             if (user != null)
             {
-                var resetLink = $"https://strategies.com/reset-password?email={Uri.EscapeDataString(user.Email)}";
+                var baseUrl = _configuration["App:BaseUrl"] ?? "https://strategies.com";
+                var resetLink = $"{baseUrl.TrimEnd('/')}/reset-password?email={Uri.EscapeDataString(user.Email)}";
                 await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
             }
 
             return Ok(new { Message = "If an account with that email exists, a reset link has been sent." });
+        }
+
+        [HttpPost("register")]
+        [AllowAnonymous]
+        [EnableRateLimiting("auth-strict")]
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiErrorResponse { Message = "Validation failed." });
+
+            var result = await _authService.RegisterAsync(request);
+            if (!result)
+                return BadRequest(new ApiErrorResponse { Message = "Registration failed or email already exists." });
+
+            return StatusCode(201, new { Message = "Registration successful. Please check your email to confirm your account." });
+        }
+
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        [EnableRateLimiting("auth-strict")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new ApiErrorResponse { Message = "Validation failed." });
+
+            var result = await _authService.ResetPasswordAsync(request);
+            if (!result)
+                return BadRequest(new ApiErrorResponse { Message = "Invalid request or token." });
+
+            return Ok(new { Message = "Password reset successfully." });
         }
 
         /// <summary>

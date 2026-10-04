@@ -14,4 +14,22 @@ namespace Strategies.Api.DTOs
         public DateTime CreatedAt { get; set; }
         public DateTime LastUpdated { get; set; }
     }
+
+    public class UpdateCaseStageRequest
+    {
+        public Strategies.Api.Data.Enums.CaseStage Stage { get; set; }
+        public string Notes { get; set; } = string.Empty;
+    }
+
+    public class AssignConsultantRequest
+    {
+        public Guid ConsultantId { get; set; }
+    }
+
+    public class CreateCaseRequest
+    {
+        public Guid ClientId { get; set; }
+        public Guid VisaCategoryId { get; set; }
+        public Guid? LeadId { get; set; }
+    }
 }

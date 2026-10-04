@@ -62,11 +62,42 @@ namespace Strategies.Api.Services
                 response.EnsureSuccessStatusCode();
 
                 var responseString = await response.Content.ReadAsStringAsync();
+                
+                string extractedText = string.Empty;
+                try
+                {
+                    using var jsonDoc = JsonDocument.Parse(responseString);
+                    extractedText = jsonDoc.RootElement
+                        .GetProperty("candidates")[0]
+                        .GetProperty("content")
+                        .GetProperty("parts")[0]
+                        .GetProperty("text")
+                        .GetString() ?? string.Empty;
+                        
+                    // Strip markdown blocks if Gemini returns them
+                    extractedText = extractedText.Trim();
+                    if (extractedText.StartsWith("```json"))
+                        extractedText = extractedText.Substring(7);
+                    else if (extractedText.StartsWith("```"))
+                        extractedText = extractedText.Substring(3);
+                        
+                    if (extractedText.EndsWith("```"))
+                        extractedText = extractedText.Substring(0, extractedText.Length - 3);
+                        
+                    extractedText = extractedText.Trim();
+                }
+                catch (Exception parseEx)
+                {
+                    _logger.LogWarning(parseEx, "Failed to parse Gemini response: {Response}", responseString);
+                    // Fall back to just returning the raw string if parsing fails
+                    extractedText = responseString;
+                }
+
                 return new AgentResponse
                 {
                     Status        = RunStatus.Success.ToString(),
                     Message       = "AI processed successfully.",
-                    ExtractedData = responseString
+                    ExtractedData = extractedText
                 };
             }
             catch (Exception ex)
