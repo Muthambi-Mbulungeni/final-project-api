@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.Nexus" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#A31217</item>
+        <item name="android:windowBackground">#FAFAF9</item>
+    </style>
+</resources>
