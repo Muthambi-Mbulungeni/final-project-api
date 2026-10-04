@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -68,6 +69,20 @@ namespace Strategies.Api.Controllers
                 return Conflict(new ApiErrorResponse { Message = "User account is already suspended." });
 
             user.IsActive = false;
+
+            var adminIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid.TryParse(adminIdStr, out var adminId);
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = adminId,
+                Action = "Suspended user",
+                EntityType = "User",
+                EntityId = id,
+                CreatedAt = DateTime.UtcNow
+            });
+
             await _context.SaveChangesAsync();
             return Ok(new { Message = "User account has been suspended." });
         }
@@ -83,6 +98,20 @@ namespace Strategies.Api.Controllers
                 return Conflict(new ApiErrorResponse { Message = "User account is already active." });
 
             user.IsActive = true;
+
+            var adminIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid.TryParse(adminIdStr, out var adminId);
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = adminId,
+                Action = "Reinstated user",
+                EntityType = "User",
+                EntityId = id,
+                CreatedAt = DateTime.UtcNow
+            });
+
             await _context.SaveChangesAsync();
             return Ok(new { Message = "User account has been reinstated." });
         }
@@ -98,8 +127,21 @@ namespace Strategies.Api.Controllers
                 return Conflict(new ApiErrorResponse { Message = "User is already deactivated." });
 
             user.IsActive = false; // Soft delete
-            await _context.SaveChangesAsync();
 
+            var adminIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid.TryParse(adminIdStr, out var adminId);
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = adminId,
+                Action = "Deactivated user",
+                EntityType = "User",
+                EntityId = id,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync();
             return Ok(new { Message = "User soft-deleted successfully (deactivated)." });
         }
 
