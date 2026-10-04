@@ -80,7 +80,7 @@ namespace Strategies.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -153,7 +153,7 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<Guid>("ChangedById")
+                    b.Property<Guid?>("ChangedById")
                         .HasColumnType("uuid");
 
                     b.Property<int>("FromStage")
@@ -462,8 +462,7 @@ namespace Strategies.Api.Migrations
                     b.HasOne("Strategies.Api.Data.Models.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Case", b =>
@@ -471,7 +470,7 @@ namespace Strategies.Api.Migrations
                     b.HasOne("Strategies.Api.Data.Models.User", null)
                         .WithMany()
                         .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Strategies.Api.Data.Models.User", null)
@@ -487,7 +486,7 @@ namespace Strategies.Api.Migrations
                     b.HasOne("Strategies.Api.Data.Models.VisaCategory", null)
                         .WithMany()
                         .HasForeignKey("VisaCategoryId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
@@ -502,8 +501,7 @@ namespace Strategies.Api.Migrations
                     b.HasOne("Strategies.Api.Data.Models.User", null)
                         .WithMany()
                         .HasForeignKey("ChangedById")
-                        .OnDelete(DeleteBehavior.SetNull)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.ChecklistTemplate", b =>

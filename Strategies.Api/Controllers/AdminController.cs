@@ -88,17 +88,19 @@ namespace Strategies.Api.Controllers
         }
 
         [HttpDelete("users/{id}")]
-        public IActionResult DeleteUser(Guid id)
+        public async Task<IActionResult> DeleteUser(Guid id)
         {
-            return StatusCode(405, new ApiErrorResponse
-            {
-                Message = "Permanent user deletion is not permitted.",
-                Errors = new System.Collections.Generic.List<string>
-                {
-                    "User records must be retained for POPIA compliance and case audit trail integrity.",
-                    "Use PATCH /api/admin/users/{id}/suspend to deactivate an account."
-                }
-            });
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+                return NotFound(new ApiErrorResponse { Message = "User not found." });
+
+            if (!user.IsActive)
+                return Conflict(new ApiErrorResponse { Message = "User is already deactivated." });
+
+            user.IsActive = false; // Soft delete
+            await _context.SaveChangesAsync();
+
+            return Ok(new { Message = "User soft-deleted successfully (deactivated)." });
         }
 
         [HttpGet("audit-logs")]

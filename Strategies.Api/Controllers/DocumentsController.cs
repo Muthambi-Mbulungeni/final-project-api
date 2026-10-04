@@ -141,6 +141,61 @@ namespace Strategies.Api.Controllers
         }
 
         /// <summary>
+        /// GET /api/documents/{id}/file
+        /// Downloads the physical file for a given document. Enforces ownership checks.
+        /// </summary>
+        [HttpGet("{id}/file")]
+        public async Task<IActionResult> DownloadDocument(Guid id)
+        {
+            var document = await _context.Documents.FindAsync(id);
+            if (document == null)
+                return NotFound(new ApiErrorResponse { Message = "Document not found." });
+
+            if (User.IsInRole("Client"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!Guid.TryParse(userIdStr, out var currentUserId))
+                    return Unauthorized();
+
+                var owns = await _context.Cases
+                    .AnyAsync(c => c.Id == document.CaseId && c.ClientId == currentUserId);
+                if (!owns)
+                    return Forbid();
+            }
+            else if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid.TryParse(userIdStr, out var currentUserId);
+                var owns = await _context.Cases.AnyAsync(c => c.Id == document.CaseId && c.ConsultantId == currentUserId);
+                if (!owns) return Forbid();
+            }
+
+            var relativePath = document.FilePath.StartsWith("/") ? document.FilePath.Substring(1) : document.FilePath;
+            var filePath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", relativePath);
+            if (!System.IO.File.Exists(filePath))
+                return NotFound(new ApiErrorResponse { Message = "Physical file not found." });
+
+            var memory = new System.IO.MemoryStream();
+            using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read))
+            {
+                await stream.CopyToAsync(memory);
+            }
+            memory.Position = 0;
+            
+            var ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+            var contentType = ext switch
+            {
+                ".pdf" => "application/pdf",
+                ".jpg" => "image/jpeg",
+                ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                _ => "application/octet-stream"
+            };
+
+            return File(memory, contentType, document.FileName);
+        }
+
+        /// <summary>
         /// POST /api/documents/upload
         /// Uploads a physical file to local storage. Enforces 5MB size limit and PDF/JPG/PNG types.
         /// </summary>
@@ -285,6 +340,12 @@ namespace Strategies.Api.Controllers
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
             Guid.TryParse(userIdStr, out var reviewerId);
 
+            if (User.IsInRole("Consultant"))
+            {
+                var caseOwns = await _context.Cases.AnyAsync(c => c.Id == document.CaseId && c.ConsultantId == reviewerId);
+                if (!caseOwns) return Forbid();
+            }
+
             document.Status = parsedStatus;
             document.ReviewComment = dto.ReviewComment?.Trim();
             document.ReviewedById = reviewerId;
@@ -319,7 +380,27 @@ namespace Strategies.Api.Controllers
             if (document.IsArchived)
                 return Conflict(new ApiErrorResponse { Message = "Document is already archived." });
 
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid.TryParse(userIdStr, out var currentUserId);
+
+            if (User.IsInRole("Consultant"))
+            {
+                var caseOwns = await _context.Cases.AnyAsync(c => c.Id == document.CaseId && c.ConsultantId == currentUserId);
+                if (!caseOwns) return Forbid();
+            }
+
             document.IsArchived = true;
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = currentUserId,
+                Action = "ArchiveDocument",
+                EntityType = "Document",
+                EntityId = document.Id,
+                CreatedAt = DateTime.UtcNow
+            });
+
             await _context.SaveChangesAsync();
             return Ok(new { Message = "Document archived." });
         }

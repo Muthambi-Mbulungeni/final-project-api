@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Strategies.Api.Data.Models;
 
 namespace Strategies.Api.Data
@@ -128,7 +128,7 @@ namespace Strategies.Api.Data
                 caseEntity.HasOne<User>()
                     .WithMany()
                     .HasForeignKey(caseRecord => caseRecord.ClientId)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 caseEntity.HasOne<User>()
                     .WithMany()
@@ -138,7 +138,7 @@ namespace Strategies.Api.Data
                 caseEntity.HasOne<VisaCategory>()
                     .WithMany()
                     .HasForeignKey(caseRecord => caseRecord.VisaCategoryId)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(DeleteBehavior.Restrict);
 
                 caseEntity.Property(caseRecord => caseRecord.IsArchived)
                     .HasDefaultValue(false);

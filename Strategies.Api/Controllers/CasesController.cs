@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
+using Strategies.Api.Data.Models;
 using Strategies.Api.DTOs;
 
 namespace Strategies.Api.Controllers
@@ -93,12 +94,74 @@ namespace Strategies.Api.Controllers
         }
 
         /// <summary>
+        /// POST /api/cases
+        /// Creates a new case for a client. Admin and Consultant only.
+        /// </summary>
+        [HttpPost]
+        [Authorize(Roles = "Admin,Consultant")]
+        public async Task<IActionResult> CreateCase([FromBody] CreateCaseRequest request)
+        {
+            var client = await _context.Users.FindAsync(request.ClientId);
+            if (client == null || !client.IsActive)
+                return BadRequest(new ApiErrorResponse { Message = "Valid, active client is required." });
+
+            var visaCat = await _context.VisaCategories.FindAsync(request.VisaCategoryId);
+            if (visaCat == null || !visaCat.IsActive)
+                return BadRequest(new ApiErrorResponse { Message = "Valid, active visa category is required." });
+
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid.TryParse(userIdStr, out var currentUserId);
+
+            var newCase = new Case
+            {
+                Id = Guid.NewGuid(),
+                ClientId = request.ClientId,
+                VisaCategoryId = request.VisaCategoryId,
+                LeadId = request.LeadId,
+                ConsultantId = User.IsInRole("Consultant") ? currentUserId : null,
+                Stage = CaseStage.InitialIntake,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.Cases.Add(newCase);
+
+            var audit = new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = currentUserId,
+                Action = "CreateCase",
+                EntityType = "Case",
+                EntityId = newCase.Id,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.AuditLogs.Add(audit);
+
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetCase), new { id = newCase.Id }, new { Message = "Case created.", CaseId = newCase.Id });
+        }
+
+        /// <summary>
         /// GET /api/cases/{id}
         /// Single case with display names.
         /// </summary>
         [HttpGet("{id}")]
         public async Task<IActionResult> GetCase(Guid id)
         {
+            if (User.IsInRole("Consultant") || User.IsInRole("Client"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid.TryParse(userIdStr, out var currentUserId);
+                bool owns;
+                if (User.IsInRole("Consultant"))
+                    owns = await _context.Cases.AnyAsync(c => c.Id == id && c.ConsultantId == currentUserId);
+                else
+                    owns = await _context.Cases.AnyAsync(c => c.Id == id && c.ClientId == currentUserId);
+                
+                if (!owns) return Forbid();
+            }
+
             var caseRecord = await (from c in _context.Cases
                                     join cl in _context.Users on c.ClientId equals cl.Id into cg
                                     from client in cg.DefaultIfEmpty()
@@ -123,14 +186,6 @@ namespace Strategies.Api.Controllers
             if (caseRecord == null)
                 return NotFound(new ApiErrorResponse { Message = "Case not found." });
 
-            if (User.IsInRole("Consultant"))
-            {
-                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                Guid.TryParse(userIdStr, out var currentUserId);
-                var owns = await _context.Cases.AnyAsync(c => c.Id == id && c.ConsultantId == currentUserId);
-                if (!owns) return Forbid();
-            }
-
             return Ok(caseRecord);
         }
 
@@ -142,7 +197,15 @@ namespace Strategies.Api.Controllers
         [Authorize(Roles = "Admin,Consultant")]
         public async Task<IActionResult> ExportCases()
         {
-            var cases = await (from c in _context.Cases
+            var baseQuery = _context.Cases.AsQueryable();
+            if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                Guid.TryParse(userIdStr, out var currentUserId);
+                baseQuery = baseQuery.Where(c => c.ConsultantId == currentUserId);
+            }
+
+            var cases = await (from c in baseQuery
                                join cl in _context.Users on c.ClientId equals cl.Id into cg
                                from client in cg.DefaultIfEmpty()
                                join vc in _context.VisaCategories on c.VisaCategoryId equals vc.Id into vcg
@@ -183,20 +246,32 @@ namespace Strategies.Api.Controllers
                     return Forbid();
             }
 
-            var query = _context.Cases.Where(c => c.ClientId == clientId);
+            var query = from c in _context.Cases
+                        join cl in _context.Users on c.ClientId equals cl.Id into clientGroup
+                        from client in clientGroup.DefaultIfEmpty()
+                        join co in _context.Users on c.ConsultantId equals co.Id into cog
+                        from consultant in cog.DefaultIfEmpty()
+                        join vc in _context.VisaCategories on c.VisaCategoryId equals vc.Id into vcg
+                        from visaCat in vcg.DefaultIfEmpty()
+                        where c.ClientId == clientId
+                        select new { c, client, consultant, visaCat };
+
             var totalRecords = await query.CountAsync();
             var cases = await query
-                .OrderByDescending(c => c.CreatedAt)
+                .OrderByDescending(x => x.c.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(c => new CaseDto
+                .Select(x => new CaseDto
                 {
-                    Id          = c.Id,
-                    ClientId    = c.ClientId,
-                    Stage       = c.Stage.ToString(),
-                    IsArchived  = c.IsArchived,
-                    CreatedAt   = c.CreatedAt,
-                    LastUpdated = c.UpdatedAt
+                    Id          = x.c.Id,
+                    ClientId    = x.c.ClientId,
+                    ClientName  = x.client != null ? x.client.FullName : "Unassigned",
+                    ConsultantName = x.consultant != null ? x.consultant.FullName : "Unassigned",
+                    VisaCategoryName = x.visaCat != null ? x.visaCat.Name : "N/A",
+                    Stage       = x.c.Stage.ToString(),
+                    IsArchived  = x.c.IsArchived,
+                    CreatedAt   = x.c.CreatedAt,
+                    LastUpdated = x.c.UpdatedAt
                 })
                 .ToListAsync();
 
@@ -207,6 +282,77 @@ namespace Strategies.Api.Controllers
                 TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
                 CurrentPage  = page
             });
+        }
+
+        [HttpPatch("{id}/stage")]
+        [Authorize(Roles = "Admin,Consultant")]
+        public async Task<IActionResult> UpdateStage(Guid id, [FromBody] UpdateCaseStageRequest request)
+        {
+            var c = await _context.Cases.FindAsync(id);
+            if (c == null) return NotFound(new ApiErrorResponse { Message = "Case not found." });
+
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid.TryParse(userIdStr, out var currentUserId);
+
+            if (User.IsInRole("Consultant") && c.ConsultantId != currentUserId)
+                return Forbid();
+
+            var oldStage = c.Stage;
+            c.Stage = request.Stage;
+            c.UpdatedAt = DateTime.UtcNow;
+
+            var history = new CaseStageHistory
+            {
+                Id = Guid.NewGuid(),
+                CaseId = id,
+                FromStage = oldStage,
+                ToStage = request.Stage,
+                ChangedById = currentUserId,
+                ChangedAt = DateTime.UtcNow
+            };
+            _context.CaseStageHistories.Add(history);
+
+            var audit = new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = currentUserId,
+                Action = "UpdateCaseStage",
+                EntityType = "Case",
+                EntityId = id,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.AuditLogs.Add(audit);
+
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Stage updated." });
+        }
+
+        [HttpPatch("{id}/assign")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AssignConsultant(Guid id, [FromBody] AssignConsultantRequest request)
+        {
+            var c = await _context.Cases.FindAsync(id);
+            if (c == null) return NotFound(new ApiErrorResponse { Message = "Case not found." });
+
+            c.ConsultantId = request.ConsultantId;
+            c.UpdatedAt = DateTime.UtcNow;
+
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            Guid.TryParse(userIdStr, out var currentUserId);
+
+            var audit = new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = currentUserId,
+                Action = "AssignConsultant",
+                EntityType = "Case",
+                EntityId = id,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.AuditLogs.Add(audit);
+
+            await _context.SaveChangesAsync();
+            return Ok(new { Message = "Consultant assigned." });
         }
 
         private static string EscapeCsv(string value)

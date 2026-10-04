@@ -24,4 +24,9 @@ namespace Strategies.Api.DTOs
 
         public Guid? VisaCategoryId { get; set; }
     }
+
+    public class UpdateLeadStatusRequest
+    {
+        public TriageStatus Status { get; set; }
+    }
 }
