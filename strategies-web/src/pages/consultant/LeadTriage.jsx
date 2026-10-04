@@ -5,11 +5,12 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { enumFilter, enumOrder, resolveEnum } from '../../config/enums'
 import { formatDate } from '../../lib/format'
-import { leadsPath } from '../../lib/leads'
+import { applyDecision, leadsPath } from '../../lib/leads'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
 import { useLeadSummary } from '../../lib/useLeadSummary'
+import { useSession } from '../../lib/useSession'
 import LeadDetailPanel from './LeadDetailPanel'
 
 const PAGE_SIZE = 10
@@ -27,7 +28,7 @@ function buildColumns(onOpen, sortable) {
         <div>
           <button
             type="button"
-            onClick={() => onOpen(lead.id)}
+            onClick={() => onOpen(lead)}
             aria-haspopup="dialog"
             className="text-left font-medium text-stone-900 hover:text-brand-700 hover:underline"
           >
@@ -66,7 +67,7 @@ function buildColumns(onOpen, sortable) {
     },
     {
       key: 'triageStatus',
-      header: 'Agent verdict',
+      header: 'Verdict',
       sortable,
       sortValue: (lead) => enumOrder('triageStatus', lead.triageStatus),
       render: (lead) => <StatusBadge type="triageStatus" value={lead.triageStatus} />,
@@ -82,7 +83,7 @@ function buildColumns(onOpen, sortable) {
 }
 
 const FILTERS = [
-  enumFilter('triageStatus', 'triageStatus', 'Agent verdict'),
+  enumFilter('triageStatus', 'triageStatus', 'Verdict'),
   enumFilter('immigrationStatus', 'immigrationStatus', 'Immigration status'),
 ]
 
@@ -115,8 +116,9 @@ function LeadTriage({ eyebrow, title, description }) {
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [status, setStatus] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedLead, setSelectedLead] = useState(null)
   const search = useDebouncedValue(searchInput, 400)
+  const session = useSession()
 
   const request = useApi(leadsPath({ page, pageSize: PAGE_SIZE, search, status }))
   const leadSummary = useLeadSummary()
@@ -126,10 +128,15 @@ function LeadTriage({ eyebrow, title, description }) {
   // The real API pages, searches and filters by verdict on the server. The mock API returns
   // every lead as a plain array; then the table does all of that in the browser.
   const serverMode = !Array.isArray(response)
-  const columns = useMemo(() => buildColumns(setSelectedId, !serverMode), [serverMode])
+  const columns = useMemo(() => buildColumns(setSelectedLead, !serverMode), [serverMode])
 
-  // Looked up by ID so the panel always shows the latest data after a reload.
-  const selectedLead = leads.find((lead) => lead.id === selectedId) ?? null
+  // Called after the API accepted the decision (200). The panel keeps its own copy of the lead,
+  // so it stays open even when the decision moves the lead out of the filtered list.
+  function handleDecided(leadId, status) {
+    setSelectedLead((current) => (current?.id === leadId ? applyDecision(current, status, session?.id) : current))
+    request.reload()
+    leadSummary.reload()
+  }
 
   function handleSearchChange(value) {
     setSearchInput(value)
@@ -160,7 +167,7 @@ function LeadTriage({ eyebrow, title, description }) {
           loading={request.loading}
           error={request.error?.message}
           onRetry={request.reload}
-          onRowClick={(lead) => setSelectedId(lead.id)}
+          onRowClick={setSelectedLead}
           searchKeys={SEARCH_KEYS}
           searchPlaceholder="Search by name or email"
           searchValue={serverMode ? searchInput : undefined}
@@ -185,13 +192,13 @@ function LeadTriage({ eyebrow, title, description }) {
         />
       </div>
 
-      <LeadDetailPanel lead={selectedLead} onClose={() => setSelectedId(null)} />
+      <LeadDetailPanel lead={selectedLead} onClose={() => setSelectedLead(null)} onDecided={handleDecided} />
     </>
   )
 }
 
-// GET /api/leads allows Admin and Consultant and returns every lead to both, so the two pages
-// differ only in their wording. The lead panel has no consultant-only actions.
+// GET /api/leads and PATCH /api/leads/{id}/status allow Admin and Consultant and treat both alike,
+// so the two pages differ only in their wording.
 export function AdminLeadsPage() {
   return (
     <LeadTriage

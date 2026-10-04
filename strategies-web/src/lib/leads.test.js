@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   agentReason,
+  applyDecision,
   countFromLeadsResponse,
+  decisionChoices,
+  decisionErrorMessage,
+  decisionLabel,
   enquiryMailto,
   isAwaitingReview,
+  leadStatusBody,
+  leadStatusPath,
   leadsPath,
   percentOf,
   startTimingLabel,
@@ -100,6 +106,48 @@ describe('verdictExplanation', () => {
   it('falls back when no verdict is recorded', () => {
     expect(verdictExplanation({}).title).toBe('No verdict recorded')
     expect(verdictExplanation(null).title).toBe('No verdict recorded')
+  })
+
+  it('credits a consultant, not the agent, once the lead is reviewed', () => {
+    expect(verdictExplanation({ triageStatus: 'Qualified', reviewedById: 'u1' }).title).toBe('Qualified by a consultant')
+    expect(verdictExplanation({ triageStatus: 2, reviewedById: 'u1' }).title).toBe('Unqualified by a consultant')
+    expect(verdictExplanation({ triageStatus: 'NeedsReview', reviewedById: 'u1' }).title).toBe('Waiting for your review')
+  })
+})
+
+describe('lead decisions', () => {
+  it('sends the status name to the lead status endpoint', () => {
+    expect(leadStatusPath('a b')).toBe('/api/leads/a%20b/status')
+    expect(leadStatusBody('Unqualified')).toEqual({ status: 'Unqualified' })
+  })
+
+  it('offers both decisions before review, so the agent verdict can be confirmed', () => {
+    expect(decisionChoices({ triageStatus: 'Qualified' })).toEqual(['Qualified', 'Unqualified'])
+    expect(decisionChoices({ triageStatus: 'NeedsReview' })).toEqual(['Qualified', 'Unqualified'])
+    expect(decisionLabel({ triageStatus: 'NeedsReview' }, 'Qualified')).toBe('Mark qualified')
+  })
+
+  it('offers only the other decision after review, matching numeric enums too', () => {
+    expect(decisionChoices({ triageStatus: 1, reviewedById: 'u1' })).toEqual(['Unqualified'])
+    expect(decisionChoices({ triageStatus: 'Unqualified', reviewedById: 'u1' })).toEqual(['Qualified'])
+    expect(decisionLabel({ reviewedById: 'u1' }, 'Unqualified')).toBe('Change to unqualified')
+    expect(decisionChoices(null)).toEqual([])
+  })
+
+  it('applies an accepted decision and records the reviewer', () => {
+    const lead = { id: 'l1', fullName: 'Naledi', triageStatus: 'NeedsReview', reviewedById: null }
+    expect(applyDecision(lead, 'Qualified', 'u9')).toEqual({ ...lead, triageStatus: 'Qualified', reviewedById: 'u9' })
+    expect(applyDecision({ ...lead, reviewedById: 'u1' }, 'Qualified', undefined).reviewedById).toBe('u1')
+  })
+
+  it('explains failed decisions in plain language', () => {
+    expect(decisionErrorMessage({ status: 403 })).toMatch(/isn’t allowed/)
+    expect(decisionErrorMessage({ status: 404 })).toMatch(/no longer exists/)
+    expect(decisionErrorMessage({ status: 400, message: 'One or more validation errors occurred.' })).toMatch(
+      /wasn’t accepted/,
+    )
+    expect(decisionErrorMessage({ status: 500, message: 'Server error' })).toBe('Server error')
+    expect(decisionErrorMessage(null)).toMatch(/could not be saved/)
   })
 })
 
