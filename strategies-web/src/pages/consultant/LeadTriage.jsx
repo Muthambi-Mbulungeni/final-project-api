@@ -95,7 +95,7 @@ function TriageSummary({ summary, loading }) {
     { label: 'Screened by the intake agent', value: summary?.total },
     { label: 'Awaiting review', value: summary?.awaiting },
     { label: 'Qualified', value: summary?.qualified },
-    { label: 'Filtered out', value: summary?.unqualified },
+    { label: 'Unqualified', value: summary?.unqualified },
   ]
 
   return (

@@ -16,7 +16,7 @@ function caseDetails(item) {
   if (!item) return []
   const hasConsultant = item.consultantName && item.consultantName !== 'Unassigned'
   return [
-    { label: 'Case reference', value: shortId(item.id).toUpperCase(), mono: true },
+    { label: 'Case reference', value: shortId(item.id), mono: true },
     { label: 'Opened', value: formatDate(item.createdAt) },
     item.visaCategoryName && item.visaCategoryName !== 'N/A' && { label: 'Visa category', value: item.visaCategoryName },
     hasConsultant && { label: 'Your consultant', value: item.consultantName },

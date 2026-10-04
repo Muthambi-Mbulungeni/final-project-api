@@ -80,8 +80,8 @@ const VERDICTS = {
     body: 'The agent assessed this enquiry as complete and eligible to proceed. It does not need to wait in the review queue.',
   },
   Unqualified: {
-    title: 'Filtered out by the intake agent',
-    body: 'The agent assessed this enquiry as not viable, so it was kept out of the review queue.',
+    title: 'Unqualified by the intake agent',
+    body: 'The agent assessed this enquiry as not eligible to proceed, so it was kept out of the review queue.',
   },
 }
 
@@ -179,7 +179,7 @@ export function startTimingLabel(value, now = new Date()) {
 
 // The same reference the public sees on their enquiry confirmation.
 export function enquiryReference(lead) {
-  return lead?.id ? shortId(lead.id).toUpperCase() : null
+  return lead?.id ? shortId(lead.id) : null
 }
 
 // A mailto link that opens the consultant's email app, addressed to the lead.

@@ -3,7 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 import { X } from 'lucide-react'
 import DataTable from '../../components/ui/DataTable'
 import PageHeader from '../../components/ui/PageHeader'
-import { actorName } from '../../lib/audit'
+import { actionLabel, actorName } from '../../lib/audit'
 import { formatDateTime, shortId } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
@@ -74,7 +74,7 @@ export default function AuditLogPage() {
     {
       key: 'action',
       header: 'Action',
-      render: (entry) => <span className="font-medium text-stone-900">{entry.action ?? '—'}</span>,
+      render: (entry) => <span className="font-medium text-stone-900">{actionLabel(entry.action)}</span>,
     },
     {
       key: 'entityType',

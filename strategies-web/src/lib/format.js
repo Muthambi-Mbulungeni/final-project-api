@@ -42,8 +42,9 @@ export function getInitials(name) {
     .toUpperCase()
 }
 
-// First 8 characters of an ID (e.g. a GUID) for compact display.
+// First 8 characters of an ID (e.g. a GUID) for compact display, in capitals everywhere, so
+// staff see the same reference a client quotes from their confirmation or dashboard.
 export function shortId(id) {
   if (id === null || id === undefined || id === '') return '—'
-  return String(id).slice(0, 8)
+  return String(id).slice(0, 8).toUpperCase()
 }

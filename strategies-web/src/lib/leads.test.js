@@ -100,7 +100,7 @@ describe('verdictExplanation', () => {
     expect(verdictExplanation({ triageStatus: 'NeedsReview' }).title).toBe('Waiting for your review')
     expect(verdictExplanation({ triageStatus: 'Pending' }).title).toBe('Not yet screened')
     expect(verdictExplanation({ triageStatus: 1 }).title).toBe('Qualified by the intake agent')
-    expect(verdictExplanation({ triageStatus: 'Unqualified' }).title).toBe('Filtered out by the intake agent')
+    expect(verdictExplanation({ triageStatus: 'Unqualified' }).title).toBe('Unqualified by the intake agent')
   })
 
   it('falls back when no verdict is recorded', () => {

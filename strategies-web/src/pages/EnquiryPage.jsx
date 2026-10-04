@@ -166,7 +166,7 @@ export default function EnquiryPage() {
       setSubmitted({
         firstName: values.fullName.trim().split(' ')[0],
         email: values.email.trim(),
-        reference: result?.leadId ? shortId(result.leadId).toUpperCase() : null,
+        reference: result?.leadId ? shortId(result.leadId) : null,
       })
     } catch (error) {
       setFormError(submissionErrorMessage(error))

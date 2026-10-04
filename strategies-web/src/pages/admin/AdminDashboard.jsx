@@ -5,6 +5,7 @@ import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
 import StatTile from '../../components/ui/StatTile'
 import StatusBadge from '../../components/ui/StatusBadge'
+import { actionLabel } from '../../lib/audit'
 import { formatDateTime, getInitials } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
@@ -117,7 +118,7 @@ export default function AdminDashboard() {
               {auditEntries.map((entry, index) => (
                 <li key={entry.id ?? index} className="flex items-center justify-between gap-4 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-stone-900">{entry.action}</p>
+                    <p className="truncate text-sm font-medium text-stone-900">{actionLabel(entry.action)}</p>
                     {entry.entityType && <p className="truncate text-xs text-stone-500">{entry.entityType} record</p>}
                   </div>
                   <span className="shrink-0 text-xs text-stone-500 tabular-nums">{formatDateTime(entry.createdAt)}</span>

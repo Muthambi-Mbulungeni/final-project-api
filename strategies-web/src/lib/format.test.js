@@ -46,6 +46,7 @@ describe('getInitials', () => {
 describe('shortId', () => {
   it('returns the first 8 characters of an ID', () => {
     expect(shortId('33333333-3333-3333-3333-333333333333')).toBe('33333333')
+    expect(shortId('6adcbe68-1f2e-4c3d-8b9a-0123456789ab')).toBe('6ADCBE68')
   })
 
   it('returns a dash when there is no ID', () => {
