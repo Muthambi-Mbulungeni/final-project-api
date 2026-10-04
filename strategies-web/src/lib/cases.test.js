@@ -6,6 +6,9 @@ import {
   assignedConsultantName,
   canChangeStage,
   consultantChoices,
+  consultantWorkload,
+  isActiveCase,
+  workloadStatus,
   currentConsultantId,
   latestCase,
   stageActionLabel,
@@ -63,6 +66,56 @@ describe('assigning a consultant', () => {
     expect(assignErrorMessage({ status: 404 })).toMatch(/no longer exists/)
     expect(assignErrorMessage({ status: 400, message: 'One or more validation errors occurred.' })).toMatch(/wasn’t accepted/)
     expect(assignErrorMessage(null)).toMatch(/could not be assigned/)
+  })
+})
+
+describe('consultant workload', () => {
+  const consultants = [
+    { id: 'c1', fullName: 'Consultant User' },
+    { id: 'c2', fullName: 'Riaad' },
+    { id: 'c3', fullName: 'Ayanda Khumalo' },
+  ]
+  const cases = {
+    data: [
+      { consultantName: 'Consultant User', stage: 'UnderReview' },
+      { consultantName: 'Consultant User', stage: 1 },
+      { consultantName: 'Consultant User', stage: 'DocumentGathering', isArchived: true },
+      { consultantName: 'Riaad', stage: 'FinalDecision' },
+      { consultantName: 'Riaad', stage: 'InitialIntake' },
+      { consultantName: 'Unassigned', stage: 'InitialIntake' },
+    ],
+    totalRecords: 6,
+  }
+
+  it('counts active cases like the API: not archived and not at Final decision', () => {
+    expect(isActiveCase({ stage: 'UnderReview' })).toBe(true)
+    expect(isActiveCase({ stage: 4 })).toBe(false)
+    expect(isActiveCase({ stage: 'InitialIntake', isArchived: true })).toBe(false)
+  })
+
+  it('lists every consultant, busiest first, and counts unassigned active cases', () => {
+    const { rows, unassigned, complete } = consultantWorkload(consultants, cases)
+    expect(rows.map((row) => [row.name, row.active])).toEqual([
+      ['Consultant User', 2],
+      ['Riaad', 1],
+      ['Ayanda Khumalo', 0],
+    ])
+    expect(unassigned).toBe(1)
+    expect(complete).toBe(true)
+  })
+
+  it('reports no count for a shared name, and flags a partial case list', () => {
+    const twins = [...consultants, { id: 'c4', fullName: 'Riaad' }]
+    const { rows, complete } = consultantWorkload(twins, { ...cases, totalRecords: 140 })
+    expect(rows.filter((row) => row.name === 'Riaad').map((row) => row.active)).toEqual([null, null])
+    expect(complete).toBe(false)
+  })
+
+  it('describes the load against the target in words', () => {
+    expect(workloadStatus(7)).toBe('3 below target')
+    expect(workloadStatus(10)).toBe('At target')
+    expect(workloadStatus(12)).toBe('2 over target')
+    expect(workloadStatus(null)).toMatch(/shared/)
   })
 })
 

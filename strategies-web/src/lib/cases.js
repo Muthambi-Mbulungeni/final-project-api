@@ -78,6 +78,51 @@ export function assignedConsultantName(caseItem) {
   return name && name !== 'Unassigned' ? name : null
 }
 
+// Consultant workload for the admin overview. "Active" matches the API's own definition in
+// StatsController: not archived and not yet at Final decision. The client asked for an even spread
+// of about 10 active cases per consultant (client interview), so 10 is the reference line.
+// Cases carry the consultant's name only, so they are matched by name; a name shared by two
+// consultants cannot be split fairly, so those rows report no count rather than a wrong one.
+export const WORKLOAD_TARGET = 10
+export const WORKLOAD_CASES_PATH = '/api/cases?page=1&pageSize=100'
+
+export function isActiveCase(caseItem) {
+  return Boolean(caseItem) && !caseItem.isArchived && resolveEnum('caseStage', caseItem.stage)?.value !== 'FinalDecision'
+}
+
+export function consultantWorkload(consultants, casesResponse) {
+  const cases = listItems(casesResponse)
+  const active = cases.filter(isActiveCase)
+  const nameCounts = new Map()
+  for (const consultant of consultants) nameCounts.set(consultant.fullName, (nameCounts.get(consultant.fullName) ?? 0) + 1)
+
+  const rows = consultants
+    .map((consultant) => ({
+      id: consultant.id,
+      name: consultant.fullName,
+      active:
+        nameCounts.get(consultant.fullName) > 1
+          ? null
+          : active.filter((caseItem) => assignedConsultantName(caseItem) === consultant.fullName).length,
+    }))
+    .sort((a, b) => (b.active ?? -1) - (a.active ?? -1) || String(a.name).localeCompare(String(b.name)))
+
+  const total = casesResponse?.totalRecords
+  return {
+    rows,
+    unassigned: active.filter((caseItem) => !assignedConsultantName(caseItem)).length,
+    complete: typeof total !== 'number' || total <= cases.length,
+  }
+}
+
+// Plain words beside each bar, so the status never depends on colour alone.
+export function workloadStatus(active, target = WORKLOAD_TARGET) {
+  if (active === null || active === undefined) return 'Name shared with another consultant'
+  if (active > target) return `${active - target} over target`
+  if (active === target) return 'At target'
+  return `${target - active} below target`
+}
+
 export function assignErrorMessage(error) {
   if (error?.status === 403) return 'Only administrators can assign consultants.'
   if (error?.status === 404) return 'This case no longer exists. Close the panel and refresh the list.'
