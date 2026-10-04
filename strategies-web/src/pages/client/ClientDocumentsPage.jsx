@@ -326,8 +326,8 @@ function DocumentsOverview({ caseId }) {
 }
 
 // Clients see what needs their attention, their progress, and each document's review status.
-// Clients can upload a new copy of a rejected document. A general upload is not offered because
-// the API has no list of document types to choose from.
+// Clients can upload a new copy of a rejected document. A general upload (choosing a type from
+// GET /api/documenttypes) is not built yet; consultants add the other documents to the case.
 export default function ClientDocumentsPage() {
   const session = getSession()
   const casesRequest = useApi(`/api/cases/client/${session?.id}`)
