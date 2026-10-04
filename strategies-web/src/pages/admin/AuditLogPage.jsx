@@ -3,6 +3,7 @@ import { useLocation, useSearchParams } from 'react-router-dom'
 import { X } from 'lucide-react'
 import DataTable from '../../components/ui/DataTable'
 import PageHeader from '../../components/ui/PageHeader'
+import { actorName } from '../../lib/audit'
 import { formatDateTime, shortId } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
@@ -11,9 +12,10 @@ const PAGE_SIZE = 20
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // GET /api/admin/audit-logs?page&pageSize&userId returns
-// { data: [{ id, userId, action, entityType, entityId, createdAt }], totalRecords, totalPages, currentPage },
-// always newest first. userId is the only filter the API supports, so it is the only one offered.
-// The filter lives in the URL (?userId=), so Back, bookmarks and the Users page's "Activity" link all work.
+// { data: [{ id, userId, userName, action, entityType, entityId, createdAt }], totalRecords, totalPages, currentPage },
+// always newest first. userName is "System/Unknown" when no user matches. userId is the only filter the API
+// supports, so it is the only one offered. The filter lives in the URL (?userId=), so Back, bookmarks and the
+// Users page's "Activity" link all work.
 function buildAuditPath(page, userId) {
   const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })
   if (userId) params.set('userId', userId)
@@ -36,8 +38,6 @@ export default function AuditLogPage() {
   // Only a well-formed id is sent; anything else would be rejected by the API.
   const rawUserId = searchParams.get('userId')
   const userId = rawUserId && GUID_PATTERN.test(rawUserId) ? rawUserId : null
-  // Present when arriving from the Users page; a shared link falls back to the short id.
-  const userName = userId ? location.state?.userName : null
 
   // The page number belongs to one filter: changing the filter (including via Back) starts at page 1.
   const [paging, setPaging] = useState({ userId: null, page: 1 })
@@ -45,9 +45,17 @@ export default function AuditLogPage() {
 
   const request = useApi(buildAuditPath(page, userId))
   const response = request.data
+  const rows = listItems(response)
 
-  function filterByUser(id) {
-    setSearchParams({ userId: id })
+  // Name for the filter chip: router state (Users page or a row click), else the first loaded row,
+  // but only if that row belongs to this user (stale rows from the previous list must not name the wrong person).
+  const firstRow = rows[0]
+  const userName = userId
+    ? location.state?.userName ?? (firstRow?.userId === userId ? actorName(firstRow) : null)
+    : null
+
+  function filterByUser(id, name) {
+    setSearchParams({ userId: id }, { state: name ? { userName: name } : undefined })
   }
 
   function clearUserFilter() {
@@ -81,22 +89,39 @@ export default function AuditLogPage() {
     {
       key: 'userId',
       header: 'Performed by',
-      render: (entry) =>
-        !entry.userId ? (
-          '—'
-        ) : userId ? (
-          <IdText value={entry.userId} />
-        ) : (
-          <button
-            type="button"
-            onClick={() => filterByUser(entry.userId)}
-            title="Show only this user's actions"
-            aria-label={`${shortId(entry.userId)}: show only this user's actions`}
-            className="rounded font-mono text-xs text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline"
-          >
-            {shortId(entry.userId)}
-          </button>
-        ),
+      render: (entry) => {
+        if (!entry.userId) return '—'
+        const name = actorName(entry)
+        // Names are not unique, so the short id stays visible under the name as the audit evidence.
+        if (userId) {
+          return name ? (
+            <div>
+              <p className="text-stone-800">{name}</p>
+              <IdText value={entry.userId} />
+            </div>
+          ) : (
+            <IdText value={entry.userId} />
+          )
+        }
+        return (
+          <div className="flex flex-col items-start">
+            <button
+              type="button"
+              onClick={() => filterByUser(entry.userId, name)}
+              title="Show only this user's actions"
+              aria-label={`${name ?? shortId(entry.userId)}: show only this user's actions`}
+              className={
+                name
+                  ? 'rounded text-left font-medium text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline'
+                  : 'rounded font-mono text-xs text-brand-700 underline-offset-2 hover:text-brand-800 hover:underline'
+              }
+            >
+              {name ?? shortId(entry.userId)}
+            </button>
+            {name && <IdText value={entry.userId} />}
+          </div>
+        )
+      },
     },
   ]
 
@@ -130,7 +155,7 @@ export default function AuditLogPage() {
             </span>
           </span>
         ) : (
-          <span>Select an ID under “Performed by” to see only that user’s actions.</span>
+          <span>Select a name under “Performed by” to see only that user’s actions.</span>
         )}
         <span className="text-xs text-stone-500">Newest first</span>
       </div>
@@ -139,7 +164,7 @@ export default function AuditLogPage() {
         <DataTable
           caption={userName ? `Audit log for ${userName}` : 'Audit log'}
           columns={columns}
-          rows={listItems(response)}
+          rows={rows}
           loading={request.loading}
           error={request.error?.message}
           onRetry={request.reload}

@@ -8,10 +8,12 @@ const TONE_STYLES = {
   danger: 'bg-brand-50 text-brand-700 ring-brand-200',
 }
 
-export default function StatusBadge({ type, value }) {
+// `label` lets a screen word a status for its audience (e.g. "Needs replacing" for clients)
+// while keeping the tone, so the colour still means the same thing everywhere.
+export default function StatusBadge({ type, value, label: labelOverride }) {
   const option = resolveEnum(type, value)
   const tone = option?.tone ?? 'neutral'
-  const label = option?.label ?? (value === null || value === undefined ? 'Unknown' : String(value))
+  const label = labelOverride ?? option?.label ?? (value === null || value === undefined ? 'Unknown' : String(value))
 
   return (
     <span

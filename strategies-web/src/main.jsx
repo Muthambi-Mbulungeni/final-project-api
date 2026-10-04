@@ -7,14 +7,20 @@ import '@fontsource/ibm-plex-sans/600.css'
 import '@fontsource/ibm-plex-sans/700.css'
 import './index.css'
 import App from './App.jsx'
+import AppErrorFallback from './components/AppErrorFallback.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import ToastProvider from './components/ui/ToastProvider.jsx'
 
+// The outer boundary is the last resort: if anything above the page level fails, users get a
+// branded screen with a way back instead of a blank page. Pages have their own boundary in AppShell.
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
-    </BrowserRouter>
+    <ErrorBoundary fallback={() => <AppErrorFallback />}>
+      <BrowserRouter>
+        <ToastProvider>
+          <App />
+        </ToastProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )

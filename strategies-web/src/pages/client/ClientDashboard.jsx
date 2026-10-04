@@ -6,14 +6,10 @@ import RequestState from '../../components/ui/RequestState'
 import { CASE_STAGES } from '../../config/caseStages'
 import { enumOrder } from '../../config/enums'
 import { formatDate, shortId } from '../../lib/format'
+import { latestCase } from '../../lib/cases'
 import { listItems } from '../../lib/listData'
 import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
-
-// The client's most recently opened case.
-function latestCase(cases) {
-  return [...cases].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] ?? null
-}
 
 // Only show details the API actually sent.
 function caseDetails(item) {
