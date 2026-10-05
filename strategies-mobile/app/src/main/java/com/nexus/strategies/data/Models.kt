@@ -128,6 +128,6 @@ class ApiException(val kind: Kind, message: String = kind.name) : IOException(me
         Kind.RateLimited -> "Too many attempts, wait a minute and try again."
         Kind.Server -> "Something went wrong on our side. Please try again."
         Kind.Network -> "We can't reach the service right now. Check your connection and try again."
-        Kind.NotClient -> "This app is for clients. Staff please use the web portal."
+        Kind.NotClient -> "This app is for clients. Staff, please use the web portal."
     }
 }

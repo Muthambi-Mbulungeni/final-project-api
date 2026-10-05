@@ -13,7 +13,7 @@ Screenshots: to be attached (kept by the tester).
 | 3 | Documents | Lists the case's documents with status and reviewer note | Documents shown, including a rejection note | PASS |
 | 4 | Messages | Lists notifications, unread badge from `unreadCount` | Messages shown, 2 unread | PASS |
 | 5 | Wrong password | One generic message, no hint which field was wrong | TODO | TODO |
-| 6 | Staff account sign-in | Refused: "This app is for clients. Staff please use the web portal." | TODO | TODO |
+| 6 | Staff account sign-in | Refused: "This app is for clients. Staff, please use the web portal." | TODO | TODO |
 | 7 | 6th login in a minute | "Too many attempts, wait a minute and try again." | TODO | TODO |
 | 8 | Reopen app | Silent restore, no login screen | TODO | TODO |
 | 9 | Expired access token | One refresh, request retried, user stays signed in | TODO | TODO |

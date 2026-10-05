@@ -119,6 +119,6 @@ class ModelsTest {
             ApiException(ApiException.Kind.Network).userMessage(),
         )
         assertEquals("Too many attempts, wait a minute and try again.", ApiException(ApiException.Kind.RateLimited).userMessage())
-        assertEquals("This app is for clients. Staff please use the web portal.", ApiException(ApiException.Kind.NotClient).userMessage())
+        assertEquals("This app is for clients. Staff, please use the web portal.", ApiException(ApiException.Kind.NotClient).userMessage())
     }
 }
