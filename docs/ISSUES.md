@@ -22,7 +22,7 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
 | [ISS-10](#iss-10) | Medium | No automated tests for the API controllers | Marco, Mbulungeni |
-| [ISS-11](#iss-11) | Medium | Mobile: Gradle wrapper missing, manual checks incomplete | Kundai |
+| [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run; release build has no API address | Kundai |
 | [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan, Marco |
 | [ISS-12](#iss-12) | Low | Mixed audit action wording; old lead verdict not recorded | Marco |
 | [ISS-13](#iss-13) | Low | Users list cannot show the join date | Marco, Riaad |
@@ -117,11 +117,11 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 ### ISS-11
 
-**Medium. Mobile: Gradle wrapper missing, manual checks incomplete.**
+**Medium. Mobile: 4 manual checks not run; release build has no API address.**
 
-- **Problem:** `gradlew` and its wrapper files are not committed, so `./gradlew testDebugUnitTest` from the mobile README cannot run from a fresh clone. 8 of 12 manual checks are not yet run.
-- **Evidence:** `strategies-mobile`; [mobile test log](../strategies-mobile/TESTING.md).
-- **Fix:** commit `gradlew`, `gradlew.bat` and `gradle/wrapper/gradle-wrapper.jar`, and complete the manual checks.
+- **Problem:** checks 7 (rate limit), 8 (reopen app), 9 (expired access token) and 11 (API stopped) are not yet run. Release builds point at `https://CHANGE-ME.example.com/` because the API is not hosted yet.
+- **Evidence:** [mobile test log](../strategies-mobile/TESTING.md); `strategies-mobile/app/build.gradle.kts`.
+- **Fix:** run the 4 checks; set the hosted API address once deployed.
 
 ### ISS-15
 
@@ -186,3 +186,9 @@ Issues found by testing or review and fixed before submission.
 | First-time visitors triggered a failed token refresh and a console error | The web portal only refreshes when a session exists (PR #19) |
 | Admin overview panels were read in a different order from how they look (WCAG 1.3.2, 2.4.3) | Source order now matches the visual order (PR #23) |
 | Caps Lock warning was shown only as an icon | Warning given in words again (PR #23) |
+| Mobile: a fresh clone could not reach the local API: the debug http setting was never committed, because the root `.gitignore` ignores every `debug/` folder | Debug-only network config (http to `10.0.2.2` and `localhost` only) and a `.gitignore` exception (PR #27) |
+| Mobile: a refused staff session was never revoked on the server (the revoke call ran on the main thread and its error was hidden) | Sign-in runs off the main thread; Network Inspector shows `revoke` 200 (PR #27) |
+| Mobile: "You have been signed out." and "Incorrect email or password." showed together | A new sign-in clears the old notice (PR #27) |
+| Mobile: after a client uploaded a new copy on the web, the app still asked for a replacement and counted both copies | Same rule as the web: a rejected copy is hidden once a newer copy of the same type exists, with unit tests (PR #27) |
+| Mobile: told clients to contact their consultant for a new copy | Points to upload on the web portal (PR #27) |
+| Mobile: Gradle wrapper missing, so a fresh clone could not build or run the tests | `gradlew`, `gradlew.bat` and the wrapper jar committed (PR #27) |

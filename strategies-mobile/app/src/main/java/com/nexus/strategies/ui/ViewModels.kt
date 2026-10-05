@@ -61,6 +61,8 @@ class AuthViewModel : ViewModel() {
     }
 
     fun login(email: String, password: String) {
+        // A new attempt replaces any earlier notice ("You have been signed out."), so only one message shows.
+        if (_state.value is AuthState.SignedOut) _state.value = AuthState.SignedOut()
         if (email.isBlank() || password.isBlank()) {
             _error.value = "Enter your email and password."
             return

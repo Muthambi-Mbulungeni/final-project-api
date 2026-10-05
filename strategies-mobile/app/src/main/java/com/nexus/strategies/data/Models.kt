@@ -49,6 +49,7 @@ data class CaseDto(
 @Serializable
 data class DocumentDto(
     val id: String,
+    val documentTypeId: String? = null,
     val documentTypeName: String = "Document",
     val fileName: String = "",
     val status: String = "Pending",
@@ -58,6 +59,30 @@ data class DocumentDto(
 ) {
     val state: DocStatus get() = DocStatus.parse(status)
 }
+
+/**
+ * The documents a client sees, same rule as the web portal (strategies-web lib/documents.js):
+ * archived copies are left out, and a rejected copy is hidden once a newer copy of the same
+ * document type is on the case (the client's old copy stays in the API; staff still see it).
+ * Order: to replace first, then awaiting review, then approved; newest first within each.
+ */
+fun documentsForClient(documents: List<DocumentDto>): List<DocumentDto> {
+    val current = documents.filter { !it.isArchived }
+    fun isReplaced(d: DocumentDto) = d.state == DocStatus.NeedsReplacing && d.documentTypeId != null &&
+        current.any { it !== d && it.documentTypeId == d.documentTypeId && uploadedTime(it) > uploadedTime(d) }
+    return current
+        .filter { !isReplaced(it) }
+        .sortedWith(
+            compareBy<DocumentDto> { CLIENT_ORDER.indexOf(it.state) }.thenByDescending { uploadedTime(it) }
+        )
+}
+
+private val CLIENT_ORDER = listOf(DocStatus.NeedsReplacing, DocStatus.Awaiting, DocStatus.Approved)
+
+// Compared as times, not text: the API's timestamps vary in their number of fractional digits.
+// A missing or unreadable time sorts as oldest, like the web.
+private fun uploadedTime(d: DocumentDto): LocalDateTime =
+    runCatching { LocalDateTime.parse(d.uploadedAt!!.removeSuffix("Z")) }.getOrDefault(LocalDateTime.MIN)
 
 /** Client-facing wording for a document's review status (matches the web portal). */
 enum class DocStatus(val label: String) {
@@ -128,6 +153,6 @@ class ApiException(val kind: Kind, message: String = kind.name) : IOException(me
         Kind.RateLimited -> "Too many attempts, wait a minute and try again."
         Kind.Server -> "Something went wrong on our side. Please try again."
         Kind.Network -> "We can't reach the service right now. Check your connection and try again."
-        Kind.NotClient -> "This app is for clients. Staff please use the web portal."
+        Kind.NotClient -> "This app is for clients. Staff, please use the web portal."
     }
 }

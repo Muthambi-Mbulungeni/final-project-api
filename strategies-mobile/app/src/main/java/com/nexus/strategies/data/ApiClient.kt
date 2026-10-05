@@ -49,12 +49,14 @@ class ApiClient(private val tokens: TokenStore, baseUrl: String) {
 
     // ---------- Auth ----------
 
-    suspend fun login(email: String, password: String): AuthResponse {
+    // On IO as a whole: acceptClientOnly() makes a blocking revoke call for staff accounts,
+    // which fails on the main thread (NetworkOnMainThreadException, hidden by runCatching).
+    suspend fun login(email: String, password: String): AuthResponse = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(base + "api/auth/login")
             .post(json.encodeToString(LoginRequest(email.trim(), password)).toRequestBody(jsonType))
             .build()
         val auth = json.decodeFromString<AuthResponse>(exec(plain, req))
-        return acceptClientOnly(auth)
+        acceptClientOnly(auth)
     }
 
     /** Silent sign-in on app start using the stored refresh token. Returns null if none is stored. */
@@ -162,7 +164,7 @@ class ApiClient(private val tokens: TokenStore, baseUrl: String) {
 
     suspend fun documents(caseId: String): List<DocumentDto> {
         val body = get("api/documents?caseId=$caseId&page=1&pageSize=50")
-        return json.decodeFromString<PagedResponse<DocumentDto>>(body).data.filter { !it.isArchived }
+        return documentsForClient(json.decodeFromString<PagedResponse<DocumentDto>>(body).data)
     }
 
     suspend fun notifications(): NotificationsResponse =

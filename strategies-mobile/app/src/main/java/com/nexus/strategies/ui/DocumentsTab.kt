@@ -82,9 +82,9 @@ private fun ActionNeededCard(docs: List<DocumentDto>) {
             }
         }
         Spacer(Modifier.height(14.dp))
-        // The API has no file-upload endpoint yet, so the app can't send a new copy itself.
+        // The app can't upload yet; clients upload new copies on the web portal (POST /api/documents/upload).
         Text(
-            "To send a new copy, contact your consultant. Uploading from the app is coming soon.",
+            "To send a new copy, sign in on the web portal and open Documents. Uploading from the app is coming soon.",
             fontSize = 13.sp,
             color = Stone600,
         )
@@ -206,7 +206,8 @@ private fun HowReviewWorks() {
             Column(Modifier.weight(1f)) {
                 Text("Sending documents", fontWeight = FontWeight.SemiBold)
                 Text(
-                    "Your consultant adds your documents to your case, and they appear here once added.",
+                    "If a document needs replacing, upload a new copy on the web portal. " +
+                        "Your consultant adds your other documents to your case, and they appear here once added.",
                     fontSize = 13.sp,
                     color = Stone600,
                 )

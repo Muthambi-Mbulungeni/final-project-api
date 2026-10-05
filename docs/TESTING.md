@@ -15,7 +15,7 @@ This document covers the API, the web portal and the database seed. The Android 
 | API checks against a real database | Scripted HTTP calls | Passed, except the defects in ISSUES.md | Local PostgreSQL 17, seeded |
 | Browser checks per role | Edge and Opera, DevTools at 1280 px and 390 px | Passed | Local, real API and seeded data |
 | Responsive and console sweep | Playwright driving Edge | 16 screens at 1280 and 390 px: no horizontal overflow, no console errors when signed in | Local, 2026-10-04 |
-| Android app, manual end to end | Emulator, real API ([mobile log](../strategies-mobile/TESTING.md)) | 4 of 12 checks passed, 8 not yet run | Kundai's emulator |
+| Android app, manual end to end | Emulator, real API ([mobile log](../strategies-mobile/TESTING.md)) | 8 of 12 checks passed against the real API and seeded database, 4 not yet run; unit tests 19 of 19 | Kundai's emulator; re-run by Riaad, 5 Oct 2026 |
 
 ## 2. Requirement traceability
 

@@ -33,3 +33,7 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# The root .gitignore (.NET template) ignores every debug/ folder (meant for bin/Debug).
+# app/src/debug is Android source (debug-only network config), so keep it tracked.
+!/app/src/debug/

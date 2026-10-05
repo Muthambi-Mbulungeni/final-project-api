@@ -14,8 +14,9 @@ It talks to the same `Strategies.Api` as the web (see Riaad's context file) and 
 4. Sign in with the dev client account: `client@nexus.com` / `ClientPassword123!`
    (login is rate limited to 5 per minute; the 6th shows "Too many attempts").
 
-Without the hosted PostgreSQL, sign-in works but the data tabs show "Something went wrong on our side" (the API returns 500).
-That is the expected state until Lekabe's connection string + seed data exist.
+The API needs a database with the migrations and the demo seed ([database/seed/README.md](../database/seed/README.md));
+without it, sign-in works but the data tabs show "Something went wrong on our side" (the API returns 500).
+Only the real API is used for the results in [TESTING.md](TESTING.md); `mock-api/` is for development only.
 
 ## What it does
 | Screen | API | Notes |
@@ -23,7 +24,7 @@ That is the expected state until Lekabe's connection string + seed data exist.
 | Sign in | `POST /api/auth/login` | Non-Client roles are refused and their session revoked |
 | Silent restore | `POST /api/auth/refresh` | On launch, using the stored refresh token |
 | Progress | `GET /api/cases/client/{userId}` | Newest case; reference = first 8 chars of id, upper case; 5-stage vertical stepper + "What happens next" |
-| Documents | `GET /api/documents?caseId=` | Read-only list with status (Pending / Approved / Rejected) |
+| Documents | `GET /api/documents?caseId=` | Read-only list with status (Pending / Approved / Rejected); a rejected copy is hidden once a newer copy of the same type exists, as on the web |
 | Messages | `GET /api/notifications`, `PATCH /api/notifications/{id}/read` | Unread badge from `unreadCount` |
 | Sign out | `POST /api/auth/revoke` | Local tokens are cleared even if offline |
 
@@ -35,8 +36,7 @@ That is the expected state until Lekabe's connection string + seed data exist.
 - **Font (IBM Plex Sans):** download IBM Plex Sans from Google Fonts (static files) and add these four files, with exactly these names,
   to a new folder `app/src/main/res/font/`: `ibm_plex_sans_regular.ttf`, `ibm_plex_sans_medium.ttf`,
   `ibm_plex_sans_semibold.ttf`, `ibm_plex_sans_bold.ttf`. The app picks them up automatically; without them it uses the system font.
-- Not in the app on purpose: "Forgot password?", "Start an enquiry" and the privacy page (they live on the web; the API has no
-  password-reset endpoint yet).
+- Not in the app on purpose: "Forgot password?", "Start an enquiry" and the privacy page (they live on the web).
 
 ## How sessions work (`data/ApiClient.kt`)
 - Access token: memory only. Refresh token: `EncryptedSharedPreferences` (Android Keystore). Never logged. `allowBackup=false`.
@@ -49,7 +49,12 @@ That is the expected state until Lekabe's connection string + seed data exist.
 Cleartext http is allowed only for `10.0.2.2` and `localhost` through `src/debug` (debug builds). Release builds are HTTPS only:
 set the real address in `app/build.gradle.kts` (`release` > `API_BASE_URL`).
 
-## Known gaps (waiting on the API)
-- Document **upload**: `POST /api/documents` only records metadata (FileName/FilePath); there is no file-upload endpoint yet.
-- Registration, email confirmation and password reset: endpoints don't exist yet.
-- No automated tests yet; manual checks against the dev API are listed above.
+## Tests
+`./gradlew testDebugUnitTest` runs the unit tests in `ModelsTest` (19, all passing on 5 Oct 2026). Manual checks against the
+real API are in [TESTING.md](TESTING.md).
+
+## Known gaps
+- Document **upload** is not in the app yet. The API has it (`POST /api/documents/upload`, used by the web portal), so the app
+  tells clients to send new copies there.
+- Registration and password reset are not in the app. Password reset waits for the API fix in
+  [ISS-01](../docs/ISSUES.md#iss-01).

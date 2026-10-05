@@ -20,7 +20,7 @@ The platform has three parts:
 
 1. **Public enquiry form.** Anyone can send an enquiry after giving POPIA consent. The API validates it and asks a Gemini triage agent whether the lead is qualified. If the AI is unavailable or unsure, the lead goes to a consultant as NeedsReview, so no enquiry is lost.
 2. **Staff portal.** Consultants review the leads the AI could not decide, manage their cases and approve or reject documents. Administrators manage users, assign cases to consultants for an even workload and read the audit trail.
-3. **Client tracking.** Clients follow their case through five stages on the web or the Android app, and upload a new copy of any document a consultant rejects.
+3. **Client tracking.** Clients follow their case through five stages on the web or the Android app, and upload a new copy of any document a consultant rejects on the web portal.
 
 The five stages: **Initial intake → Document gathering → Under review → Submitted to authority → Final decision**.
 
@@ -35,6 +35,14 @@ The web portal running against the real API and the demo data, from the producti
 | <a href="docs/images/consultant-lead.png"><img src="docs/images/consultant-lead.png" width="420" alt="Consultant lead triage with a lead's details open"></a><br>**Consultant: lead triage.** A lead the AI could not qualify, routed for review; the consultant confirms or overrides the verdict (B6). | <a href="docs/images/consultant-case.png"><img src="docs/images/consultant-case.png" width="420" alt="Consultant case panel with stages and a document awaiting review"></a><br>**Consultant: case panel.** Stage control, a document awaiting a decision, Open file, Approve and Reject with a required note (B7, B8). |
 | <a href="docs/images/admin-overview.png"><img src="docs/images/admin-overview.png" width="420" alt="Administrator overview with totals and consultant workload"></a><br>**Administrator: overview.** Live totals, enquiries waiting for review, and each consultant's workload against a target of 10 active cases (B9). | <a href="docs/images/admin-audit-log.png"><img src="docs/images/admin-audit-log.png" width="420" alt="Audit log listing actions, records and who performed them"></a><br>**Administrator: audit log.** Who changed what, and when: document decisions, stage changes, assignments, lead reviews and suspensions (B10). |
 
+### Android app (client role)
+
+The Android app on an emulator (API 37.1 image, 1080 × 2400) against the real API and the demo data on a local database, signed in as the demo client John Doe (5 October 2026). It shows the same case as the web screenshots above. Numbers in brackets are checks in the [mobile test log](strategies-mobile/TESTING.md).
+
+| | | | | |
+|---|---|---|---|---|
+| <a href="docs/images/mobile-my-case.png"><img src="docs/images/mobile-my-case.png" width="160" alt="Android app: my case with an action needed card and the five-stage progress"></a><br>**My case.** Stage 3 of 5 and the document to replace (1, 2). | <a href="docs/images/mobile-documents.png"><img src="docs/images/mobile-documents.png" width="160" alt="Android app: documents with the consultant's rejection note and 1 of 3 approved"></a><br>**Documents.** The consultant's note; new copies are uploaded on the web portal (3). | <a href="docs/images/mobile-messages.png"><img src="docs/images/mobile-messages.png" width="160" alt="Android app: messages with one read and one unread"></a><br>**Messages.** Opening a message marks it read on the server (4, 12). | <a href="docs/images/mobile-signin.png"><img src="docs/images/mobile-signin.png" width="160" alt="Android app: sign-in screen after signing out"></a><br>**Sign in.** Shown after signing out (10). | <a href="docs/images/mobile-staff-refused.png"><img src="docs/images/mobile-staff-refused.png" width="160" alt="Android app refusing an administrator account"></a><br>**Staff refused.** Staff use the web portal; their session is revoked (6). |
+
 ## Components
 
 | Component | Folder | Technology | Owner | Status |
@@ -42,7 +50,7 @@ The web portal running against the real API and the demo data, from the producti
 | API | [`Strategies.Api`](Strategies.Api) | .NET 10, EF Core, JWT, bcrypt, Gemini | Marco (API, AI), Kaan (security) | Working; open issues in [ISSUES.md](docs/ISSUES.md) |
 | Database | [`database`](database/seed/README.md), EF migrations | PostgreSQL | Lekabe | 3 migrations, demo seed data |
 | Web portal | [`strategies-web`](strategies-web/README.md) | React 19, Vite, Tailwind, React Router | Riaad | All three roles working against the real API |
-| Android app | [`strategies-mobile`](strategies-mobile/README.md) | Kotlin, Jetpack Compose | Kundai | Client role: sign-in, case progress, documents, notifications |
+| Android app | [`strategies-mobile`](strategies-mobile/README.md) | Kotlin, Jetpack Compose | Kundai | Client role working against the real API: sign-in, case progress, documents, messages; no upload in the app yet |
 | CI and deployment | [`.github/workflows`](.github/workflows/ci.yml) | GitHub Actions | Mbulungeni | CI on every push and pull request |
 
 ## Architecture
@@ -141,7 +149,7 @@ Demo accounts for each role (`admin@nexus.com`, `consultant@nexus.com`, `client@
 |---|---|---|
 | API | `dotnet test` (repository root) | 27 of 27 passed |
 | Web | `cd strategies-web`, then `npm test`, `npm run lint`, `npm run build` | 185 of 185 passed, lint and build clean |
-| Mobile | `ModelsTest` in Android Studio | See the [mobile test log](strategies-mobile/TESTING.md) |
+| Mobile | `cd strategies-mobile`, then `./gradlew testDebugUnitTest` | 19 of 19 passed; manual checks in the [mobile test log](strategies-mobile/TESTING.md) |
 
 CI runs the API build and tests and the web lint, tests and build on every push and pull request. The full test plan, requirement traceability and manual results are in [docs/TESTING.md](docs/TESTING.md).
 
