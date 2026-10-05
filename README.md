@@ -2,15 +2,14 @@
 
 Case management for **Strategies Migration Services**, a South African immigration consultancy. Built by Team Nexus Solutions for INSY7315 (Work Integrated Learning).
 
-<!-- TODO(video): replace VIDEO_ID twice with the YouTube id of the demo, then delete this comment.
-[![Watch the 10-minute demo](https://img.youtube.com/vi/VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=VIDEO_ID)
--->
-**Demo video:** TODO(video): link to follow.
+**Demo video:** https://youtu.be/aw8wSutQ7Z8
+
+**Presentation:** [Task 2 presentation (PDF)](docs/presentation/Task2-Presentation-Nexus-Solutions.pdf) · [Implementation access and links (PDF)](docs/presentation/Task2-Implementation-Access-and-Links.pdf)
 
 | Live system | Address |
 |---|---|
-| Web portal | TODO(url): hosted web portal address |
-| API | TODO(url): hosted API address |
+| Web portal | https://emgprs.github.io/insy7315-2026-task-2-hartmarcost10462493/ |
+| API | To be added |
 
 ## The problem and the solution
 
@@ -175,6 +174,8 @@ Details and the other features not delivered are in [ISSUES.md section 2](docs/I
 
 | Document | What it covers |
 |---|---|
+| [Task 2 presentation](docs/presentation/Task2-Presentation-Nexus-Solutions.pdf) | Presentation deck: requirements, architecture, security, DevOps, demo order |
+| [Implementation access and links](docs/presentation/Task2-Implementation-Access-and-Links.pdf) | Live links, demo accounts and a guided tour per role |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Step-by-step guide for administrators, consultants and clients |
 | [docs/TESTING.md](docs/TESTING.md) | Test plan, requirement traceability and results |
 | [docs/ISSUES.md](docs/ISSUES.md) | Open issues, features not delivered, issues fixed |
@@ -185,11 +186,11 @@ Details and the other features not delivered are in [ISSUES.md section 2](docs/I
 
 ## Team Nexus Solutions
 
-| Member | Role |
-|---|---|
-| Marco | Team lead, API and AI |
-| Kaan | Security: authentication, rate limiting, file storage |
-| Lekabe | Database and migrations |
-| Kundai | Android app |
-| Mbulungeni | Repository, CI, QA and deployment |
-| Riaad | Web portal, integration testing, documentation |
+| Member | Student number | Role |
+|---|---|---|
+| Marco Alexandre George Hart | ST10462493 | Team lead, API and AI |
+| Kaan Dogan | ST10442156 | Security: authentication, rate limiting, file storage |
+| Lekabe Herman Mabalane | ST10278399 | Database and migrations |
+| Kundai Makuzha | ST10251297 | Android app |
+| Mbulungeni Kenneth Muthambi | ST10447819 | Repository, CI, QA and deployment |
+| Riaad Hercules | ST10258492 | Web portal, integration testing, documentation |
