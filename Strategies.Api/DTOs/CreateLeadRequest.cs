@@ -27,6 +27,7 @@ namespace Strategies.Api.DTOs
 
     public class UpdateLeadStatusRequest
     {
-        public TriageStatus Status { get; set; }
+        [Required(ErrorMessage = "Status is required.")]
+        public TriageStatus? Status { get; set; }
     }
 }

@@ -1,14 +1,15 @@
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import EmptyState from '../../components/ui/EmptyState'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
+import StageMarker from '../../components/ui/StageMarker'
 import { CASE_STAGES } from '../../config/caseStages'
 import { enumOrder } from '../../config/enums'
 import { formatDate, shortId } from '../../lib/format'
-import { latestCase } from '../../lib/cases'
-import { documentsPath, documentsToReplace } from '../../lib/documents'
+import { assignedConsultantName, latestCase } from '../../lib/cases'
+import { documentsPath, documentsToReplace, replaceActionLabel } from '../../lib/documents'
 import { listItems } from '../../lib/listData'
 import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
@@ -25,40 +26,19 @@ function caseDetails(item) {
   ].filter(Boolean)
 }
 
-function StageMarker({ index, state }) {
-  if (state === 'done') {
-    return (
-      <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white">
-        <Check className="size-4" strokeWidth={2.5} aria-hidden="true" />
-      </span>
-    )
-  }
-
-  if (state === 'current') {
-    return (
-      <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-brand-600 bg-white text-xs font-semibold text-brand-700 ring-4 ring-brand-100">
-        {index + 1}
-      </span>
-    )
-  }
-
-  return (
-    <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border border-stone-300 bg-white text-xs font-semibold text-stone-500">
-      {index + 1}
-    </span>
-  )
-}
-
 // The one thing the client has to do, surfaced on their home screen. The Documents page holds
 // the details and the upload form; this card only points there. It stays out of the way while
 // loading or if the request fails (the Documents page explains errors), and when nothing is needed.
-function DocumentsAttention({ caseId }) {
+// The button names the document when there is only one, and the note names the consultant
+// when the case has one, so the client knows exactly what to do and who asked.
+function DocumentsAttention({ caseId, consultantName }) {
   const request = useApi(documentsPath(caseId))
   const toReplace = request.error ? [] : documentsToReplace(listItems(request.data))
   if (toReplace.length === 0) return null
 
   const count = toReplace.length
   const names = toReplace.map((document) => document.documentTypeName).filter(Boolean)
+  const asker = consultantName ?? 'Your consultant'
 
   return (
     <section
@@ -72,7 +52,9 @@ function DocumentsAttention({ caseId }) {
         </h2>
         {names.length > 0 && (
           <p className="mt-0.5 text-sm text-stone-600">
-            Your consultant asked for a new copy of: {names.join(', ')}.
+            {names.length === 1
+              ? `${asker} asked for a new copy of your ${names[0].toLowerCase()}.`
+              : `${asker} asked for new copies of: ${names.join(', ')}.`}
           </p>
         )}
       </div>
@@ -80,16 +62,17 @@ function DocumentsAttention({ caseId }) {
         to="/client/documents"
         className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
       >
-        Go to documents
+        {replaceActionLabel(toReplace)}
         <ArrowRight className="size-4" strokeWidth={2} aria-hidden="true" />
       </Link>
     </section>
   )
 }
 
+// The current stage is named in visible text too, so it never relies on the red ring alone.
 function StageLabel({ state }) {
   if (state === 'done') return <span className="sr-only"> (completed)</span>
-  if (state === 'current') return <span className="sr-only"> (current stage)</span>
+  if (state === 'current') return <span className="block text-xs font-medium text-brand-700">Current stage</span>
   return null
 }
 
@@ -103,6 +86,8 @@ export default function ClientDashboard() {
   const currentStage = currentIndex === null ? null : CASE_STAGES[currentIndex]
   const nextStage = currentIndex === null ? null : CASE_STAGES[currentIndex + 1]
   const details = caseDetails(currentCase)
+  const visa = currentCase?.visaCategoryName && currentCase.visaCategoryName !== 'N/A' ? currentCase.visaCategoryName : null
+  const consultantName = assignedConsultantName(currentCase)
 
   function stateFor(index) {
     if (currentIndex === null) return 'upcoming'
@@ -116,12 +101,16 @@ export default function ClientDashboard() {
       <PageHeader
         eyebrow="Your application"
         title={`Welcome back, ${firstName}`}
-        description="See where your application stands and what happens next."
+        description={
+          visa ? `Here’s the latest on your ${visa} application.` : 'See where your application stands and what happens next.'
+        }
       />
 
       {/* The attention card renders nothing when there is nothing to do, so the spacing stays even. */}
       <div className="mt-8 space-y-6">
-        {currentCase?.id && <DocumentsAttention key={currentCase.id} caseId={currentCase.id} />}
+        {currentCase?.id && (
+          <DocumentsAttention key={currentCase.id} caseId={currentCase.id} consultantName={consultantName} />
+        )}
 
         <Panel title="Application progress">
           <RequestState

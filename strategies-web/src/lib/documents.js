@@ -57,6 +57,13 @@ export function documentsToReplace(documents) {
   return documentsForClient(documents).filter((document) => documentStatus(document) === 'Rejected')
 }
 
+// The client dashboard's button: names the document when there is exactly one to replace.
+export function replaceActionLabel(documents) {
+  const names = documents.map((document) => document.documentTypeName).filter(Boolean)
+  if (documents.length === 1 && names.length === 1) return `Replace ${names[0].toLowerCase()}`
+  return 'Go to documents'
+}
+
 // POST /api/documents/upload accepts PDF, JPG and PNG files up to 5 MB. Checked here first so the
 // client hears straight away; the API checks again and its message is shown if it disagrees.
 export const UPLOAD_PATH = '/api/documents/upload'

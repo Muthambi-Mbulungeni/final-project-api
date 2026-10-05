@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Check } from 'lucide-react'
+import StageMarker from '../../components/ui/StageMarker'
 import { useToast } from '../../components/ui/toastContext'
 import { ENUMS, enumOrder, resolveEnum } from '../../config/enums'
 import { apiPatch } from '../../lib/api'
@@ -14,35 +14,46 @@ import {
 
 const NO_ERRORS = { field: null, request: null }
 
-// Where the case sits in the five-stage lifecycle. Built only from the case's current stage:
-// the API has no stage history endpoint, so no dates or past moves are shown.
+// Where the case sits in the five-stage lifecycle, drawn like the client's own progress view
+// (numbered steps joined by a line that turns red as stages complete), so it reads as progress
+// rather than as options to pick. Built only from the current stage: the API has no stage
+// history endpoint, so no dates or past moves are shown.
 function StageSteps({ stage }) {
   const current = enumOrder('caseStage', stage)
+  const last = ENUMS.caseStage.length - 1
 
   return (
-    <ol className="mt-3 space-y-2">
+    <ol className="mt-3 space-y-3">
       {ENUMS.caseStage.map((option, index) => {
-        const done = current !== null && index < current
-        const isCurrent = index === current
+        const state = current === null || index > current ? 'upcoming' : index < current ? 'done' : 'current'
+        const connector = current !== null && index < current ? 'bg-brand-600' : 'bg-stone-200'
         return (
-          <li key={option.value} aria-current={isCurrent ? 'step' : undefined} className="flex items-center gap-3">
+          <li
+            key={option.value}
+            aria-current={state === 'current' ? 'step' : undefined}
+            className="relative flex items-center gap-3"
+          >
+            {index < last && (
+              <span
+                className={`absolute top-7 -bottom-3 left-[13px] w-0.5 rounded-full ${connector}`}
+                aria-hidden="true"
+              />
+            )}
+            <span aria-hidden="true">
+              <StageMarker index={index} state={state} />
+            </span>
             <span
-              aria-hidden="true"
-              className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${
-                done
-                  ? 'border-brand-600 bg-brand-600 text-white'
-                  : isCurrent
-                    ? 'border-brand-600 bg-white'
-                    : 'border-stone-300 bg-white'
+              className={`text-sm ${
+                state === 'current'
+                  ? 'font-semibold text-stone-900'
+                  : state === 'done'
+                    ? 'font-medium text-stone-700'
+                    : 'text-stone-500'
               }`}
             >
-              {done && <Check className="size-3" strokeWidth={2.5} />}
-              {isCurrent && <span className="size-2 rounded-full bg-brand-600" />}
-            </span>
-            <span className={`text-sm ${isCurrent ? 'font-medium text-stone-900' : 'text-stone-600'}`}>
               {option.label}
-              {done && <span className="sr-only"> (completed)</span>}
-              {isCurrent && <span className="sr-only"> (current stage)</span>}
+              {state === 'done' && <span className="sr-only"> (completed)</span>}
+              {state === 'current' && <span className="block text-xs font-medium text-brand-700">Current stage</span>}
             </span>
           </li>
         )
@@ -125,7 +136,7 @@ export default function CaseStageSection({ caseItem, onStageChanged }) {
             <button
               type="submit"
               disabled={busy}
-              className="shrink-0 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
+              className="shrink-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60"
             >
               {busy ? 'Saving…' : stageActionLabel(caseItem.stage, nextStage)}
             </button>

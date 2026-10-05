@@ -7,6 +7,7 @@ import StatusBadge from '../../components/ui/StatusBadge'
 import { useToast } from '../../components/ui/toastContext'
 import { enumFilter } from '../../config/enums'
 import { apiDownload } from '../../lib/api'
+import { assignedConsultantName } from '../../lib/cases'
 import { formatDate } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { casesPath } from '../../lib/listPaths'
@@ -17,10 +18,18 @@ import CaseDocumentsPanel from './CaseDocumentsPanel'
 const PAGE_SIZE = 10
 const EXPORT_PATH = '/api/cases/export?format=csv'
 
-// GET /api/cases returns { data: [{ id, clientName, visaCategoryName, stage, isArchived, createdAt, lastUpdated }],
-// totalRecords, totalPages, currentPage } and supports page, pageSize, search and stage.
+// GET /api/cases returns { data: [{ id, clientName, consultantName, visaCategoryName, stage, isArchived,
+// createdAt, lastUpdated }], totalRecords, totalPages, currentPage } and supports page, pageSize, search and stage.
 // The client's name is a real button that opens the case panel, so keyboard users can reach it too.
-function buildColumns(onOpen) {
+// Administrators also see who handles each case; consultants only see their own cases, so it is left out.
+function buildColumns(onOpen, showConsultant) {
+  const consultantColumn = {
+    key: 'consultantName',
+    header: 'Consultant',
+    className: 'whitespace-nowrap',
+    render: (item) => assignedConsultantName(item) ?? <span className="text-brand-700">Unassigned</span>,
+  }
+
   return [
     {
       key: 'clientName',
@@ -32,7 +41,7 @@ function buildColumns(onOpen) {
             onClick={() => onOpen(item)}
             aria-haspopup="dialog"
             aria-label={`${item.clientName ?? 'Client'}, open case`}
-            className="text-left font-medium text-stone-900 hover:text-brand-700 hover:underline"
+            className="text-left font-medium whitespace-nowrap text-stone-900 hover:text-brand-700 hover:underline"
           >
             {item.clientName ?? '—'}
           </button>
@@ -47,6 +56,7 @@ function buildColumns(onOpen) {
       header: 'Visa category',
       render: (item) => item.visaCategoryName ?? '—',
     },
+    ...(showConsultant ? [consultantColumn] : []),
     {
       key: 'stage',
       header: 'Stage',
@@ -77,7 +87,7 @@ function buildColumns(onOpen) {
 // The stage filter is sent to the API, which filters across every page.
 const FILTERS = [enumFilter('caseStage', 'stage', 'Stage')]
 
-function CasesPage({ eyebrow, title, description }) {
+function CasesPage({ eyebrow, title, description, canAssign = false }) {
   const toast = useToast()
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
@@ -91,11 +101,17 @@ function CasesPage({ eyebrow, title, description }) {
   const request = useApi(casesPath({ page, pageSize: PAGE_SIZE, search, stage }))
   const response = request.data
   const rows = listItems(response)
-  const columns = useMemo(() => buildColumns(setSelectedCase), [])
+  const columns = useMemo(() => buildColumns(setSelectedCase, canAssign), [canAssign])
 
   // Called after the API confirmed the change (200), so the panel shows the saved stage; the list reloads.
   function handleStageChanged(caseId, newStage) {
     setSelectedCase((current) => (current?.id === caseId ? { ...current, stage: newStage } : current))
+    request.reload()
+  }
+
+  // Same for a new consultant: the panel shows the saved name and the list reloads.
+  function handleAssigned(caseId, consultantName) {
+    setSelectedCase((current) => (current?.id === caseId ? { ...current, consultantName } : current))
     request.reload()
   }
 
@@ -175,6 +191,7 @@ function CasesPage({ eyebrow, title, description }) {
         caseItem={selectedCase}
         onClose={() => setSelectedCase(null)}
         onStageChanged={handleStageChanged}
+        onAssigned={canAssign ? handleAssigned : undefined}
       />
     </>
   )
@@ -185,7 +202,8 @@ export function AdminCasesPage() {
     <CasesPage
       eyebrow="Administration"
       title="Cases"
-      description="Every case across the practice and its current stage. Select a client to update the stage or review documents."
+      description="Every case across the practice, who handles it and its current stage. Select a client to assign a consultant, update the stage or review documents."
+      canAssign
     />
   )
 }

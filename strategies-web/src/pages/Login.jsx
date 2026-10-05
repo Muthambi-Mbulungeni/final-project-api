@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
-import { Eye, EyeOff } from 'lucide-react'
+import { ArrowBigUpDash, CircleCheck, Clock, Eye, EyeOff, LoaderCircle } from 'lucide-react'
 import AuthLayout from '../components/layout/AuthLayout'
-import { inputClasses } from '../components/ui/fieldStyles'
+import { refinedInputClasses } from '../components/ui/fieldStyles'
 import TextField from '../components/ui/TextField'
 import { destinationFor, signIn, signInNotice } from '../lib/auth'
 import { signInErrorMessage } from '../lib/authMessages'
@@ -23,9 +23,13 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [capsLockOn, setCapsLockOn] = useState(false)
+  // A short shake when the API refuses the sign-in (motion-safe only), like a desktop login screen.
+  const [shaking, setShaking] = useState(false)
 
   const from = location.state?.from
-  const notice = signInNotice(location.state?.reason)
+  const reason = location.state?.reason
+  const notice = signInNotice(reason)
+  const NoticeIcon = reason === 'signed-out' ? CircleCheck : Clock
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -60,6 +64,7 @@ export default function Login() {
       await signIn(values.email.trim(), values.password)
     } catch (error) {
       setFormError(signInErrorMessage(error))
+      setShaking(true)
       setSubmitting(false)
     }
   }
@@ -71,40 +76,67 @@ export default function Login() {
 
   const passwordErrorId = 'password-error'
 
-  return (
-    <AuthLayout>
-      <h1 className="text-center text-xl font-semibold tracking-tight text-stone-900">Sign in</h1>
-      <p className="mt-1.5 text-center text-sm text-stone-600">Strategies Migration Services portal</p>
+  // Staggered entrance for the form; motion-safe only.
+  const rise = (seconds) => ({ animationDelay: `${seconds}s` })
 
-      <form noValidate onSubmit={handleSubmit} className="mt-8 space-y-5">
-        {formError ? (
-          <div role="alert" className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2.5 text-sm text-brand-800">
+  return (
+    <AuthLayout journey>
+      <h1
+        className="text-center text-[26px] font-semibold tracking-[-0.022em] text-stone-900 motion-safe:animate-rise-soft lg:text-[30px]"
+        style={rise(0.22)}
+      >
+        Welcome back
+      </h1>
+      <p className="mt-1.5 text-center text-[15px] text-stone-500 motion-safe:animate-rise-soft" style={rise(0.27)}>
+        Sign in to your client and staff portal.
+      </p>
+
+      {notice && !formError && (
+        <p
+          role="status"
+          className="mx-auto mt-5 flex w-fit max-w-full items-start gap-2 rounded-2xl bg-stone-100 px-3.5 py-2 text-[13px] text-stone-700 motion-safe:animate-rise-soft"
+          style={rise(0.35)}
+        >
+          <NoticeIcon
+            className={`mt-px size-4 shrink-0 ${reason === 'signed-out' ? 'text-emerald-600' : 'text-stone-500'}`}
+            strokeWidth={2}
+            aria-hidden="true"
+          />
+          {notice}
+        </p>
+      )}
+
+      <form
+        noValidate
+        onSubmit={handleSubmit}
+        onAnimationEnd={(event) => event.target === event.currentTarget && setShaking(false)}
+        className={`mt-7 space-y-5 ${shaking ? 'motion-safe:animate-shake' : ''}`}
+      >
+        {formError && (
+          <div role="alert" className="rounded-xl bg-brand-50 px-3.5 py-2.5 text-sm text-brand-800">
             {formError}
           </div>
-        ) : (
-          notice && (
-            <div role="status" className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-700">
-              {notice}
-            </div>
-          )
         )}
 
-        <TextField
-          id="email"
-          label="Email address"
-          type="email"
-          autoComplete="email"
-          value={values.email}
-          onChange={handleChange}
-          error={errors.email}
-        />
+        <div className="motion-safe:animate-rise-soft" style={rise(0.34)}>
+          <TextField
+            id="email"
+            label="Email address"
+            type="email"
+            autoComplete="email"
+            value={values.email}
+            onChange={handleChange}
+            error={errors.email}
+            refined
+          />
+        </div>
 
-        <div>
+        <div className="motion-safe:animate-rise-soft" style={rise(0.4)}>
           <div className="flex items-center justify-between gap-4">
-            <label htmlFor="password" className="block text-sm font-medium text-stone-800">
+            <label htmlFor="password" className="block text-[13px] font-medium text-stone-700">
               Password
             </label>
-            <Link to="/forgot-password" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+            <Link to="/forgot-password" className="text-[13px] font-medium text-brand-700 hover:text-brand-800">
               Forgot password?
             </Link>
           </div>
@@ -118,30 +150,38 @@ export default function Login() {
               onChange={handleChange}
               onKeyDown={handlePasswordKey}
               onKeyUp={handlePasswordKey}
+              onBlur={() => setCapsLockOn(false)}
               aria-invalid={Boolean(errors.password)}
               aria-describedby={errors.password ? passwordErrorId : undefined}
-              className={`${inputClasses(Boolean(errors.password))} pr-11`}
+              className={`${refinedInputClasses(Boolean(errors.password))} pr-20`}
             />
+            {/* Caps Lock shows as a small ⇪ inside the field, like a desktop login screen; the words
+                below the field say the same, so the symbol never has to be recognised on its own. */}
+            {capsLockOn && (
+              <span className="pointer-events-none absolute inset-y-0 right-11 flex items-center text-stone-500">
+                <ArrowBigUpDash className="size-[18px]" strokeWidth={1.75} aria-hidden="true" />
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setShowPassword((current) => !current)}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
               aria-pressed={showPassword}
-              className="absolute inset-y-0 right-0 flex items-center rounded-r-md px-3 text-stone-500 hover:text-stone-700"
+              className="absolute inset-y-0 right-0 flex items-center rounded-r-xl px-3.5 text-stone-500 hover:text-stone-700"
             >
               {showPassword ? (
-                <EyeOff className="size-4" strokeWidth={1.75} aria-hidden="true" />
+                <EyeOff className="size-[18px]" strokeWidth={1.75} aria-hidden="true" />
               ) : (
-                <Eye className="size-4" strokeWidth={1.75} aria-hidden="true" />
+                <Eye className="size-[18px]" strokeWidth={1.75} aria-hidden="true" />
               )}
             </button>
           </div>
           {/* Always rendered so screen readers announce the warning when it appears (WCAG 4.1.3). */}
           <div aria-live="polite">
-            {capsLockOn && <p className="mt-1.5 text-xs font-medium text-amber-700">Caps Lock is on.</p>}
+            {capsLockOn && <p className="mt-1.5 text-[13px] font-medium text-amber-700">Caps Lock is on.</p>}
           </div>
           {errors.password && (
-            <p id={passwordErrorId} className="mt-1.5 text-sm text-brand-700">
+            <p id={passwordErrorId} className="mt-1.5 text-[13px] text-brand-700">
               {errors.password}
             </p>
           )}
@@ -150,13 +190,15 @@ export default function Login() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-md bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-wait disabled:opacity-70"
+          className="mt-2 inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 text-base font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-wait disabled:opacity-80 motion-safe:animate-rise-soft"
+          style={rise(0.46)}
         >
+          {submitting && <LoaderCircle className="size-[18px] motion-safe:animate-spin" strokeWidth={2.25} aria-hidden="true" />}
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
 
-      <p className="mt-8 border-t border-stone-200 pt-6 text-center text-sm text-stone-600">
+      <p className="mt-6 text-center text-sm text-stone-500 motion-safe:animate-rise-soft" style={rise(0.52)}>
         New client?{' '}
         <Link to="/enquire" className="font-medium text-brand-700 hover:text-brand-800">
           Start an enquiry

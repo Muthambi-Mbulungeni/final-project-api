@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  assignBody,
+  assignErrorMessage,
+  assignPath,
+  assignedConsultantName,
   canChangeStage,
+  consultantChoices,
+  consultantWorkload,
+  isActiveCase,
+  workloadStatus,
+  currentConsultantId,
   latestCase,
   stageActionLabel,
   stageBody,
@@ -8,6 +17,107 @@ import {
   stageErrorMessage,
   stagePath,
 } from './cases'
+
+describe('assigning a consultant', () => {
+  const page = (data, totalRecords = data.length) => ({ data, totalRecords, totalPages: 1, currentPage: 1 })
+  const users = [
+    { id: 'c2', fullName: 'Sipho Dlamini', role: 'Consultant', isActive: false },
+    { id: 'c1', fullName: 'Consultant User', role: 'Consultant', isActive: true },
+    { id: 'a1', fullName: 'System Admin', role: 'Admin', isActive: true },
+    { id: 'k1', fullName: 'John Doe', role: 'Client', isActive: true },
+    { id: 'c3', fullName: 'Ayanda Khumalo', role: 1, isActive: true },
+  ]
+
+  it('sends the consultant id to the case assign endpoint', () => {
+    expect(assignPath('a b')).toBe('/api/cases/a%20b/assign')
+    expect(assignBody('c1')).toEqual({ consultantId: 'c1' })
+  })
+
+  it('offers only active consultants, by name, accepting the role as text or number', () => {
+    const { consultants, complete } = consultantChoices(page(users))
+    expect(consultants.map((consultant) => consultant.id)).toEqual(['c3', 'c1'])
+    expect(complete).toBe(true)
+  })
+
+  it('says when the API holds more accounts than were loaded', () => {
+    expect(consultantChoices(page(users, 140)).complete).toBe(false)
+    expect(consultantChoices(null)).toEqual({ consultants: [], complete: true })
+  })
+
+  it('marks the current consultant only when their name is unique', () => {
+    const consultants = [
+      { id: 'c1', fullName: 'Consultant User' },
+      { id: 'c4', fullName: 'Sam Smith' },
+      { id: 'c5', fullName: 'Sam Smith' },
+    ]
+    expect(currentConsultantId(consultants, 'Consultant User')).toBe('c1')
+    expect(currentConsultantId(consultants, 'Sam Smith')).toBeNull()
+    expect(currentConsultantId(consultants, null)).toBeNull()
+  })
+
+  it('treats the API placeholder as no consultant', () => {
+    expect(assignedConsultantName({ consultantName: 'Unassigned' })).toBeNull()
+    expect(assignedConsultantName({ consultantName: ' Riaad ' })).toBe('Riaad')
+    expect(assignedConsultantName({})).toBeNull()
+  })
+
+  it('explains failed assignments in plain language', () => {
+    expect(assignErrorMessage({ status: 403 })).toMatch(/Only administrators/)
+    expect(assignErrorMessage({ status: 404 })).toMatch(/no longer exists/)
+    expect(assignErrorMessage({ status: 400, message: 'One or more validation errors occurred.' })).toMatch(/wasn’t accepted/)
+    expect(assignErrorMessage(null)).toMatch(/could not be assigned/)
+  })
+})
+
+describe('consultant workload', () => {
+  const consultants = [
+    { id: 'c1', fullName: 'Consultant User' },
+    { id: 'c2', fullName: 'Riaad' },
+    { id: 'c3', fullName: 'Ayanda Khumalo' },
+  ]
+  const cases = {
+    data: [
+      { consultantName: 'Consultant User', stage: 'UnderReview' },
+      { consultantName: 'Consultant User', stage: 1 },
+      { consultantName: 'Consultant User', stage: 'DocumentGathering', isArchived: true },
+      { consultantName: 'Riaad', stage: 'FinalDecision' },
+      { consultantName: 'Riaad', stage: 'InitialIntake' },
+      { consultantName: 'Unassigned', stage: 'InitialIntake' },
+    ],
+    totalRecords: 6,
+  }
+
+  it('counts active cases like the API: not archived and not at Final decision', () => {
+    expect(isActiveCase({ stage: 'UnderReview' })).toBe(true)
+    expect(isActiveCase({ stage: 4 })).toBe(false)
+    expect(isActiveCase({ stage: 'InitialIntake', isArchived: true })).toBe(false)
+  })
+
+  it('lists every consultant, busiest first, and counts unassigned active cases', () => {
+    const { rows, unassigned, complete } = consultantWorkload(consultants, cases)
+    expect(rows.map((row) => [row.name, row.active])).toEqual([
+      ['Consultant User', 2],
+      ['Riaad', 1],
+      ['Ayanda Khumalo', 0],
+    ])
+    expect(unassigned).toBe(1)
+    expect(complete).toBe(true)
+  })
+
+  it('reports no count for a shared name, and flags a partial case list', () => {
+    const twins = [...consultants, { id: 'c4', fullName: 'Riaad' }]
+    const { rows, complete } = consultantWorkload(twins, { ...cases, totalRecords: 140 })
+    expect(rows.filter((row) => row.name === 'Riaad').map((row) => row.active)).toEqual([null, null])
+    expect(complete).toBe(false)
+  })
+
+  it('describes the load against the target in words', () => {
+    expect(workloadStatus(7)).toBe('3 below target')
+    expect(workloadStatus(10)).toBe('At target')
+    expect(workloadStatus(12)).toBe('2 over target')
+    expect(workloadStatus(null)).toMatch(/shared/)
+  })
+})
 
 describe('latestCase', () => {
   it('returns the most recently opened case', () => {
