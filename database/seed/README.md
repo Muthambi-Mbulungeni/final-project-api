@@ -37,8 +37,8 @@ From the repository root, with the API's `DefaultConnection` pointing at the loc
 
 ```bash
 cd Strategies.Api && dotnet ef database update && cd ..
-docker exec -i smp-postgres psql -U postgres -d strategies -v ON_ERROR_STOP=1 < database/seed/1-reference-and-users.sql
-docker exec -i smp-postgres psql -U postgres -d strategies -v ON_ERROR_STOP=1 < database/seed/2-cases-and-activity.sql
+docker exec -i smp-postgres psql -U postgres -d strategies_db -v ON_ERROR_STOP=1 < database/seed/1-reference-and-users.sql
+docker exec -i smp-postgres psql -U postgres -d strategies_db -v ON_ERROR_STOP=1 < database/seed/2-cases-and-activity.sql
 ```
 
 ## Run on Supabase
