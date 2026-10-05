@@ -23,6 +23,7 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
 | [ISS-10](#iss-10) | Medium | No automated tests for the API controllers | Marco, Mbulungeni |
 | [ISS-11](#iss-11) | Medium | Mobile: Gradle wrapper missing, manual checks incomplete | Kundai |
+| [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan, Marco |
 | [ISS-12](#iss-12) | Low | Mixed audit action wording; old lead verdict not recorded | Marco |
 | [ISS-13](#iss-13) | Low | Users list cannot show the join date | Marco, Riaad |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
@@ -121,6 +122,15 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Problem:** `gradlew` and its wrapper files are not committed, so `./gradlew testDebugUnitTest` from the mobile README cannot run from a fresh clone. 8 of 12 manual checks are not yet run.
 - **Evidence:** `strategies-mobile`; [mobile test log](../strategies-mobile/TESTING.md).
 - **Fix:** commit `gradlew`, `gradlew.bat` and `gradle/wrapper/gradle-wrapper.jar`, and complete the manual checks.
+
+### ISS-15
+
+**Medium. Refresh tokens are kept in memory.**
+
+- **Problem:** the API stores refresh tokens in an in-memory store, not in the database.
+- **Evidence:** `Program.cs` registers `InMemoryRefreshTokenStore` as `IRefreshTokenStore`.
+- **Impact:** every API restart or redeploy, and every wake-up of a free host that sleeps when idle, forgets all refresh tokens. Users are signed out when their access token next expires. With more than one API instance, a token issued by one instance is unknown to the others.
+- **Fix:** store refresh tokens (hashed) in a database table behind the same `IRefreshTokenStore` interface.
 
 ### ISS-12
 
