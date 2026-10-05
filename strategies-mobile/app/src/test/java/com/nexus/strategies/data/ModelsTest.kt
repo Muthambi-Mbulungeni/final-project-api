@@ -86,11 +86,22 @@ class ModelsTest {
         assertEquals(2, r.unreadCount)
     }
 
+    // ---- Document status wording (same as the web badges) ----
+
+    @Test fun docStatus_mapsApiValuesToClientWording() {
+        assertEquals("Awaiting review", DocStatus.parse("Pending").label)
+        assertEquals("Approved", DocStatus.parse("Approved").label)
+        assertEquals("Needs replacing", DocStatus.parse("Rejected").label)
+        assertEquals(DocStatus.Awaiting, DocStatus.parse("something new"))
+        assertEquals(DocStatus.NeedsReplacing, DocumentDto(id = "1", status = "rejected").state)
+    }
+
     // ---- Dates ----
 
     @Test fun formatDate_formatsIso() {
-        assertEquals("30 Sep 2026", formatDate("2026-09-30T10:00:00"))
-        assertEquals("30 Sep 2026", formatDate("2026-09-30T10:00:00.1234567Z"))
+        assertEquals("30 Sept 2026", formatDate("2026-09-30T10:00:00"))
+        assertEquals("30 Sept 2026", formatDate("2026-09-30T10:00:00.1234567Z"))
+        assertEquals("06 Oct 2026", formatDate("2026-10-06T08:00:00"))
     }
 
     @Test fun formatDate_badInputIsNull() {

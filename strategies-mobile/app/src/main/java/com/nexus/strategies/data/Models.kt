@@ -55,7 +55,24 @@ data class DocumentDto(
     val reviewComment: String? = null,
     val uploadedAt: String? = null,
     val isArchived: Boolean = false,
-)
+) {
+    val state: DocStatus get() = DocStatus.parse(status)
+}
+
+/** Client-facing wording for a document's review status (matches the web portal). */
+enum class DocStatus(val label: String) {
+    Awaiting("Awaiting review"),
+    Approved("Approved"),
+    NeedsReplacing("Needs replacing");
+
+    companion object {
+        fun parse(raw: String?): DocStatus = when (raw?.trim()?.lowercase()) {
+            "approved" -> Approved
+            "rejected" -> NeedsReplacing
+            else -> Awaiting // "Pending" and anything unknown
+        }
+    }
+}
 
 @Serializable
 data class NotificationDto(
@@ -82,7 +99,7 @@ enum class Stage(val label: String, val hint: String) {
     InitialIntake("Initial intake", "We assess your enquiry and eligibility."),
     DocumentGathering("Document gathering", "Upload the documents on your checklist."),
     UnderReview("Under review", "Your consultant checks your complete file."),
-    SubmittedToAuthority("Submitted to authority", "Your application has been lodged."),
+    SubmittedToAuthority("Submitted to authority", "Your application is lodged with the authority for a decision."),
     FinalDecision("Final decision", "The outcome is received and shared with you.");
 
     companion object {
@@ -94,10 +111,10 @@ enum class Stage(val label: String, val hint: String) {
     }
 }
 
-/** Formats an ISO timestamp from the API as "30 Sep 2026". Returns null if it can't be read. */
+/** Formats an ISO timestamp from the API like the web does: "06 Sept 2026". Returns null if it can't be read. */
 fun formatDate(iso: String?): String? = runCatching {
     val d = LocalDateTime.parse(iso!!.substringBefore('.').removeSuffix("Z"))
-    d.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH))
+    d.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)).replace("Sep ", "Sept ")
 }.getOrNull()
 
 /** Everything the UI needs to know about a failed call. Never carries raw server text. */

@@ -24,8 +24,8 @@ import com.nexus.strategies.ui.NexusTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Light status-bar icons on the red header.
-        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT))
+        // White header, so the status bar uses dark icons.
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT))
         setContent { NexusTheme { Root() } }
     }
 }

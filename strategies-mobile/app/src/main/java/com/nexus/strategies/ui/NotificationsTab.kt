@@ -6,16 +6,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.nexus.strategies.data.NotificationDto
 import com.nexus.strategies.data.formatDate
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationsTab(ui: HomeUi, onOpen: (NotificationDto) -> Unit, onRetry: () -> Unit) {
     LazyColumn(
@@ -23,6 +25,16 @@ fun NotificationsTab(ui: HomeUi, onOpen: (NotificationDto) -> Unit, onRetry: () 
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item {
+            PageHeader(
+                "Messages",
+                when {
+                    ui.unread == 1 -> "You have 1 unread message."
+                    ui.unread > 1 -> "You have ${ui.unread} unread messages."
+                    else -> "Updates from your consultant appear here."
+                },
+            )
+        }
         ui.notificationsError?.let { item { ErrorBanner(it, onRetry) } }
 
         if (ui.notifications.isEmpty() && !ui.loading && ui.notificationsError == null) item {
@@ -31,8 +43,9 @@ fun NotificationsTab(ui: HomeUi, onOpen: (NotificationDto) -> Unit, onRetry: () 
         items(ui.notifications, key = { it.id }) { n ->
             Card(
                 onClick = { onOpen(n) },
-                colors = CardDefaults.cardColors(containerColor = if (n.isRead) Color.White else BrandLight),
-                border = BorderStroke(1.dp, Stone200),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = if (n.isRead) androidx.compose.ui.graphics.Color.White else BrandLight),
+                border = BorderStroke(1.dp, if (n.isRead) Stone200 else BrandBorder),
             ) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
                     // Unread dot; "Unread" is also spelled out in text for accessibility.
@@ -44,7 +57,7 @@ fun NotificationsTab(ui: HomeUi, onOpen: (NotificationDto) -> Unit, onRetry: () 
                             n.caseReference?.let { "Case $it" },
                             formatDate(n.whenIso),
                         ).joinToString(" · ")
-                        if (meta.isNotEmpty()) Text(meta, color = Stone600, style = MaterialTheme.typography.bodySmall)
+                        if (meta.isNotEmpty()) Text(meta, color = Stone600, fontSize = 12.sp)
                     }
                 }
             }

@@ -27,6 +27,17 @@ That is the expected state until Lekabe's connection string + seed data exist.
 | Messages | `GET /api/notifications`, `PATCH /api/notifications/{id}/read` | Unread badge from `unreadCount` |
 | Sign out | `POST /api/auth/revoke` | Local tokens are cleared even if offline |
 
+## Look and feel (matches the web portal)
+- Logo (`res/drawable-nodpi/strategies_logo.png`, copied from `strategies-web/src/assets`), brand red `#c4161c`, warm stone greys,
+  red uppercase "eyebrow" labels, bordered white cards, the red-tick stepper with "Current stage", and document status badges.
+- Header like the web: logo, bell with unread badge (opens Messages), and the user's initials (tap for Sign out).
+- Wording and the "06 Sept 2026" date style follow the web. Document statuses are shown as Awaiting review / Approved / Needs replacing.
+- **Font (IBM Plex Sans):** download IBM Plex Sans from Google Fonts (static files) and add these four files, with exactly these names,
+  to a new folder `app/src/main/res/font/`: `ibm_plex_sans_regular.ttf`, `ibm_plex_sans_medium.ttf`,
+  `ibm_plex_sans_semibold.ttf`, `ibm_plex_sans_bold.ttf`. The app picks them up automatically; without them it uses the system font.
+- Not in the app on purpose: "Forgot password?", "Start an enquiry" and the privacy page (they live on the web; the API has no
+  password-reset endpoint yet).
+
 ## How sessions work (`data/ApiClient.kt`)
 - Access token: memory only. Refresh token: `EncryptedSharedPreferences` (Android Keystore). Never logged. `allowBackup=false`.
 - On a 401 an OkHttp `Authenticator` refreshes **once** and retries **once**. A lock makes concurrent 401s wait for the same refresh,
@@ -41,5 +52,4 @@ set the real address in `app/build.gradle.kts` (`release` > `API_BASE_URL`).
 ## Known gaps (waiting on the API)
 - Document **upload**: `POST /api/documents` only records metadata (FileName/FilePath); there is no file-upload endpoint yet.
 - Registration, email confirmation and password reset: endpoints don't exist yet.
-- Font is the system default (web uses IBM Plex Sans). Add the font files under `res/font` to match exactly.
 - No automated tests yet; manual checks against the dev API are listed above.
