@@ -2,7 +2,7 @@
 
 Strategies Migration Platform, Team Nexus Solutions (INSY7315).
 
-Known issues at the time of submission, checked against the code on `develop` (`0844264`, 2026-10-05). Test IDs (A1, B1 and so on) refer to [TESTING.md](TESTING.md).
+Known issues at the time of submission, checked against the code on `develop` (`e2751ac`, 2026-10-05, after the final API patches in PR #25). Test IDs (A1, B1 and so on) refer to [TESTING.md](TESTING.md).
 
 **Severity:** Critical = a security risk or data loss. High = a rubric requirement is missing or weakened. Medium = wrong behaviour with a workaround. Low = wording or polish.
 
@@ -12,30 +12,30 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 | ID | Severity | Issue | Owner |
 |---|---|---|---|
-| [ISS-01](#iss-01) | Critical | Password reset accepts any reset token | Marco, Kaan |
+| [ISS-01](#iss-01) | High | Password reset refuses genuine reset links; a link could be reused for 30 minutes | Marco, Kaan |
 | [ISS-02](#iss-02) | High | Development secrets committed in `appsettings.json` | Kaan, Mbulungeni |
-| [ISS-03](#iss-03) | High | Sign-in rate limit would be shared by all users behind a hosting proxy | Kaan, Mbulungeni |
 | [ISS-04](#iss-04) | High | POPIA consent is checked in the browser only, never sent to or stored by the API | Marco, Lekabe |
 | [ISS-05](#iss-05) | High | No per-account lockout after failed sign-ins | Kaan |
-| [ISS-06](#iss-06) | Medium | Lead review with an empty body resets the lead to Pending | Marco |
-| [ISS-07](#iss-07) | Medium | Stage change accepts an empty body, archived cases and unchanged stages | Marco |
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
 | [ISS-10](#iss-10) | Medium | No automated tests for the API controllers | Marco, Mbulungeni |
 | [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run; release build has no API address | Kundai |
 | [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan, Marco |
+| [ISS-07](#iss-07) | Low | Stage change accepts archived cases and unchanged stages | Marco |
 | [ISS-12](#iss-12) | Low | Mixed audit action wording; old lead verdict not recorded | Marco |
 | [ISS-13](#iss-13) | Low | Users list cannot show the join date | Marco, Riaad |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
 
 ### ISS-01
 
-**Critical. Password reset accepts any reset token.**
+**High. Password reset refuses genuine reset links; a link could be reused for 30 minutes.**
 
-- **Problem:** the reset endpoint only checks that the token is not blank. It does not check that the token was issued for this user, so the reset does not prove that the person owns the email address. The emailed reset link carries no token.
-- **Evidence:** A15; `AuthService.ResetPasswordAsync`.
-- **Impact:** an account's password could be changed without access to its email.
-- **Fix:** issue a random single-use token, store only its hash with an expiry, send it in the link, check and expire it on reset, apply the password policy to the new password, and revoke the user's refresh tokens. The web reset page is held back until this is fixed.
+PR #25 closed the critical part of this issue: a made-up reset token is now refused (section 3, A15).
+
+- **Problem:** the reset check looks for the email under `ClaimTypes.Email`, but the token stores it under the short name `email`. The lookup is always empty, so every genuine reset link is refused with the message "Invalid token claims" (400). Found by reading the code: nothing marks a token as used, so once the lookup is fixed a link would keep working for its full 30 minutes, even after the password has changed. The new password is not checked against any password policy. The emailed link carries only the token, but the reset request also needs the email address.
+- **Evidence:** A16; `AuthController.ResetPassword`. A token made with the same code and key contains the claims `email, purpose, nbf, exp, iat`.
+- **Impact:** users cannot reset their own password. If the lookup were fixed as it stands, anyone holding a reset link could use it again within 30 minutes.
+- **Fix:** read the email from the principal that `ValidateToken` returns (`principal.FindFirst(ClaimTypes.Email)`), or look up `JwtRegisteredClaimNames.Email`. Make the token single-use by adding a claim derived from the current password hash and checking that it still matches. Apply the password policy to `NewPassword`. The web reset page stays held back until this is fixed.
 
 ### ISS-02
 
@@ -45,15 +45,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Evidence:** `ConnectionStrings:DefaultConnection` and `Jwt:Key` in that file.
 - **Impact:** if a hosted deployment uses these values, anyone with access to the repository can sign valid tokens for any role.
 - **Fix:** remove the values from the file, set them as environment variables (or user secrets locally) on each host, and rotate the JWT key and the database password.
-
-### ISS-03
-
-**High. Sign-in rate limit would be shared by all users behind a hosting proxy.**
-
-- **Problem:** sign-in attempts are counted per network address (`Program.cs`, `RemoteIpAddress`), and the API does not read forwarded headers. Behind a hosting proxy, every request appears to come from the proxy's address.
-- **Evidence:** `Program.cs` rate limiter; no `UseForwardedHeaders` in the API. Found by reading the code; depends on the host.
-- **Impact:** five sign-ins by different people within one minute would block sign-in for everyone with a 429 error.
-- **Fix:** configure `ForwardedHeadersOptions` for the host's proxy and call `app.UseForwardedHeaders()` before the rate limiter.
 
 ### ISS-04
 
@@ -68,26 +59,9 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 **High. No per-account lockout after failed sign-ins.**
 
-- **Problem:** the only protection against password guessing is the per-address rate limit (A2), which does not stop guesses spread across many addresses.
-- **Evidence:** no lockout fields or logic in the `User` model or `AuthService`.
-- **Fix:** count failed sign-ins per user, lock the account for a set time after, for example, 5 failures, and reset the count after a successful sign-in.
-
-### ISS-06
-
-**Medium. Lead review with an empty body resets the lead to Pending.**
-
-- **Problem:** `PATCH /api/leads/{id}/status` with `{}` returns 200 and sets the lead to Pending. Sending the verdict the lead already has also returns 200.
-- **Evidence:** A12; `UpdateLeadStatusRequest.Status` is a non-nullable enum, so a missing value becomes the default.
-- **Impact:** a faulty client could undo a consultant's review. The web portal always sends a verdict.
-- **Fix:** make `Status` nullable and `[Required]` so a missing value returns 400.
-
-### ISS-07
-
-**Medium. Stage change accepts an empty body, archived cases and unchanged stages.**
-
-- **Problem:** `PATCH /api/cases/{id}/stage` has the same cause as ISS-06, so an empty body would move a case back to the first stage. It also changes archived cases, writes a history row when the stage does not change, and accepts `Notes` that are never saved.
-- **Evidence:** `UpdateCaseStageRequest`, `CasesController.UpdateStage`. Found by reading the code, not by a call.
-- **Fix:** nullable `[Required]` `Stage`; return 400 for archived cases and unchanged stages; remove `Notes` or add a column for it. The web portal never sends an empty body.
+- **Problem:** the only protection against password guessing is the per-address rate limit (A2), which does not stop guesses spread across many addresses. Since PR #25 the API takes the address from the `X-Forwarded-For` header and trusts that header from any sender. Behind a hosting proxy that adds the real address, this is correct. If the API can be reached directly, a caller can put a different address in each request and is never limited (A19).
+- **Evidence:** no lockout fields or logic in the `User` model or `AuthService`; `ForwardedHeadersOptions` in `Program.cs` clears `KnownProxies` and `KnownIPNetworks`.
+- **Fix:** count failed sign-ins per user, lock the account for a set time after, for example, 5 failures, and reset the count after a successful sign-in. Make sure the hosted API is only reachable through its proxy, or list the host's proxy addresses in `ForwardedHeadersOptions`.
 
 ### ISS-08
 
@@ -132,11 +106,22 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Impact:** every API restart or redeploy, and every wake-up of a free host that sleeps when idle, forgets all refresh tokens. Users are signed out when their access token next expires. With more than one API instance, a token issued by one instance is unknown to the others.
 - **Fix:** store refresh tokens (hashed) in a database table behind the same `IRefreshTokenStore` interface.
 
+### ISS-07
+
+**Low. Stage change accepts archived cases and unchanged stages.**
+
+PR #25 fixed the empty body (section 3).
+
+- **Problem:** `PATCH /api/cases/{id}/stage` still changes archived cases. Sending the stage a case already has returns 200 and writes a history row and an audit row for a change that did not happen.
+- **Evidence:** A18; `CasesController.UpdateStage` has no archived or same-stage check.
+- **Impact:** the case history can show stage changes that never happened. The web portal disables the current stage in its stage list.
+- **Fix:** return 400 for archived cases and for unchanged stages.
+
 ### ISS-12
 
 **Low. Mixed audit action wording; old lead verdict not recorded.**
 
-- **Problem:** some audit actions are stored as code names (`UpdateCaseStage`, `UpdateLeadStatus`), others as sentences ("Suspended user"). The lead review audit row does not record the previous verdict.
+- **Problem:** some audit actions are stored as code names (`UpdateCaseStage`, `UpdateLeadStatus`), others as sentences ("Suspended user"). The lead review audit row does not record the previous verdict, and sending the verdict a lead already has returns 200 and writes another audit row.
 - **Evidence:** `CasesController`, `LeadsController`.
 - **Fix:** store sentences and include the old value. The web audit page already shows the code names in plain words.
 
@@ -181,6 +166,10 @@ Issues found by testing or review and fixed before submission.
 | Archiving a document wrote no audit row | Audit row added (PR #18) |
 | Suspending, reinstating and deleting users wrote no audit rows | Audit rows added (PR #20) |
 | Admin delete returned 405 | Now a soft delete: the user is marked inactive and kept for the audit trail |
+| Password reset accepted any non-blank token, so a password could be changed without access to the email (was ISS-01, Critical) | The reset link now carries a signed token that expires after 30 minutes and names its purpose and email; a made-up token is refused (A15). The user's refresh tokens are revoked after a reset (PR #25). Genuine links are still refused, see [ISS-01](#iss-01) |
+| Behind a hosting proxy, all users would share one sign-in rate limit (was ISS-03) | The API reads the forwarded client address before the rate limiter (PR #25). See the note in [ISS-05](#iss-05) |
+| Lead review with an empty body `{}` returned 200 and reset the lead to Pending (was ISS-06) | Verdict is required: 400 and the lead is unchanged (PR #25, A12) |
+| Stage change with an empty body would have moved a case back to the first stage, and accepted notes that were never saved | Stage is required: 400 (A17); the unsaved notes field was removed (PR #25). Rest open as [ISS-07](#iss-07) |
 | Uploaded test files could be committed | `Strategies.Api/wwwroot/uploads` added to `.gitignore` (PR #18) |
 | Seed data reused the same id pattern across tables | Distinct seed ids (PR #19) |
 | First-time visitors triggered a failed token refresh and a console error | The web portal only refreshes when a session exists (PR #19) |
