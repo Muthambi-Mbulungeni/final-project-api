@@ -1,5 +1,7 @@
 // Thin wrapper around fetch for the Strategies API.
 // Requests use relative /api paths: Vite forwards them to the API in development.
+// A hosted build served from another origin (e.g. GitHub Pages) sets VITE_API_BASE_URL
+// at build time, and every request is sent to that address instead.
 // Every failure becomes an ApiError with a readable message, using the API's
 // standard error shape { message, errors } when the server provides it.
 //
@@ -27,6 +29,15 @@ function unreachableMessage() {
 }
 const SERVER_ERROR_MESSAGE = 'Something went wrong on our side. Please try again in a moment.'
 const REFRESH_PATH = '/api/auth/refresh'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
+// Joins the configured API address and a request path. With no address set, the path stays
+// relative (development proxy). Absolute URLs pass through unchanged.
+export function apiUrl(path, base = API_BASE_URL) {
+  const trimmed = String(base ?? '').trim().replace(/\/+$/, '')
+  if (!trimmed || /^https?:\/\//i.test(path)) return path
+  return `${trimmed}${path.startsWith('/') ? '' : '/'}${path}`
+}
 
 let refreshInFlight = null
 let sessionExpiredHandler = () => {}
@@ -66,7 +77,7 @@ function toApiError(response, body) {
 
 async function send(path, options) {
   try {
-    return await fetch(path, options)
+    return await fetch(apiUrl(path), options)
   } catch (error) {
     if (error.name === 'AbortError') throw error
     throw new ApiError(unreachableMessage())
@@ -90,7 +101,7 @@ async function requestNewTokens() {
 
   let response
   try {
-    response = await fetch(REFRESH_PATH, options)
+    response = await fetch(apiUrl(REFRESH_PATH), options)
   } catch {
     return false
   }

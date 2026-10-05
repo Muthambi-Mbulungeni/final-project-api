@@ -4,12 +4,31 @@ import {
   apiGet,
   apiPost,
   apiUpload,
+  apiUrl,
   filenameFromDisposition,
   onSessionExpired,
   openBlob,
   refreshSession,
 } from './api'
 import { endSession, getAccessToken, getSession, startSession } from './session'
+
+describe('apiUrl (hosted API address)', () => {
+  it('keeps paths relative when no API address is configured (development proxy)', () => {
+    expect(apiUrl('/api/cases', '')).toBe('/api/cases')
+    expect(apiUrl('/api/cases', undefined)).toBe('/api/cases')
+    expect(apiUrl('/api/cases', '   ')).toBe('/api/cases')
+  })
+
+  it('prefixes the configured address, without doubling or dropping the slash', () => {
+    expect(apiUrl('/api/cases', 'https://api.example.com')).toBe('https://api.example.com/api/cases')
+    expect(apiUrl('/api/cases', 'https://api.example.com/')).toBe('https://api.example.com/api/cases')
+    expect(apiUrl('api/cases', 'https://api.example.com')).toBe('https://api.example.com/api/cases')
+  })
+
+  it('leaves absolute URLs unchanged', () => {
+    expect(apiUrl('https://other.example.com/x', 'https://api.example.com')).toBe('https://other.example.com/x')
+  })
+})
 
 describe('protected files', () => {
   beforeEach(() => {
