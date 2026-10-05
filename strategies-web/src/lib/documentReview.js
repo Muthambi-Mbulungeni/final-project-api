@@ -26,6 +26,25 @@ export function reviewErrorMessage(error) {
   return error?.message || 'The review could not be saved. Please try again.'
 }
 
+// How many documents on this case still need a staff decision: the same rule as the
+// Approve / Reject buttons, so the summary and the buttons can never disagree.
+export function awaitingDecisionCount(documents, caseArchived) {
+  return documents.filter((document) => canReview(document, caseArchived)).length
+}
+
+// GET /api/documents/{id}/file streams the stored file. Clients only reach their own cases and
+// consultants only their assigned ones (403 otherwise). The API answers 404 both for an unknown
+// document and for a record whose file is not on the server (e.g. demo rows with no upload).
+export function documentFilePath(documentId) {
+  return `/api/documents/${encodeURIComponent(documentId)}/file`
+}
+
+export function documentFileErrorMessage(error) {
+  if (error?.status === 403) return 'This case isn’t assigned to you, so you can’t open its files.'
+  if (error?.status === 404) return 'This file isn’t stored on the server, so it can’t be opened. Ask the client for a new copy.'
+  return error?.message || 'The file could not be opened. Please try again.'
+}
+
 // Only pending documents on open cases can be reviewed: re-reviewing is not a defined workflow.
 export function canReview(document, caseArchived) {
   return !caseArchived && !document.isArchived && documentStatus(document) === 'Pending'

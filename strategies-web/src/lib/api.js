@@ -196,9 +196,8 @@ export function filenameFromDisposition(header, fallback) {
   return plain ? plain[1].trim() : fallback
 }
 
-// Downloads a file from the API and saves it through the browser.
-// Returns the filename used.
-export async function apiDownload(path, fallbackName = 'download') {
+// Fetches a protected file with the signed-in user's token. Returns { blob, filename }.
+export async function apiFetchFile(path, fallbackName = 'download') {
   const response = await authorizedFetch(path)
 
   if (!response.ok) {
@@ -208,8 +207,11 @@ export async function apiDownload(path, fallbackName = 'download') {
 
   const blob = await response.blob()
   const filename = filenameFromDisposition(response.headers.get('Content-Disposition'), fallbackName)
-  const url = URL.createObjectURL(blob)
+  return { blob, filename }
+}
 
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
   link.download = filename
@@ -217,6 +219,39 @@ export async function apiDownload(path, fallbackName = 'download') {
   link.click()
   link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 0)
+}
 
+// How long an opened file's temporary URL stays valid: long enough for the new tab to load it.
+const OPENED_FILE_URL_LIFETIME_MS = 60_000
+
+// Shows a fetched file in a new tab. The tab is opened only after the file arrived, so a
+// missing file shows an error here instead of leaving an empty tab. If a popup blocker stops
+// the tab, the file is saved instead. The new tab cannot reach back into the portal (opener).
+// `browser` is injectable for tests.
+export function openBlob(blob, filename, browser = {}) {
+  const { open = (url) => window.open(url, '_blank'), save = saveBlob, later = setTimeout } = browser
+  const url = URL.createObjectURL(blob)
+  const tab = open(url)
+  if (!tab) {
+    URL.revokeObjectURL(url)
+    save(blob, filename)
+    return 'saved'
+  }
+  tab.opener = null
+  later(() => URL.revokeObjectURL(url), OPENED_FILE_URL_LIFETIME_MS)
+  return 'opened'
+}
+
+// Opens a protected file in a new tab (or saves it if tabs are blocked). Returns 'opened' or 'saved'.
+export async function apiOpenFile(path, fallbackName = 'file') {
+  const { blob, filename } = await apiFetchFile(path, fallbackName)
+  return openBlob(blob, filename)
+}
+
+// Downloads a file from the API and saves it through the browser.
+// Returns the filename used.
+export async function apiDownload(path, fallbackName = 'download') {
+  const { blob, filename } = await apiFetchFile(path, fallbackName)
+  saveBlob(blob, filename)
   return filename
 }

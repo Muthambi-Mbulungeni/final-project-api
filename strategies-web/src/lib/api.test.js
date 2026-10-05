@@ -1,6 +1,70 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiGet, apiPost, apiUpload, filenameFromDisposition, onSessionExpired, refreshSession } from './api'
+import {
+  apiFetchFile,
+  apiGet,
+  apiPost,
+  apiUpload,
+  filenameFromDisposition,
+  onSessionExpired,
+  openBlob,
+  refreshSession,
+} from './api'
 import { endSession, getAccessToken, getSession, startSession } from './session'
+
+describe('protected files', () => {
+  beforeEach(() => {
+    vi.stubGlobal('sessionStorage', createStorage())
+    vi.stubGlobal('localStorage', createStorage())
+  })
+
+  afterEach(() => {
+    endSession()
+    vi.unstubAllGlobals()
+  })
+
+  it('fetches a file with the access token and reads its name from the API', async () => {
+    startSession(AUTH)
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('%PDF-1.4', {
+          headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="passport.pdf"' },
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { blob, filename } = await apiFetchFile('/api/documents/d1/file', 'document')
+
+    expect(authHeader(fetchMock.mock.calls[0][1])).toBe('Bearer old-token')
+    expect(filename).toBe('passport.pdf')
+    expect(blob.type).toBe('application/pdf')
+  })
+
+  it('throws the API error for a missing file, so nothing is opened', async () => {
+    startSession(AUTH)
+    vi.stubGlobal('fetch', vi.fn(async () => json({ message: 'Physical file not found.' }, 404)))
+
+    await expect(apiFetchFile('/api/documents/d1/file')).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('opens the file in a new tab that cannot reach back into the portal', () => {
+    const tab = { opener: 'portal' }
+    const open = vi.fn(() => tab)
+    const save = vi.fn()
+
+    expect(openBlob(new Blob(['x'], { type: 'image/png' }), 'scan.png', { open, save, later: () => {} })).toBe('opened')
+    expect(open).toHaveBeenCalledWith(expect.stringMatching(/^blob:/))
+    expect(tab.opener).toBeNull()
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('saves the file instead when the browser blocks the new tab', () => {
+    const save = vi.fn()
+    const blob = new Blob(['x'], { type: 'application/pdf' })
+
+    expect(openBlob(blob, 'report.pdf', { open: () => null, save })).toBe('saved')
+    expect(save).toHaveBeenCalledWith(blob, 'report.pdf')
+  })
+})
 
 function createStorage() {
   const values = new Map()

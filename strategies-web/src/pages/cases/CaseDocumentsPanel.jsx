@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { ExternalLink, X } from 'lucide-react'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { useToast } from '../../components/ui/toastContext'
-import { apiPatch } from '../../lib/api'
+import { apiOpenFile, apiPatch } from '../../lib/api'
 import {
+  awaitingDecisionCount,
   canReview,
+  documentFileErrorMessage,
+  documentFilePath,
   documentsForReview,
   rejectionCommentError,
   reviewBody,
@@ -13,9 +16,10 @@ import {
   reviewPath,
 } from '../../lib/documentReview'
 import { documentSummary, documentsPath } from '../../lib/documents'
-import { formatDate } from '../../lib/format'
+import { formatDate, shortId } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
+import CaseConsultantSection from './CaseConsultantSection'
 import CaseStageSection from './CaseStageSection'
 
 const NO_REJECTION = { id: null, comment: '', error: null }
@@ -24,11 +28,10 @@ function documentName(document) {
   return document.documentTypeName || document.fileName || 'Document'
 }
 
-// Loads and reviews one case's documents. Mounted per case (keyed by id), so a newly opened
-// case never shows the previous case's documents while its own load.
-function DocumentsBody({ caseItem }) {
+// Reviews one case's documents. The request is owned by CasePanelBody, so the decision summary
+// at the top of the panel and this list always come from the same response.
+function DocumentsBody({ caseItem, request, headingRef }) {
   const toast = useToast()
-  const request = useApi(documentsPath(caseItem.id))
   const documents = documentsForReview(listItems(request.data))
   const summary = documentSummary(documents)
 
@@ -37,8 +40,24 @@ function DocumentsBody({ caseItem }) {
   const [rowError, setRowError] = useState({ id: null, message: null })
   // Reviewed here but not yet reloaded: their buttons are hidden so nothing is submitted twice.
   const [reviewedIds, setReviewedIds] = useState(() => new Set())
+  const [openingId, setOpeningId] = useState(null)
+  const [fileError, setFileError] = useState({ id: null, message: null })
   const headingRefs = useRef(new Map())
   const commentRef = useRef(null)
+
+  // Staff read the actual file before approving or rejecting it.
+  async function openFile(document) {
+    setOpeningId(document.id)
+    setFileError({ id: null, message: null })
+    try {
+      const result = await apiOpenFile(documentFilePath(document.id), document.fileName || 'document')
+      if (result === 'saved') toast.show(`${documentName(document)} downloaded. Your browser blocked the new tab.`)
+    } catch (error) {
+      setFileError({ id: document.id, message: documentFileErrorMessage(error) })
+    } finally {
+      setOpeningId(null)
+    }
+  }
 
   function focusHeading(id) {
     requestAnimationFrame(() => headingRefs.current.get(id)?.focus())
@@ -125,9 +144,25 @@ function DocumentsBody({ caseItem }) {
                   <p className="truncate text-xs text-stone-500">
                     {document.fileName || 'No file name'} · Uploaded {formatDate(document.uploadedAt)}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => openFile(document)}
+                    disabled={openingId === document.id}
+                    aria-label={`Open the ${name} file in a new tab`}
+                    className="mt-1.5 inline-flex items-center gap-1.5 rounded text-sm font-medium text-brand-700 hover:text-brand-800 hover:underline disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <ExternalLink className="size-3.5" strokeWidth={2} aria-hidden="true" />
+                    {openingId === document.id ? 'Opening…' : 'Open file'}
+                  </button>
                 </div>
                 <StatusBadge type="documentStatus" value={document.status} />
               </div>
+
+              {fileError.id === document.id && (
+                <p role="alert" className="mt-2 text-sm text-brand-700">
+                  {fileError.message}
+                </p>
+              )}
 
               {document.reviewComment && (
                 <p className="mt-2 rounded-md bg-stone-50 px-3 py-2 text-sm text-stone-700">
@@ -219,30 +254,73 @@ function DocumentsBody({ caseItem }) {
   }
 
   return (
+    <section aria-labelledby="case-docs-heading" className="mt-6 scroll-mt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        {/* tabIndex -1: the summary's "Review" button moves focus here; not a control, so no outline. */}
+        <h3 id="case-docs-heading" ref={headingRef} tabIndex={-1} className="text-sm font-semibold text-stone-900 outline-none">
+          Documents
+        </h3>
+        {documents.length > 0 && (
+          <p className="text-xs text-stone-500">
+            {summary.pending} awaiting review · {summary.approved} approved · {summary.rejected} rejected
+          </p>
+        )}
+      </div>
+      {content}
+    </section>
+  )
+}
+
+// What the panel shows for one case. Mounted per case (keyed by id), so a newly opened case never
+// shows the previous case's documents while its own load. Owns the documents request so the
+// "needs your decision" summary and the document list cannot disagree.
+function CasePanelBody({ caseItem, onStageChanged, onAssigned }) {
+  const request = useApi(documentsPath(caseItem.id))
+  const documentsHeadingRef = useRef(null)
+  const awaiting = awaitingDecisionCount(documentsForReview(listItems(request.data)), caseItem.isArchived)
+
+  function goToDocuments() {
+    const heading = documentsHeadingRef.current
+    heading?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    heading?.focus({ preventScroll: true })
+  }
+
+  return (
     <>
-      <section aria-labelledby="case-docs-heading" className="mt-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h3 id="case-docs-heading" className="text-sm font-semibold text-stone-900">
-            Documents
-          </h3>
-          {documents.length > 0 && (
-            <p className="text-xs text-stone-500">
-              {summary.pending} awaiting review · {summary.approved} approved · {summary.rejected} rejected
+      {awaiting > 0 && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-amber-800">Needs your decision</p>
+            <p className="mt-0.5 text-sm font-medium text-stone-900">
+              {awaiting === 1 ? '1 document is awaiting review' : `${awaiting} documents are awaiting review`}
             </p>
-          )}
+          </div>
+          <button
+            type="button"
+            onClick={goToDocuments}
+            className="shrink-0 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-900 transition-colors hover:bg-amber-100"
+          >
+            Review
+          </button>
         </div>
-        {content}
-      </section>
-      <p className="mt-6 text-xs text-stone-500">Opening files from the portal isn’t available yet.</p>
+      )}
+      {caseItem.isArchived && (
+        <p className="mb-4 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+          This case is archived, so its stage and documents are read-only.
+        </p>
+      )}
+      <CaseStageSection caseItem={caseItem} onStageChanged={onStageChanged} />
+      {onAssigned && <CaseConsultantSection caseItem={caseItem} onAssigned={onAssigned} />}
+      <DocumentsBody caseItem={caseItem} request={request} headingRef={documentsHeadingRef} />
     </>
   )
 }
 
-// Side panel for one case: its stage (staff can move it) and its documents, with
-// approve / reject for pending ones.
+// Side panel for one case: its stage (staff can move it), its consultant (administrators can
+// assign one; pass onAssigned only for them) and its documents, with approve / reject for pending ones.
 // Same native <dialog> pattern as LeadDetailPanel: focus moves in, Escape closes,
 // focus returns to the client name that opened it. Full screen on phones.
-export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged }) {
+export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged, onAssigned }) {
   const dialogRef = useRef(null)
   const open = caseItem !== null
 
@@ -275,7 +353,9 @@ export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged }
         <div className="flex h-full flex-col">
           <header className="flex items-start justify-between gap-4 border-b border-stone-200 px-5 py-5 sm:px-6">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-700">Case</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-brand-700">
+                Case <span className="font-mono tracking-wider">{shortId(caseItem.id)}</span>
+              </p>
               <h2 id="case-docs-title" className="mt-1 truncate text-lg font-semibold tracking-tight">
                 {caseItem.clientName ?? 'Client'}
               </h2>
@@ -295,13 +375,12 @@ export default function CaseDocumentsPanel({ caseItem, onClose, onStageChanged }
           </header>
 
           <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-            {caseItem.isArchived && (
-              <p className="mb-4 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
-                This case is archived, so its stage and documents are read-only.
-              </p>
-            )}
-            <CaseStageSection key={`stage-${caseItem.id}`} caseItem={caseItem} onStageChanged={onStageChanged} />
-            <DocumentsBody key={caseItem.id} caseItem={caseItem} />
+            <CasePanelBody
+              key={caseItem.id}
+              caseItem={caseItem}
+              onStageChanged={onStageChanged}
+              onAssigned={onAssigned}
+            />
           </div>
 
           <footer className="grid grid-cols-1 border-t border-stone-200 bg-stone-50 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:px-6">

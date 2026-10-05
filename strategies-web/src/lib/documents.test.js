@@ -6,9 +6,20 @@ import {
   documentsForClient,
   documentsPath,
   documentsToReplace,
+  replaceActionLabel,
   replacementBody,
   uploadFileError,
 } from './documents'
+
+describe('replaceActionLabel', () => {
+  it('names the document when there is exactly one to replace', () => {
+    expect(replaceActionLabel([{ documentTypeName: 'Medical report' }])).toBe('Replace medical report')
+    expect(replaceActionLabel([{ documentTypeName: 'Passport' }, { documentTypeName: 'Medical report' }])).toBe(
+      'Go to documents',
+    )
+    expect(replaceActionLabel([{}])).toBe('Go to documents')
+  })
+})
 
 describe('documentsToReplace', () => {
   it('lists rejected documents the client has not yet replaced, ignoring archived ones', () => {
