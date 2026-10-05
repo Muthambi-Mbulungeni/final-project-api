@@ -17,7 +17,7 @@ namespace Strategies.Api.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("databasestorage")
+                .HasDefaultSchema("public")
                 .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
@@ -56,7 +56,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("LeadId");
 
-                    b.ToTable("AgentRun", "databasestorage");
+                    b.ToTable("AgentRun", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.AuditLog", b =>
@@ -88,7 +88,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AuditLog", "databasestorage");
+                    b.ToTable("AuditLog", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Case", b =>
@@ -137,7 +137,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("VisaCategoryId");
 
-                    b.ToTable("Case", "databasestorage");
+                    b.ToTable("Case", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.CaseStageHistory", b =>
@@ -169,7 +169,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("ChangedById");
 
-                    b.ToTable("CaseStageHistory", "databasestorage");
+                    b.ToTable("CaseStageHistory", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.ChecklistTemplate", b =>
@@ -195,7 +195,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("VisaCategoryId");
 
-                    b.ToTable("ChecklistTemplate", "databasestorage");
+                    b.ToTable("ChecklistTemplate", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Document", b =>
@@ -245,7 +245,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("ReviewedById");
 
-                    b.ToTable("Document", "databasestorage");
+                    b.ToTable("Document", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.DocumentType", b =>
@@ -263,7 +263,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DocumentType", "databasestorage");
+                    b.ToTable("DocumentType", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Lead", b =>
@@ -312,7 +312,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("VisaCategoryId");
 
-                    b.ToTable("Lead", "databasestorage");
+                    b.ToTable("Lead", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.Message", b =>
@@ -347,7 +347,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("SenderId");
 
-                    b.ToTable("Message", "databasestorage");
+                    b.ToTable("Message", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.User", b =>
@@ -388,7 +388,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("User", "databasestorage");
+                    b.ToTable("User", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.VisaCategory", b =>
@@ -411,7 +411,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("VisaCategory", "databasestorage");
+                    b.ToTable("VisaCategory", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.VisaRecord", b =>
@@ -442,7 +442,7 @@ namespace Strategies.Api.Migrations
 
                     b.HasIndex("CaseId");
 
-                    b.ToTable("VisaRecord", "databasestorage");
+                    b.ToTable("VisaRecord", "public");
                 });
 
             modelBuilder.Entity("Strategies.Api.Data.Models.AgentRun", b =>

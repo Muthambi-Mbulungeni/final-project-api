@@ -26,7 +26,7 @@ namespace Strategies.Api.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.HasDefaultSchema("databasestorage");
+            modelBuilder.HasDefaultSchema("public");
 
             modelBuilder.Entity<VisaCategory>(visaCategory =>
             {
