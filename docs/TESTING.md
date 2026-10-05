@@ -27,8 +27,8 @@ Each requirement from the brief, with the tests that prove it. Test IDs refer to
 | Role-based access on the server | A3 (consultant sees own cases only), A11 (client gets 403) | Pass |
 | JWT authentication and refresh | `TokenServiceTests`, `AuthServiceTests` (refresh and revoke), A1, B3 | Pass |
 | Passwords hashed with bcrypt | Login tests verify against stored bcrypt hashes (`PasswordHasherService`, work factor 11) | Pass |
-| Brute-force protection | A2 (5 sign-ins per minute per address) | Pass for rate limiting, but **no per-account lockout** ([ISS-05](ISSUES.md#iss-05)), and the limit would be shared by all users behind a hosting proxy ([ISS-03](ISSUES.md#iss-03)) |
-| Password reset | A15 | **Fail** ([ISS-01](ISSUES.md#iss-01)) |
+| Brute-force protection | A2 (5 sign-ins per minute per address), A19 | Pass for rate limiting, but **no per-account lockout**, and a caller that reaches the API directly can avoid the limit (A19, [ISS-05](ISSUES.md#iss-05)) |
+| Password reset | A15, A16 | Made-up tokens refused (A15), but **genuine reset links are refused too** (A16, [ISS-01](ISSUES.md#iss-01)) |
 | Client and server validation | B1, B5 (client side); A4, A6, A7, A10, A11 (server side); `validation` tests | Pass |
 | File upload with server validation | A6, A7, B4, B5 | Pass |
 | Audit trail | A5, A13, B10 | Pass |
@@ -108,7 +108,7 @@ Run: `cd strategies-web`, then `npm ci` and `npm test`.
 
 ## 5. API checks against a real database
 
-Run against the local API with the seeded database, 2026-10-03 and 2026-10-04 (before the final API patches; A12 and A15 to be re-checked on the final build).
+Run against the local API with the seeded database, 2026-10-03 and 2026-10-04. A12 and A15 were re-run, and A16 to A19 added, on develop `e2751ac` (after the final API patches in PR #25), 2026-10-05.
 
 | # | Check | Expected | Result |
 |---|---|---|---|
@@ -123,10 +123,14 @@ Run against the local API with the seeded database, 2026-10-03 and 2026-10-04 (b
 | A9 | Leads filtered by status Qualified | 5 leads, all Qualified | Pass |
 | A10 | Change a case stage, then an invalid stage | 200, then 400 | Pass |
 | A11 | Lead review: valid verdict, invalid verdict, unknown lead, client role | 200, 400, 404, 403 | Pass |
-| A12 | Lead review with an empty body `{}` | 400 | **Fail**: 200 and the lead is reset to Pending ([ISS-06](ISSUES.md#iss-06)) |
+| A12 | Lead review with an empty body `{}` | 400 | Pass: 400, lead unchanged (failed before PR #25) |
 | A13 | Admin suspends and reinstates a user | Audit rows "Suspended user" and "Reinstated user" | Pass |
 | A14 | Public enquiry with no Gemini key configured | Lead is saved as NeedsReview (AI fallback) | Pass |
-| A15 | Password reset only with a valid reset token | Request refused without a valid token | **Fail** ([ISS-01](ISSUES.md#iss-01)) |
+| A15 | Password reset only with a valid reset token | Request refused without a valid token | Pass: 400 for a made-up token and for a token issued for another email (failed before PR #25) |
+| A16 | Password reset with a valid token, made by the same code and key the API uses | 200 | **Fail**: 400 "Invalid token claims" ([ISS-01](ISSUES.md#iss-01)) |
+| A17 | Stage change with an empty body `{}` | 400 | Pass |
+| A18 | Stage change to the stage the case already has | 400 | **Fail**: 200, with a history row and an audit row ([ISS-07](ISSUES.md#iss-07)) |
+| A19 | Seven failed sign-ins sent straight to the API, each with a different `X-Forwarded-For` header | 429 after 5 | **Fail**: no 429; the same seven without the header were stopped with 429 ([ISS-05](ISSUES.md#iss-05)) |
 
 ## 6. Browser checks per role
 
