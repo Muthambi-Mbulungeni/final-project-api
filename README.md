@@ -97,12 +97,18 @@ flowchart LR
 
 ### 1. Database
 
-Create an empty database (for example `strategies`), apply the migrations, then load the demo data. The exact commands are in [database/seed/README.md](database/seed/README.md).
+You can spin up the database instantly using Docker Compose (recommended):
+```bash
+docker compose up -d
+```
+Then, apply the EF Core migrations to create the tables:
 
 ```bash
 cd Strategies.Api
 dotnet ef database update
 ```
+
+To load the demo data, follow the commands in [database/seed/README.md](database/seed/README.md).
 
 ### 2. API
 
