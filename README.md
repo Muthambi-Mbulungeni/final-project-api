@@ -2,7 +2,7 @@
 
 Case management for **Strategies Migration Services**, a South African immigration consultancy. Built by Team Nexus Solutions for INSY7315 (Work Integrated Learning).
 
-**Demo video:** https://youtu.be/aw8wSutQ7Z8
+**Demo video:** [Part 1](https://youtu.be/aw8wSutQ7Z8) · [Part 2](https://youtu.be/IjRK_5XBhtY)
 
 **Presentation:** [Task 2 presentation (PDF)](docs/presentation/Task2-Presentation-Nexus-Solutions.pdf) · [Implementation access and links (PDF)](docs/presentation/Task2-Implementation-Access-and-Links.pdf)
 
