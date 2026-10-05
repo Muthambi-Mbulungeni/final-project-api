@@ -164,7 +164,7 @@ class ApiClient(private val tokens: TokenStore, baseUrl: String) {
 
     suspend fun documents(caseId: String): List<DocumentDto> {
         val body = get("api/documents?caseId=$caseId&page=1&pageSize=50")
-        return json.decodeFromString<PagedResponse<DocumentDto>>(body).data.filter { !it.isArchived }
+        return documentsForClient(json.decodeFromString<PagedResponse<DocumentDto>>(body).data)
     }
 
     suspend fun notifications(): NotificationsResponse =

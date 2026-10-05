@@ -54,6 +54,55 @@ class ModelsTest {
         assertEquals("Thandi", d.consultantOrNull)
     }
 
+    // ---- Documents shown to the client (same rule as the web portal) ----
+
+    private fun doc(id: String, type: String?, status: String, at: String, archived: Boolean = false) =
+        DocumentDto(id = id, documentTypeId = type, status = status, uploadedAt = at, isArchived = archived)
+
+    @Test fun documents_rejectedCopyWithNewerCopyOfSameType_isHidden() {
+        val shown = documentsForClient(listOf(
+            doc("old", "medical", "Rejected", "2026-10-01T10:00:00.1234567Z"),
+            doc("new", "medical", "Pending", "2026-10-02T09:00:00.5Z"),
+            doc("passport", "passport", "Approved", "2026-09-30T10:00:00Z"),
+        ))
+        assertEquals(listOf("new", "passport"), shown.map { it.id })
+    }
+
+    @Test fun documents_comparesTimesNotText() {
+        // As text "...00Z" sorts after "...00.5Z", which would wrongly keep the old copy.
+        val shown = documentsForClient(listOf(
+            doc("old", "medical", "Rejected", "2026-10-01T10:00:00Z"),
+            doc("new", "medical", "Pending", "2026-10-01T10:00:00.5Z"),
+        ))
+        assertEquals(listOf("new"), shown.map { it.id })
+    }
+
+    @Test fun documents_rejectedCopyStays_whenNoNewerCopyOfSameType() {
+        val shown = documentsForClient(listOf(
+            doc("rejected", "medical", "Rejected", "2026-10-02T10:00:00Z"),
+            doc("olderSameType", "medical", "Approved", "2026-10-01T10:00:00Z"),
+            doc("newerOtherType", "passport", "Pending", "2026-10-03T10:00:00Z"),
+            doc("noType", null, "Rejected", "2026-09-01T10:00:00Z"),
+        ))
+        assertEquals(setOf("rejected", "olderSameType", "newerOtherType", "noType"), shown.map { it.id }.toSet())
+    }
+
+    @Test fun documents_archivedLeftOut_andOrderedForTheClient() {
+        val shown = documentsForClient(listOf(
+            doc("approved", "a", "Approved", "2026-10-05T10:00:00Z"),
+            doc("archived", "b", "Rejected", "2026-10-05T10:00:00Z", archived = true),
+            doc("pendingOld", "c", "Pending", "2026-10-01T10:00:00Z"),
+            doc("pendingNew", "d", "Pending", "2026-10-03T10:00:00Z"),
+            doc("rejected", "e", "Rejected", "2026-09-01T10:00:00Z"),
+        ))
+        assertEquals(listOf("rejected", "pendingNew", "pendingOld", "approved"), shown.map { it.id })
+    }
+
+    @Test fun documents_typeIdReadFromJson() {
+        val d = json.decodeFromString<DocumentDto>("""{"id":"a","documentTypeId":"7","status":"Rejected"}""")
+        assertEquals("7", d.documentTypeId)
+    }
+
     @Test fun case_stageAcceptsStringOrNumberFromJson() {
         val byName = json.decodeFromString<CaseDto>("""{"id":"a","stage":"UnderReview"}""")
         val byIndex = json.decodeFromString<CaseDto>("""{"id":"a","stage":2}""")
