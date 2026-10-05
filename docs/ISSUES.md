@@ -1,0 +1,178 @@
+# Issue log
+
+Strategies Migration Platform, Team Nexus Solutions (INSY7315).
+
+Known issues at the time of submission, checked against the code on `develop` (`0844264`, 2026-10-05). Test IDs (A1, B1 and so on) refer to [TESTING.md](TESTING.md).
+
+**Severity:** Critical = a security risk or data loss. High = a rubric requirement is missing or weakened. Medium = wrong behaviour with a workaround. Low = wording or polish.
+
+**How issues are handled.** Issues are found by the tests in TESTING.md or by reviewing the code. Each one is checked in the code, reported to the owner of that part of the system with a suggested fix, and checked again after the fix is merged. Fixed issues move to section 3.
+
+## 1. Open issues
+
+| ID | Severity | Issue | Owner |
+|---|---|---|---|
+| [ISS-01](#iss-01) | Critical | Password reset accepts any reset token | Marco, Kaan |
+| [ISS-02](#iss-02) | High | Development secrets committed in `appsettings.json` | Kaan, Mbulungeni |
+| [ISS-03](#iss-03) | High | Sign-in rate limit would be shared by all users behind a hosting proxy | Kaan, Mbulungeni |
+| [ISS-04](#iss-04) | High | POPIA consent is checked in the browser only, never sent to or stored by the API | Marco, Lekabe |
+| [ISS-05](#iss-05) | High | No per-account lockout after failed sign-ins | Kaan |
+| [ISS-06](#iss-06) | Medium | Lead review with an empty body resets the lead to Pending | Marco |
+| [ISS-07](#iss-07) | Medium | Stage change accepts an empty body, archived cases and unchanged stages | Marco |
+| [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
+| [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
+| [ISS-10](#iss-10) | Medium | No automated tests for the API controllers | Marco, Mbulungeni |
+| [ISS-11](#iss-11) | Medium | Mobile: Gradle wrapper missing, manual checks incomplete | Kundai |
+| [ISS-12](#iss-12) | Low | Mixed audit action wording; old lead verdict not recorded | Marco |
+| [ISS-13](#iss-13) | Low | Users list cannot show the join date | Marco, Riaad |
+| [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
+
+### ISS-01
+
+**Critical. Password reset accepts any reset token.**
+
+- **Problem:** the reset endpoint only checks that the token is not blank. It does not check that the token was issued for this user, so the reset does not prove that the person owns the email address. The emailed reset link carries no token.
+- **Evidence:** A15; `AuthService.ResetPasswordAsync`.
+- **Impact:** an account's password could be changed without access to its email.
+- **Fix:** issue a random single-use token, store only its hash with an expiry, send it in the link, check and expire it on reset, apply the password policy to the new password, and revoke the user's refresh tokens. The web reset page is held back until this is fixed.
+
+### ISS-02
+
+**High. Development secrets committed in `appsettings.json`.**
+
+- **Problem:** `Strategies.Api/appsettings.json` contains a database password and the JWT signing key.
+- **Evidence:** `ConnectionStrings:DefaultConnection` and `Jwt:Key` in that file.
+- **Impact:** if a hosted deployment uses these values, anyone with access to the repository can sign valid tokens for any role.
+- **Fix:** remove the values from the file, set them as environment variables (or user secrets locally) on each host, and rotate the JWT key and the database password.
+
+### ISS-03
+
+**High. Sign-in rate limit would be shared by all users behind a hosting proxy.**
+
+- **Problem:** sign-in attempts are counted per network address (`Program.cs`, `RemoteIpAddress`), and the API does not read forwarded headers. Behind a hosting proxy, every request appears to come from the proxy's address.
+- **Evidence:** `Program.cs` rate limiter; no `UseForwardedHeaders` in the API. Found by reading the code; depends on the host.
+- **Impact:** five sign-ins by different people within one minute would block sign-in for everyone with a 429 error.
+- **Fix:** configure `ForwardedHeadersOptions` for the host's proxy and call `app.UseForwardedHeaders()` before the rate limiter.
+
+### ISS-04
+
+**High. POPIA consent is checked in the browser only.**
+
+- **Problem:** the enquiry form requires the consent box, but the request it sends has no consent field, and the API has no field or column for it.
+- **Evidence:** B1; `EnquiryPage.jsx` request body; no consent field in `CreateLeadRequest` or the `Lead` table.
+- **Impact:** there is no record that a person consented to processing, and a request sent straight to the API skips the check.
+- **Fix:** add a required consent flag to `CreateLeadRequest` (reject the request without it) and store the consent time on the lead (a new migration); the web form then sends it.
+
+### ISS-05
+
+**High. No per-account lockout after failed sign-ins.**
+
+- **Problem:** the only protection against password guessing is the per-address rate limit (A2), which does not stop guesses spread across many addresses.
+- **Evidence:** no lockout fields or logic in the `User` model or `AuthService`.
+- **Fix:** count failed sign-ins per user, lock the account for a set time after, for example, 5 failures, and reset the count after a successful sign-in.
+
+### ISS-06
+
+**Medium. Lead review with an empty body resets the lead to Pending.**
+
+- **Problem:** `PATCH /api/leads/{id}/status` with `{}` returns 200 and sets the lead to Pending. Sending the verdict the lead already has also returns 200.
+- **Evidence:** A12; `UpdateLeadStatusRequest.Status` is a non-nullable enum, so a missing value becomes the default.
+- **Impact:** a faulty client could undo a consultant's review. The web portal always sends a verdict.
+- **Fix:** make `Status` nullable and `[Required]` so a missing value returns 400.
+
+### ISS-07
+
+**Medium. Stage change accepts an empty body, archived cases and unchanged stages.**
+
+- **Problem:** `PATCH /api/cases/{id}/stage` has the same cause as ISS-06, so an empty body would move a case back to the first stage. It also changes archived cases, writes a history row when the stage does not change, and accepts `Notes` that are never saved.
+- **Evidence:** `UpdateCaseStageRequest`, `CasesController.UpdateStage`. Found by reading the code, not by a call.
+- **Fix:** nullable `[Required]` `Stage`; return 400 for archived cases and unchanged stages; remove `Notes` or add a column for it. The web portal never sends an empty body.
+
+### ISS-08
+
+**Medium. Gemini model name may be retired; live call not tested.**
+
+- **Problem:** the API calls `gemini-1.5-flash`, which may no longer be available. The test environment has no Gemini key, so a live call was not tested.
+- **Evidence:** `Gemini:Url` in `appsettings.json`; A14 shows the fallback.
+- **Impact:** if the call fails, every enquiry is saved as NeedsReview, so no enquiry is lost but none is triaged automatically.
+- **Fix:** update the model name and test one real call with a key.
+
+### ISS-09
+
+**Medium. Uploaded files are stored on the API server's disk.**
+
+- **Problem:** uploads are saved to `wwwroot/uploads` on the API server, not to cloud storage (R2 was planned).
+- **Evidence:** `DocumentsController` upload and file endpoints.
+- **Impact:** on a host whose disk is reset on each deploy, files would be lost while their database rows remain.
+- **Fix:** move uploads to R2 or another object store, or use a host with a persistent disk.
+
+### ISS-10
+
+**Medium. No automated tests for the API controllers.**
+
+- **Problem:** the API tests cover services only, so role checks, validation responses and audit rows are tested by hand (TESTING.md section 5).
+- **Evidence:** `Strategies.Api.Tests`.
+- **Fix:** integration tests with `WebApplicationFactory` against a test database, run in CI.
+
+### ISS-11
+
+**Medium. Mobile: Gradle wrapper missing, manual checks incomplete.**
+
+- **Problem:** `gradlew` and its wrapper files are not committed, so `./gradlew testDebugUnitTest` from the mobile README cannot run from a fresh clone. 8 of 12 manual checks are not yet run.
+- **Evidence:** `strategies-mobile`; [mobile test log](../strategies-mobile/TESTING.md).
+- **Fix:** commit `gradlew`, `gradlew.bat` and `gradle/wrapper/gradle-wrapper.jar`, and complete the manual checks.
+
+### ISS-12
+
+**Low. Mixed audit action wording; old lead verdict not recorded.**
+
+- **Problem:** some audit actions are stored as code names (`UpdateCaseStage`, `UpdateLeadStatus`), others as sentences ("Suspended user"). The lead review audit row does not record the previous verdict.
+- **Evidence:** `CasesController`, `LeadsController`.
+- **Fix:** store sentences and include the old value. The web audit page already shows the code names in plain words.
+
+### ISS-13
+
+**Low. Users list cannot show the join date.**
+
+- **Problem:** the API's user data (`UserDto`) has no creation date, so the admin Users list cannot show it.
+- **Fix:** add `CreatedAt` to `UserDto`; the web column follows.
+
+### ISS-14
+
+**Low. Client logo is low resolution.**
+
+- **Problem:** the logo is a small PNG without transparency and looks soft on high-resolution screens.
+- **Fix:** ask the client for an SVG or a 2x transparent PNG.
+
+## 2. Planned but not delivered
+
+These were in the original plan or came up in the client interview, and are not in this submission. The database already has tables for most of them, so they can be added without changing the design.
+
+| Feature | Status | What exists |
+|---|---|---|
+| Conversational AI intake | Delivered as a two-step form with server-side Gemini triage instead of a chat | Form with consent box, validation before the AI call, rate limiting, fallback to NeedsReview |
+| Summarisation agent | Not delivered; the case lifecycle was prioritised | The same agent service interface can host it |
+| Document checklist per visa type | No API yet | `ChecklistTemplate` table |
+| Messages between client and consultant | No API yet; menu items hidden in the web portal | `Message` table |
+| Visa expiry reminders for renewals | No API yet | `VisaRecord` table |
+| Turning a qualified lead into a case | Not possible from the web portal: there is no endpoint listing visa categories, and consultants cannot look up client accounts | `POST /api/cases` exists for a known client and visa category |
+| Visa category on the enquiry form | Not asked yet, although the client named it as one of four essential questions; the AI prompt uses only immigration status and whether help is needed | Needs a visa categories endpoint first |
+| Admin reports page | Menu item hidden | Dashboard statistics and CSV export of cases |
+| Client profile page | Menu item hidden | None yet |
+
+## 3. Fixed during the project
+
+Issues found by testing or review and fixed before submission.
+
+| Issue | Fix |
+|---|---|
+| AI verdict was never read: every successful Gemini call marked the lead Qualified, and no reason was saved | The API now reads the verdict and reason, and falls back to NeedsReview (PR #18); the reason is shown to consultants (PR #19) |
+| Consultants could export, and change documents on, cases that were not theirs | Ownership checks on export and on document approval, rejection and archiving (PR #18) |
+| Archiving a document wrote no audit row | Audit row added (PR #18) |
+| Suspending, reinstating and deleting users wrote no audit rows | Audit rows added (PR #20) |
+| Admin delete returned 405 | Now a soft delete: the user is marked inactive and kept for the audit trail |
+| Uploaded test files could be committed | `Strategies.Api/wwwroot/uploads` added to `.gitignore` (PR #18) |
+| Seed data reused the same id pattern across tables | Distinct seed ids (PR #19) |
+| First-time visitors triggered a failed token refresh and a console error | The web portal only refreshes when a session exists (PR #19) |
+| Admin overview panels were read in a different order from how they look (WCAG 1.3.2, 2.4.3) | Source order now matches the visual order (PR #23) |
+| Caps Lock warning was shown only as an icon | Warning given in words again (PR #23) |

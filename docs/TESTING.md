@@ -27,8 +27,8 @@ Each requirement from the brief, with the tests that prove it. Test IDs refer to
 | Role-based access on the server | A3 (consultant sees own cases only), A11 (client gets 403) | Pass |
 | JWT authentication and refresh | `TokenServiceTests`, `AuthServiceTests` (refresh and revoke), A1, B3 | Pass |
 | Passwords hashed with bcrypt | Login tests verify against stored bcrypt hashes (`PasswordHasherService`, work factor 11) | Pass |
-| Brute-force protection | A2 (5 sign-ins per minute per address) | Pass for rate limiting; **no per-account lockout** (see ISSUES.md) |
-| Password reset | A15 | **Fail** (see ISSUES.md) |
+| Brute-force protection | A2 (5 sign-ins per minute per address) | Pass for rate limiting, but **no per-account lockout** ([ISS-05](ISSUES.md#iss-05)), and the limit would be shared by all users behind a hosting proxy ([ISS-03](ISSUES.md#iss-03)) |
+| Password reset | A15 | **Fail** ([ISS-01](ISSUES.md#iss-01)) |
 | Client and server validation | B1, B5 (client side); A4, A6, A7, A10, A11 (server side); `validation` tests | Pass |
 | File upload with server validation | A6, A7, B4, B5 | Pass |
 | Audit trail | A5, A13, B10 | Pass |
@@ -37,8 +37,8 @@ Each requirement from the brief, with the tests that prove it. Test IDs refer to
 | Export | Cases page CSV export | Not yet tested |
 | Notifications | `notifications` tests; mobile check 4 | Pass |
 | Soft delete | Admin user delete marks the user inactive instead of deleting | Not yet tested |
-| AI triage with fallback | A14 (no key: lead saved as NeedsReview) | Pass for fallback; live Gemini call not tested |
-| POPIA consent | B1 (enquiry cannot be sent without consent) | Pass |
+| AI triage with fallback | A14 (no key: lead saved as NeedsReview) | Pass for fallback; live Gemini call not tested ([ISS-08](ISSUES.md#iss-08)) |
+| POPIA consent | B1 (enquiry cannot be sent without consent) | Pass in the web form only; **the API neither requires nor stores consent** ([ISS-04](ISSUES.md#iss-04)) |
 | Responsive and accessible | Section 7 | Pass |
 | Deployment | Hosted URLs | Not yet tested |
 
@@ -123,10 +123,10 @@ Run against the local API with the seeded database, 2026-10-03 and 2026-10-04 (b
 | A9 | Leads filtered by status Qualified | 5 leads, all Qualified | Pass |
 | A10 | Change a case stage, then an invalid stage | 200, then 400 | Pass |
 | A11 | Lead review: valid verdict, invalid verdict, unknown lead, client role | 200, 400, 404, 403 | Pass |
-| A12 | Lead review with an empty body `{}` | 400 | **Fail**: 200 and the lead is reset to Pending (see ISSUES.md) |
+| A12 | Lead review with an empty body `{}` | 400 | **Fail**: 200 and the lead is reset to Pending ([ISS-06](ISSUES.md#iss-06)) |
 | A13 | Admin suspends and reinstates a user | Audit rows "Suspended user" and "Reinstated user" | Pass |
 | A14 | Public enquiry with no Gemini key configured | Lead is saved as NeedsReview (AI fallback) | Pass |
-| A15 | Password reset only with a valid reset token | Request refused without a valid token | **Fail** (see ISSUES.md) |
+| A15 | Password reset only with a valid reset token | Request refused without a valid token | **Fail** ([ISS-01](ISSUES.md#iss-01)) |
 
 ## 6. Browser checks per role
 
