@@ -2,15 +2,12 @@
 
 Case management for **Strategies Migration Services**, a South African immigration consultancy. Built by Team Nexus Solutions for INSY7315 (Work Integrated Learning).
 
-<!-- TODO(video): replace VIDEO_ID twice with the YouTube id of the demo, then delete this comment.
-[![Watch the 10-minute demo](https://img.youtube.com/vi/VIDEO_ID/hqdefault.jpg)](https://www.youtube.com/watch?v=VIDEO_ID)
--->
-**Demo video:** TODO(video): link to follow.
+**Demo video:** to be added.
 
 | Live system | Address |
 |---|---|
-| Web portal | TODO(url): hosted web portal address |
-| API | TODO(url): hosted API address |
+| Web portal | To be added |
+| API | To be added |
 
 ## The problem and the solution
 
@@ -185,11 +182,11 @@ Details and the other features not delivered are in [ISSUES.md section 2](docs/I
 
 ## Team Nexus Solutions
 
-| Member | Role |
-|---|---|
-| Marco | Team lead, API and AI |
-| Kaan | Security: authentication, rate limiting, file storage |
-| Lekabe | Database and migrations |
-| Kundai | Android app |
-| Mbulungeni | Repository, CI, QA and deployment |
-| Riaad | Web portal, integration testing, documentation |
+| Member | Student number | Role |
+|---|---|---|
+| Marco Alexandre George Hart | ST10462493 | Team lead, API and AI |
+| Kaan Dogan | ST10442156 | Security: authentication, rate limiting, file storage |
+| Lekabe Herman Mabalane | ST10278399 | Database and migrations |
+| Kundai Makuzha | ST10251297 | Android app |
+| Mbulungeni Kenneth Muthambi | ST10447819 | Repository, CI, QA and deployment |
+| Riaad Hercules | ST10258492 | Web portal, integration testing, documentation |
