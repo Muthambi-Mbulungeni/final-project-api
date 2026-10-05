@@ -24,6 +24,17 @@ The platform has three parts:
 
 The five stages: **Initial intake → Document gathering → Under review → Submitted to authority → Final decision**.
 
+## Screenshots
+
+The web portal running against the real API and the demo data, from the production build (5 October 2026). Each caption names what the screen proves and the matching check in [TESTING.md](docs/TESTING.md). Select an image to see it full size.
+
+| | |
+|---|---|
+| <a href="docs/images/enquiry.png"><img src="docs/images/enquiry.png" width="420" alt="Public enquiry form, step 1 of 2"></a><br>**Visitor: enquiry form.** Two steps, validated in the browser and on the server; POPIA consent on step 2 (B1). | <a href="docs/images/client-case.png"><img src="docs/images/client-case.png" width="420" alt="Client case page with the five stages and an action needed card"></a><br>**Client: my case.** The five-stage progress, what happens next, and a rejected document flagged as Action needed (B3). |
+| <a href="docs/images/client-documents.png"><img src="docs/images/client-documents.png" width="420" alt="Client documents page with a rejected document, the consultant's note and an upload form"></a><br>**Client: documents.** The consultant's rejection note and a server-validated upload of a new copy, PDF, JPG or PNG up to 5 MB (B4, B5). | <a href="docs/images/client-case-phone.png"><img src="docs/images/client-case-phone.png" width="200" alt="Client case page at phone width"></a><br>**Client on a phone (390 px).** The same page at phone width, with no sideways scrolling (section 7). |
+| <a href="docs/images/consultant-lead.png"><img src="docs/images/consultant-lead.png" width="420" alt="Consultant lead triage with a lead's details open"></a><br>**Consultant: lead triage.** A lead the AI could not qualify, routed for review; the consultant confirms or overrides the verdict (B6). | <a href="docs/images/consultant-case.png"><img src="docs/images/consultant-case.png" width="420" alt="Consultant case panel with stages and a document awaiting review"></a><br>**Consultant: case panel.** Stage control, a document awaiting a decision, Open file, Approve and Reject with a required note (B7, B8). |
+| <a href="docs/images/admin-overview.png"><img src="docs/images/admin-overview.png" width="420" alt="Administrator overview with totals and consultant workload"></a><br>**Administrator: overview.** Live totals, enquiries waiting for review, and each consultant's workload against a target of 10 active cases (B9). | <a href="docs/images/admin-audit-log.png"><img src="docs/images/admin-audit-log.png" width="420" alt="Audit log listing actions, records and who performed them"></a><br>**Administrator: audit log.** Who changed what, and when: document decisions, stage changes, assignments, lead reviews and suspensions (B10). |
+
 ## Components
 
 | Component | Folder | Technology | Owner | Status |
