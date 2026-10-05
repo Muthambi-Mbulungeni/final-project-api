@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 
 namespace Strategies.Api.DTOs
 {
@@ -17,8 +18,8 @@ namespace Strategies.Api.DTOs
 
     public class UpdateCaseStageRequest
     {
-        public Strategies.Api.Data.Enums.CaseStage Stage { get; set; }
-        public string Notes { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Stage is required.")]
+        public Strategies.Api.Data.Enums.CaseStage? Stage { get; set; }
     }
 
     public class AssignConsultantRequest

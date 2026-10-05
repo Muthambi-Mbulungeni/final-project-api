@@ -72,24 +72,24 @@ namespace Strategies.Api.Controllers
                 .Take(pageSize)
                 .Select(x => new CaseDto
                 {
-                    Id               = x.c.Id,
-                    ClientId         = x.c.ClientId,
-                    ClientName       = x.client != null ? x.client.FullName : "Unassigned",
-                    ConsultantName   = x.consultant != null ? x.consultant.FullName : "Unassigned",
+                    Id = x.c.Id,
+                    ClientId = x.c.ClientId,
+                    ClientName = x.client != null ? x.client.FullName : "Unassigned",
+                    ConsultantName = x.consultant != null ? x.consultant.FullName : "Unassigned",
                     VisaCategoryName = x.visaCat != null ? x.visaCat.Name : "N/A",
-                    Stage            = x.c.Stage.ToString(),
-                    IsArchived       = x.c.IsArchived,
-                    CreatedAt        = x.c.CreatedAt,
-                    LastUpdated      = x.c.UpdatedAt
+                    Stage = x.c.Stage.ToString(),
+                    IsArchived = x.c.IsArchived,
+                    CreatedAt = x.c.CreatedAt,
+                    LastUpdated = x.c.UpdatedAt
                 })
                 .ToListAsync();
 
             return Ok(new PagedResponse<CaseDto>
             {
-                Data         = cases,
+                Data = cases,
                 TotalRecords = totalRecords,
-                TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                CurrentPage  = page
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage = page
             });
         }
 
@@ -158,7 +158,7 @@ namespace Strategies.Api.Controllers
                     owns = await _context.Cases.AnyAsync(c => c.Id == id && c.ConsultantId == currentUserId);
                 else
                     owns = await _context.Cases.AnyAsync(c => c.Id == id && c.ClientId == currentUserId);
-                
+
                 if (!owns) return Forbid();
             }
 
@@ -172,15 +172,15 @@ namespace Strategies.Api.Controllers
                                     where c.Id == id
                                     select new CaseDto
                                     {
-                                        Id               = c.Id,
-                                        ClientId         = c.ClientId,
-                                        ClientName       = client != null ? client.FullName : "Unassigned",
-                                        ConsultantName   = consultant != null ? consultant.FullName : "Unassigned",
+                                        Id = c.Id,
+                                        ClientId = c.ClientId,
+                                        ClientName = client != null ? client.FullName : "Unassigned",
+                                        ConsultantName = consultant != null ? consultant.FullName : "Unassigned",
                                         VisaCategoryName = visaCat != null ? visaCat.Name : "N/A",
-                                        Stage            = c.Stage.ToString(),
-                                        IsArchived       = c.IsArchived,
-                                        CreatedAt        = c.CreatedAt,
-                                        LastUpdated      = c.UpdatedAt
+                                        Stage = c.Stage.ToString(),
+                                        IsArchived = c.IsArchived,
+                                        CreatedAt = c.CreatedAt,
+                                        LastUpdated = c.UpdatedAt
                                     }).FirstOrDefaultAsync();
 
             if (caseRecord == null)
@@ -214,9 +214,9 @@ namespace Strategies.Api.Controllers
                                select new
                                {
                                    c.Id,
-                                   ClientName  = client != null ? client.FullName : "Unassigned",
-                                   VisaName    = visaCat != null ? visaCat.Name : "N/A",
-                                   Stage       = c.Stage.ToString(),
+                                   ClientName = client != null ? client.FullName : "Unassigned",
+                                   VisaName = visaCat != null ? visaCat.Name : "N/A",
+                                   Stage = c.Stage.ToString(),
                                    c.IsArchived,
                                    c.CreatedAt
                                }).ToListAsync();
@@ -263,24 +263,24 @@ namespace Strategies.Api.Controllers
                 .Take(pageSize)
                 .Select(x => new CaseDto
                 {
-                    Id          = x.c.Id,
-                    ClientId    = x.c.ClientId,
-                    ClientName  = x.client != null ? x.client.FullName : "Unassigned",
+                    Id = x.c.Id,
+                    ClientId = x.c.ClientId,
+                    ClientName = x.client != null ? x.client.FullName : "Unassigned",
                     ConsultantName = x.consultant != null ? x.consultant.FullName : "Unassigned",
                     VisaCategoryName = x.visaCat != null ? x.visaCat.Name : "N/A",
-                    Stage       = x.c.Stage.ToString(),
-                    IsArchived  = x.c.IsArchived,
-                    CreatedAt   = x.c.CreatedAt,
+                    Stage = x.c.Stage.ToString(),
+                    IsArchived = x.c.IsArchived,
+                    CreatedAt = x.c.CreatedAt,
                     LastUpdated = x.c.UpdatedAt
                 })
                 .ToListAsync();
 
             return Ok(new PagedResponse<CaseDto>
             {
-                Data         = cases,
+                Data = cases,
                 TotalRecords = totalRecords,
-                TotalPages   = (int)Math.Ceiling(totalRecords / (double)pageSize),
-                CurrentPage  = page
+                TotalPages = (int)Math.Ceiling(totalRecords / (double)pageSize),
+                CurrentPage = page
             });
         }
 
@@ -288,6 +288,9 @@ namespace Strategies.Api.Controllers
         [Authorize(Roles = "Admin,Consultant")]
         public async Task<IActionResult> UpdateStage(Guid id, [FromBody] UpdateCaseStageRequest request)
         {
+            if (!request.Stage.HasValue)
+                return BadRequest(new ApiErrorResponse { Message = "Stage is required." });
+
             var c = await _context.Cases.FindAsync(id);
             if (c == null) return NotFound(new ApiErrorResponse { Message = "Case not found." });
 
@@ -298,7 +301,7 @@ namespace Strategies.Api.Controllers
                 return Forbid();
 
             var oldStage = c.Stage;
-            c.Stage = request.Stage;
+            c.Stage = request.Stage.Value;
             c.UpdatedAt = DateTime.UtcNow;
 
             var history = new CaseStageHistory
@@ -306,7 +309,7 @@ namespace Strategies.Api.Controllers
                 Id = Guid.NewGuid(),
                 CaseId = id,
                 FromStage = oldStage,
-                ToStage = request.Stage,
+                ToStage = request.Stage.Value,
                 ChangedById = currentUserId,
                 ChangedAt = DateTime.UtcNow
             };
