@@ -2,11 +2,13 @@
 
 Case management for **Strategies Migration Services**, a South African immigration consultancy. Built by Team Nexus Solutions for INSY7315 (Work Integrated Learning).
 
-**Demo video:** to be added.
+**Demo video:** https://youtu.be/aw8wSutQ7Z8
+
+**Presentation:** [Task 2 presentation (PDF)](docs/presentation/Task2-Presentation-Nexus-Solutions.pdf) · [Implementation access and links (PDF)](docs/presentation/Task2-Implementation-Access-and-Links.pdf)
 
 | Live system | Address |
 |---|---|
-| Web portal | To be added |
+| Web portal | https://emgprs.github.io/insy7315-2026-task-2-hartmarcost10462493/ |
 | API | To be added |
 
 ## The problem and the solution
@@ -172,6 +174,8 @@ Details and the other features not delivered are in [ISSUES.md section 2](docs/I
 
 | Document | What it covers |
 |---|---|
+| [Task 2 presentation](docs/presentation/Task2-Presentation-Nexus-Solutions.pdf) | Presentation deck: requirements, architecture, security, DevOps, demo order |
+| [Implementation access and links](docs/presentation/Task2-Implementation-Access-and-Links.pdf) | Live links, demo accounts and a guided tour per role |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Step-by-step guide for administrators, consultants and clients |
 | [docs/TESTING.md](docs/TESTING.md) | Test plan, requirement traceability and results |
 | [docs/ISSUES.md](docs/ISSUES.md) | Open issues, features not delivered, issues fixed |
