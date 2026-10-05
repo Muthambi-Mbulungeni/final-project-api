@@ -26,6 +26,8 @@ namespace Strategies.Api.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.HasDefaultSchema("databasestorage");
+
             modelBuilder.Entity<VisaCategory>(visaCategory =>
             {
                 visaCategory.ToTable("VisaCategory");
