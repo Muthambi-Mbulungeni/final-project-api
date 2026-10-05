@@ -282,6 +282,8 @@ namespace Strategies.Api.Services
             {
                 _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
+
+                await _refreshTokenStore.RevokeAllUserTokensAsync(user.Id);
                 return true;
             }
             return false;

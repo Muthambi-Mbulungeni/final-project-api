@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -38,6 +39,7 @@ builder.Services.AddScoped<CaseManagementService>();
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
     throw new InvalidOperationException("Jwt:Key is not configured. Set it via .NET User Secrets or environment variables.");
+
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "StrategiesApi";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "StrategiesClients";
 
@@ -69,6 +71,14 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
     options.AddPolicy("RequireConsultantRole", policy => policy.RequireRole("Admin", "Consultant"));
     options.AddPolicy("RequireClientRole", policy => policy.RequireRole("Admin", "Consultant", "Client"));
+});
+
+// Configure Forwarded Headers to get the real user IP from the proxy
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
 });
 
 // 6. Rate Limiting
@@ -113,6 +123,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseForwardedHeaders(); // Extract real IP before rate limiting
 app.UseCors("AllowFrontend");
 app.UseSecurityHeaders();
 app.UseRateLimiter();

@@ -145,6 +145,9 @@ namespace Strategies.Api.Controllers
         [Authorize(Roles = "Admin,Consultant")]
         public async Task<IActionResult> UpdateLeadStatus(Guid id, [FromBody] UpdateLeadStatusRequest request)
         {
+            if (!request.Status.HasValue)
+                return BadRequest(new ApiErrorResponse { Message = "Status is required." });
+
             var lead = await _context.Leads.FindAsync(id);
             if (lead == null) return NotFound(new ApiErrorResponse { Message = "Lead not found." });
 
@@ -152,7 +155,7 @@ namespace Strategies.Api.Controllers
             Guid.TryParse(userIdStr, out var currentUserId);
 
             var oldStatus = lead.TriageStatus;
-            lead.TriageStatus = request.Status;
+            lead.TriageStatus = request.Status.Value;
             lead.ReviewedById = currentUserId;
 
             var audit = new AuditLog

@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.RateLimiting;
 using Strategies.Api.DTOs;
 using Strategies.Api.DTOs.Auth;
 using Strategies.Api.Services;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace Strategies.Api.Controllers
 {
@@ -108,8 +111,22 @@ namespace Strategies.Api.Controllers
             var user = await _authService.GetUserByEmailAsync(request.Email);
             if (user != null)
             {
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var keyBytes = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? string.Empty);
+                var tokenDescriptor = new SecurityTokenDescriptor
+                {
+                    Subject = new ClaimsIdentity(new[] {
+                        new Claim(ClaimTypes.Email, user.Email),
+                        new Claim("purpose", "password_reset")
+                    }),
+                    Expires = DateTime.UtcNow.AddMinutes(30),
+                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256Signature)
+                };
+                var resetToken = tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor));
+
                 var baseUrl = _configuration["App:BaseUrl"] ?? "https://strategies.com";
-                var resetLink = $"{baseUrl.TrimEnd('/')}/reset-password?email={Uri.EscapeDataString(user.Email)}";
+                var resetLink = $"{baseUrl.TrimEnd('/')}/reset-password?token={resetToken}";
+
                 await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
             }
 
@@ -138,6 +155,32 @@ namespace Strategies.Api.Controllers
         {
             if (!ModelState.IsValid)
                 return BadRequest(new ApiErrorResponse { Message = "Validation failed." });
+
+            try
+            {
+                var tokenHandler = new JwtSecurityTokenHandler();
+                var keyBytes = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? string.Empty);
+
+                tokenHandler.ValidateToken(request.Token, new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    ClockSkew = TimeSpan.Zero
+                }, out SecurityToken validatedToken);
+
+                var jwtToken = (JwtSecurityToken)validatedToken;
+                var emailClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Email)?.Value;
+                var purposeClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "purpose")?.Value;
+
+                if (purposeClaim != "password_reset" || !string.Equals(emailClaim, request.Email, StringComparison.InvariantCultureIgnoreCase))
+                    return BadRequest(new ApiErrorResponse { Message = "Invalid token claims." });
+            }
+            catch
+            {
+                return BadRequest(new ApiErrorResponse { Message = "Invalid or expired reset token." });
+            }
 
             var result = await _authService.ResetPasswordAsync(request);
             if (!result)
