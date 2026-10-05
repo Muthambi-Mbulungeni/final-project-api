@@ -172,7 +172,7 @@ Login, ForgotPassword, EnquiryPage, NotFound
 
 ## Quality
 
-- **Tests:** 109 Vitest tests in 14 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage counting, API error handling, auth messages, notifications and navigation. Run `npm test`.
+- **Tests:** 185 Vitest tests in 19 files cover form validation, table search/filter/sort/pagination, enum handling, date and ID formatting, triage and lead decisions, case stages and consultant workload, document upload rules and review, audit wording, API error handling, sessions and idle sign-out, notifications and navigation. Run `npm test`. The full test plan and results are in [docs/TESTING.md](../docs/TESTING.md).
 - **Linting:** `npm run lint` passes with no warnings.
 - **Accessibility:**
   - labelled form fields with linked error messages
@@ -247,9 +247,9 @@ Seeded by the API for local testing only. Never use them in production.
 
 ## Current status
 
-- Sign-in, token refresh and sign-out work against the real API (see "Verified end to end" above).
-- The data screens (leads, cases, users, audit log, notifications) need the hosted PostgreSQL database. Until it is connected, they show their error states. The API's mock contracts still run every screen end to end with sample data, using the development role switcher.
-- Modules not yet built (documents, messages, profile, reports) are hidden from navigation. Visiting their URL directly shows a neutral placeholder.
+- All three roles work end to end against the real API and a seeded PostgreSQL database: enquiry and AI triage fallback, lead review, cases and stage changes, consultant assignment and workload, document review and client re-upload, user suspension, the audit log and CSV export. See [docs/TESTING.md](../docs/TESTING.md).
+- Messages, the client profile and admin reports are hidden from navigation until the API supports them; visiting their URL directly shows a neutral placeholder.
+- The password reset page is held back until the API validates reset tokens ([ISS-01](../docs/ISSUES.md#iss-01)). Other known issues are in [docs/ISSUES.md](../docs/ISSUES.md).
 
 ## Contributing
 
