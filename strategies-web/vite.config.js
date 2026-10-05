@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   const apiTarget = env.API_PROXY_TARGET || 'http://localhost:5151'
 
   return {
-    base: '/insy7315-2026-task-2-hartmarcost10462493/',
+    base: mode === 'production' ? '/insy7315-2026-task-2-hartmarcost10462493/' : '/',
     plugins: [react(), tailwindcss()],
     server: {
       port: 5173,
