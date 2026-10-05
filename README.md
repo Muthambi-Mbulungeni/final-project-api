@@ -112,12 +112,11 @@ To load the demo data, follow the commands in [database/seed/README.md](database
 
 ### 2. API
 
-Secrets are kept out of the repository with .NET user secrets ([ISS-02](docs/ISSUES.md#iss-02) lists values that still need to move out of `appsettings.json`).
+Secrets are kept out of the repository with .NET user secrets ([ISS-02](docs/ISSUES.md#iss-02) lists values that still need to move out of `appsettings.json`). 
+For a quick local start, you can just use the defaults already in `appsettings.json` (which match the Docker Compose setup), so you only need to run:
 
 ```bash
 cd Strategies.Api
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=strategies;Username=postgres;Password=<your password>"
-dotnet user-secrets set "Jwt:Key" "<a random string of at least 32 characters>"
 dotnet run --launch-profile http
 ```
 
