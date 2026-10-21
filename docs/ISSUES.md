@@ -12,7 +12,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 | ID | Severity | Issue | Owner |
 |---|---|---|---|
-| [ISS-01](#iss-01) | High | Password reset refuses genuine reset links; a link could be reused for 30 minutes | Marco, Kaan |
 | [ISS-02](#iss-02) | High | Development secrets committed in `appsettings.json` | Kaan, Mbulungeni |
 | [ISS-04](#iss-04) | High | POPIA consent is checked in the browser only, never sent to or stored by the API | Marco, Lekabe |
 | [ISS-05](#iss-05) | High | No per-account lockout after failed sign-ins | Kaan |
@@ -25,17 +24,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-12](#iss-12) | Low | Mixed audit action wording; old lead verdict not recorded | Marco |
 | [ISS-13](#iss-13) | Low | Users list cannot show the join date | Marco, Riaad |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
-
-### ISS-01
-
-**High. Password reset refuses genuine reset links; a link could be reused for 30 minutes.**
-
-PR #25 closed the critical part of this issue: a made-up reset token is now refused (section 3, A15).
-
-- **Problem:** the reset check looks for the email under `ClaimTypes.Email`, but the token stores it under the short name `email`. The lookup is always empty, so every genuine reset link is refused with the message "Invalid token claims" (400). Found by reading the code: nothing marks a token as used, so once the lookup is fixed a link would keep working for its full 30 minutes, even after the password has changed. The new password is not checked against any password policy. The emailed link carries only the token, but the reset request also needs the email address.
-- **Evidence:** A16; `AuthController.ResetPassword`. A token made with the same code and key contains the claims `email, purpose, nbf, exp, iat`.
-- **Impact:** users cannot reset their own password. If the lookup were fixed as it stands, anyone holding a reset link could use it again within 30 minutes.
-- **Fix:** read the email from the principal that `ValidateToken` returns (`principal.FindFirst(ClaimTypes.Email)`), or look up `JwtRegisteredClaimNames.Email`. Make the token single-use by adding a claim derived from the current password hash and checking that it still matches. Apply the password policy to `NewPassword`. The web reset page stays held back until this is fixed.
 
 ### ISS-02
 
@@ -166,7 +154,8 @@ Issues found by testing or review and fixed before submission.
 | Archiving a document wrote no audit row | Audit row added (PR #18) |
 | Suspending, reinstating and deleting users wrote no audit rows | Audit rows added (PR #20) |
 | Admin delete returned 405 | Now a soft delete: the user is marked inactive and kept for the audit trail |
-| Password reset accepted any non-blank token, so a password could be changed without access to the email (was ISS-01, Critical) | The reset link now carries a signed token that expires after 30 minutes and names its purpose and email; a made-up token is refused (A15). The user's refresh tokens are revoked after a reset (PR #25). Genuine links are still refused, see [ISS-01](#iss-01) |
+| Password reset accepted any non-blank token, so a password could be changed without access to the email (was ISS-01, Critical) | The reset link now carries a signed token that expires after 30 minutes and names its purpose and email; a made-up token is refused (A15). The user's refresh tokens are revoked after a reset (PR #25) |
+| Password reset refused every genuine link, a link could have been reused for 30 minutes, and new passwords had no policy (was ISS-01, High) | `PasswordResetTokenService` reads the claims from the validated token, uses its own `password-reset` audience and a password-hash stamp so each link works once; register and reset apply a NIST-style password policy (12 to 64 characters, common and context-word checks) |
 | Behind a hosting proxy, all users would share one sign-in rate limit (was ISS-03) | The API reads the forwarded client address before the rate limiter (PR #25). See the note in [ISS-05](#iss-05) |
 | Lead review with an empty body `{}` returned 200 and reset the lead to Pending (was ISS-06) | Verdict is required: 400 and the lead is unchanged (PR #25, A12) |
 | Stage change with an empty body would have moved a case back to the first stage, and accepted notes that were never saved | Stage is required: 400 (A17); the unsaved notes field was removed (PR #25). Rest open as [ISS-07](#iss-07) |

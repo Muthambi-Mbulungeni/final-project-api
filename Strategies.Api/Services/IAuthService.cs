@@ -13,6 +13,6 @@ namespace Strategies.Api.Services
         Task<User?> GetUserByIdAsync(Guid userId);
         Task<User?> GetUserByEmailAsync(string email);
         Task<bool> RegisterAsync(RegisterRequest request);
-        Task<bool> ResetPasswordAsync(ResetPasswordRequest request);
+        Task<bool> ResetPasswordAsync(User user, string newPassword);
     }
 }

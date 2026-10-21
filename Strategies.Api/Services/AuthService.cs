@@ -269,14 +269,14 @@ namespace Strategies.Api.Services
             return false;
         }
 
-        public async Task<bool> ResetPasswordAsync(ResetPasswordRequest request)
+        /// <summary>
+        /// Sets a new password for a user already identified by a validated reset token
+        /// (IPasswordResetTokenService) and revokes all of their refresh tokens.
+        /// The caller checks the password against IPasswordPolicy first.
+        /// </summary>
+        public async Task<bool> ResetPasswordAsync(User user, string newPassword)
         {
-            var user = await GetUserByEmailAsync(request.Email);
-            if (user == null) return false;
-            
-            if (string.IsNullOrWhiteSpace(request.Token)) return false;
-
-            user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
+            user.PasswordHash = _passwordHasher.HashPassword(newPassword);
 
             if (await IsDbAvailableAsync())
             {

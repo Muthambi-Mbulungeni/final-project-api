@@ -3,14 +3,14 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Strategies.Api.DTOs;
 using Strategies.Api.DTOs.Auth;
 using Strategies.Api.Services;
-using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
 
 namespace Strategies.Api.Controllers
 {
@@ -18,15 +18,33 @@ namespace Strategies.Api.Controllers
     [Route("api/auth")]
     public class AuthController : ControllerBase
     {
+        private const string InvalidResetTokenMessage = "Invalid or expired reset token.";
+        private const string PasswordPolicyMessage = "Password does not meet the requirements.";
+
         private readonly IAuthService _authService;
         private readonly IEmailService _emailService;
+        private readonly IPasswordResetTokenService _resetTokenService;
+        private readonly IPasswordPolicy _passwordPolicy;
         private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+        private readonly IWebHostEnvironment _environment;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IAuthService authService, IEmailService emailService, Microsoft.Extensions.Configuration.IConfiguration configuration)
+        public AuthController(
+            IAuthService authService,
+            IEmailService emailService,
+            IPasswordResetTokenService resetTokenService,
+            IPasswordPolicy passwordPolicy,
+            Microsoft.Extensions.Configuration.IConfiguration configuration,
+            IWebHostEnvironment environment,
+            ILogger<AuthController> logger)
         {
             _authService = authService;
             _emailService = emailService;
+            _resetTokenService = resetTokenService;
+            _passwordPolicy = passwordPolicy;
             _configuration = configuration;
+            _environment = environment;
+            _logger = logger;
         }
 
         /// <summary>
@@ -111,25 +129,27 @@ namespace Strategies.Api.Controllers
             var user = await _authService.GetUserByEmailAsync(request.Email);
             if (user != null)
             {
-                var tokenHandler = new JwtSecurityTokenHandler();
-                var keyBytes = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? string.Empty);
-                var tokenDescriptor = new SecurityTokenDescriptor
+                var baseUrl = _configuration["App:BaseUrl"];
+                if (string.IsNullOrWhiteSpace(baseUrl))
                 {
-                    Subject = new ClaimsIdentity(new[] {
-                        new Claim(ClaimTypes.Email, user.Email),
-                        new Claim("purpose", "password_reset")
-                    }),
-                    Expires = DateTime.UtcNow.AddMinutes(30),
-                    SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(keyBytes), SecurityAlgorithms.HmacSha256Signature)
-                };
-                var resetToken = tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor));
+                    _logger.LogError("App:BaseUrl is not configured, so no password reset email was sent.");
+                }
+                else
+                {
+                    var resetToken = _resetTokenService.CreateToken(user);
 
-                var baseUrl = _configuration["App:BaseUrl"] ?? "https://strategies.com";
-                var resetLink = $"{baseUrl.TrimEnd('/')}/reset-password?token={resetToken}";
+                    // The web portal uses HashRouter, so the route goes after /#.
+                    var resetLink = $"{baseUrl.TrimEnd('/')}/#/reset-password?token={Uri.EscapeDataString(resetToken)}";
 
-                await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
+                    // Lets developers test without SMTP. Never logged outside Development.
+                    if (_environment.IsDevelopment())
+                        _logger.LogInformation("Development only. Password reset link for {Email}: {ResetLink}", user.Email, resetLink);
+
+                    await _emailService.SendPasswordResetEmailAsync(user.Email, resetLink);
+                }
             }
 
+            // Same response whether or not the account exists, to prevent account enumeration.
             return Ok(new { Message = "If an account with that email exists, a reset link has been sent." });
         }
 
@@ -141,6 +161,10 @@ namespace Strategies.Api.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(new ApiErrorResponse { Message = "Validation failed." });
 
+            var passwordErrors = _passwordPolicy.Validate(request.Password, request.Email, $"{request.FirstName} {request.LastName}");
+            if (passwordErrors.Count > 0)
+                return BadRequest(new ApiErrorResponse { Message = PasswordPolicyMessage, Errors = passwordErrors.ToList() });
+
             var result = await _authService.RegisterAsync(request);
             if (!result)
                 return BadRequest(new ApiErrorResponse { Message = "Registration failed or email already exists." });
@@ -148,43 +172,30 @@ namespace Strategies.Api.Controllers
             return StatusCode(201, new { Message = "Registration successful. Please check your email to confirm your account." });
         }
 
+        /// <summary>
+        /// POST /api/auth/reset-password
+        /// Body { token, newPassword }. The email comes from the validated token.
+        /// 200 { message } on success; 400 { message, errors: [] } for an invalid, expired or used token;
+        /// 400 { message, errors: [...] } when the new password fails the password policy.
+        /// </summary>
         [HttpPost("reset-password")]
         [AllowAnonymous]
         [EnableRateLimiting("auth-strict")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(new ApiErrorResponse { Message = "Validation failed." });
+            var user = await _resetTokenService.ValidateTokenAsync(request.Token ?? string.Empty);
+            if (user == null)
+                return BadRequest(new ApiErrorResponse { Message = InvalidResetTokenMessage });
 
-            try
-            {
-                var tokenHandler = new JwtSecurityTokenHandler();
-                var keyBytes = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? string.Empty);
+            var passwordErrors = _passwordPolicy.Validate(request.NewPassword, user.Email, user.FullName);
+            if (passwordErrors.Count > 0)
+                return BadRequest(new ApiErrorResponse { Message = PasswordPolicyMessage, Errors = passwordErrors.ToList() });
 
-                tokenHandler.ValidateToken(request.Token, new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ClockSkew = TimeSpan.Zero
-                }, out SecurityToken validatedToken);
-
-                var jwtToken = (JwtSecurityToken)validatedToken;
-                var emailClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Email)?.Value;
-                var purposeClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == "purpose")?.Value;
-
-                if (purposeClaim != "password_reset" || !string.Equals(emailClaim, request.Email, StringComparison.InvariantCultureIgnoreCase))
-                    return BadRequest(new ApiErrorResponse { Message = "Invalid token claims." });
-            }
-            catch
-            {
-                return BadRequest(new ApiErrorResponse { Message = "Invalid or expired reset token." });
-            }
-
-            var result = await _authService.ResetPasswordAsync(request);
+            // Only fails when the database cannot be written; reported as an unusable token
+            // to stay within the documented responses.
+            var result = await _authService.ResetPasswordAsync(user, request.NewPassword!);
             if (!result)
-                return BadRequest(new ApiErrorResponse { Message = "Invalid request or token." });
+                return BadRequest(new ApiErrorResponse { Message = InvalidResetTokenMessage });
 
             return Ok(new { Message = "Password reset successfully." });
         }

@@ -112,6 +112,7 @@ describe('signInNotice', () => {
     expect(signInNotice('expired')).toMatch(/expired/)
     expect(signInNotice('idle')).toMatch(/30 minutes/)
     expect(signInNotice('signed-out')).toBe('You have signed out.')
+    expect(signInNotice('password-reset')).toBe('Your password has been reset. Sign in with your new password.')
     expect(signInNotice('something else')).toBeNull()
   })
 })
