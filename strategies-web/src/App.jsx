@@ -16,6 +16,7 @@ import Login from './pages/Login'
 import ModulePlaceholder from './pages/ModulePlaceholder'
 import NotFound from './pages/NotFound'
 import PrivacyPage from './pages/PrivacyPage'
+import ResetPassword from './pages/ResetPassword'
 import { MODULE_PAGES } from './routes/modulePages'
 import RequireRole from './routes/RequireRole'
 
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/enquire" element={<EnquiryPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
 
