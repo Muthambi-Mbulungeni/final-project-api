@@ -76,6 +76,7 @@ const NOTICES = {
   expired: 'Your session has expired. Please sign in again.',
   idle: 'You were signed out after 30 minutes without activity, to protect client information.',
   'signed-out': 'You have signed out.',
+  'password-reset': 'Your password has been reset. Sign in with your new password.',
 }
 
 // Explains why the person is on the sign-in page, when there is a reason.

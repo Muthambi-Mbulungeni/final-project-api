@@ -29,7 +29,8 @@ export default function Login() {
   const from = location.state?.from
   const reason = location.state?.reason
   const notice = signInNotice(reason)
-  const NoticeIcon = reason === 'signed-out' ? CircleCheck : Clock
+  const positiveNotice = reason === 'signed-out' || reason === 'password-reset'
+  const NoticeIcon = positiveNotice ? CircleCheck : Clock
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -98,7 +99,7 @@ export default function Login() {
           style={rise(0.35)}
         >
           <NoticeIcon
-            className={`mt-px size-4 shrink-0 ${reason === 'signed-out' ? 'text-emerald-600' : 'text-stone-500'}`}
+            className={`mt-px size-4 shrink-0 ${positiveNotice ? 'text-emerald-600' : 'text-stone-500'}`}
             strokeWidth={2}
             aria-hidden="true"
           />
