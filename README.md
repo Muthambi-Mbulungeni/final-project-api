@@ -177,7 +177,7 @@ Team rules: you must verify your work. All tests must pass before code is consid
 | Planned | Delivered |
 |---|---|
 | Conversational intake agent | A structured two-step enquiry form with POPIA consent, validated before any AI call |
-| Triage agent | Delivered: Gemini returns a verdict and a reason, which consultants see; any failure falls back to NeedsReview |
+| Triage agent | Delivered: Gemini returns a schema-checked verdict and a reason, which consultants see. Only the immigration fields are sent (no name or email), and each run is logged to AgentRun. Any failure or timeout falls back to NeedsReview. A live call is not yet tested ([ISS-08](docs/ISSUES.md#iss-08)) |
 | Document checklist agent | Checklist templates exist in the database; no API yet |
 | Summarisation agent | Not delivered; the case lifecycle was prioritised |
 

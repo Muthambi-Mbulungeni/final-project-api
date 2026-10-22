@@ -13,9 +13,8 @@ using Xunit;
 namespace Strategies.Api.Tests
 {
     /// <summary>
-    /// AuthService tests use the InMemory EF provider for DB-backed paths and
-    /// fall through to the in-service seed store when the DB is empty (simulating
-    /// the no-database scenario the team currently runs in dev).
+    /// AuthService tests use the InMemory EF provider. AuthService reads users from the
+    /// database only, so each test inserts the users it needs.
     /// </summary>
     public class AuthServiceTests
     {
@@ -51,16 +50,46 @@ namespace Strategies.Api.Tests
             return new AuthService(ctx, hasher, tokenService, tokenStore, logger);
         }
 
-        // The seed users baked into AuthService use these credentials
+        // Same accounts as database/seed/1-reference-and-users.sql
         private const string AdminEmail    = "admin@nexus.com";
         private const string AdminPassword = "AdminPassword123!";
         private const string ClientEmail   = "client@nexus.com";
         private const string ClientPassword = "ClientPassword123!";
 
-        [Fact]
-        public async Task Login_WithValidSeedCredentials_ReturnsAuthResponse()
+        private static async Task SeedUsersAsync(ApplicationDbContext ctx)
         {
-            using var ctx = CreateContext(nameof(Login_WithValidSeedCredentials_ReturnsAuthResponse));
+            var hasher = new PasswordHasherService();
+            ctx.Users.AddRange(
+                new User
+                {
+                    Id             = Guid.Parse("00000000-0000-0000-0000-000000000001"),
+                    FullName       = "System Admin",
+                    Email          = AdminEmail,
+                    PasswordHash   = hasher.HashPassword(AdminPassword),
+                    Role           = UserRole.Admin,
+                    IsActive       = true,
+                    EmailConfirmed = true,
+                    CreatedAt      = DateTime.UtcNow
+                },
+                new User
+                {
+                    Id             = Guid.Parse("77777777-7777-7777-7777-777777777777"),
+                    FullName       = "John Doe",
+                    Email          = ClientEmail,
+                    PasswordHash   = hasher.HashPassword(ClientPassword),
+                    Role           = UserRole.Client,
+                    IsActive       = true,
+                    EmailConfirmed = true,
+                    CreatedAt      = DateTime.UtcNow
+                });
+            await ctx.SaveChangesAsync();
+        }
+
+        [Fact]
+        public async Task Login_WithValidDbCredentials_ReturnsAuthResponse()
+        {
+            using var ctx = CreateContext(nameof(Login_WithValidDbCredentials_ReturnsAuthResponse));
+            await SeedUsersAsync(ctx);
             var svc = CreateAuthService(ctx);
 
             var result = await svc.LoginAsync(new LoginRequest
@@ -80,6 +109,7 @@ namespace Strategies.Api.Tests
         public async Task Login_WithWrongPassword_ReturnsNull()
         {
             using var ctx = CreateContext(nameof(Login_WithWrongPassword_ReturnsNull));
+            await SeedUsersAsync(ctx);
             var svc = CreateAuthService(ctx);
 
             var result = await svc.LoginAsync(new LoginRequest
@@ -95,12 +125,29 @@ namespace Strategies.Api.Tests
         public async Task Login_WithUnknownEmail_ReturnsNull()
         {
             using var ctx = CreateContext(nameof(Login_WithUnknownEmail_ReturnsNull));
+            await SeedUsersAsync(ctx);
             var svc = CreateAuthService(ctx);
 
             var result = await svc.LoginAsync(new LoginRequest
             {
                 Email    = "nobody@nexus.com",
                 Password = "Anything123!"
+            });
+
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public async Task Login_AdminNotInDatabase_ReturnsNull()
+        {
+            // No users inserted: the removed built-in admin must not be able to sign in.
+            using var ctx = CreateContext(nameof(Login_AdminNotInDatabase_ReturnsNull));
+            var svc = CreateAuthService(ctx);
+
+            var result = await svc.LoginAsync(new LoginRequest
+            {
+                Email    = AdminEmail,
+                Password = AdminPassword
             });
 
             Assert.Null(result);
@@ -140,6 +187,7 @@ namespace Strategies.Api.Tests
         public async Task Login_IsCaseInsensitiveOnEmail()
         {
             using var ctx = CreateContext(nameof(Login_IsCaseInsensitiveOnEmail));
+            await SeedUsersAsync(ctx);
             var svc = CreateAuthService(ctx);
 
             var result = await svc.LoginAsync(new LoginRequest
@@ -155,6 +203,7 @@ namespace Strategies.Api.Tests
         public async Task RefreshToken_WithValidToken_ReturnsNewAuthResponse()
         {
             using var ctx = CreateContext(nameof(RefreshToken_WithValidToken_ReturnsNewAuthResponse));
+            await SeedUsersAsync(ctx);
             var svc = CreateAuthService(ctx);
 
             var loginResult = await svc.LoginAsync(new LoginRequest
@@ -176,6 +225,7 @@ namespace Strategies.Api.Tests
         public async Task RefreshToken_WithRevokedToken_ReturnsNull()
         {
             using var ctx = CreateContext(nameof(RefreshToken_WithRevokedToken_ReturnsNull));
+            await SeedUsersAsync(ctx);
             var svc = CreateAuthService(ctx);
 
             var loginResult = await svc.LoginAsync(new LoginRequest
@@ -209,6 +259,7 @@ namespace Strategies.Api.Tests
         public async Task RevokeToken_ReturnsTrueForActiveToken()
         {
             using var ctx = CreateContext(nameof(RevokeToken_ReturnsTrueForActiveToken));
+            await SeedUsersAsync(ctx);
             var svc = CreateAuthService(ctx);
 
             var loginResult = await svc.LoginAsync(new LoginRequest
@@ -227,6 +278,7 @@ namespace Strategies.Api.Tests
         public async Task RevokeToken_ReturnsFalseForAlreadyRevokedToken()
         {
             using var ctx = CreateContext(nameof(RevokeToken_ReturnsFalseForAlreadyRevokedToken));
+            await SeedUsersAsync(ctx);
             var svc = CreateAuthService(ctx);
 
             var loginResult = await svc.LoginAsync(new LoginRequest
