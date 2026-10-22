@@ -69,11 +69,11 @@ namespace Strategies.Api.Tests
             };
         }
 
-        private static async Task<HttpResponseMessage> PostLead(HttpClient client, string? remoteIp, string? forwardedFor = null)
+        private static async Task<HttpResponseMessage> PostLead(HttpClient client, string? remoteIp, string? forwardedFor = null, string json = "{}")
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "/api/leads")
             {
-                Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
             if (remoteIp != null)
                 request.Headers.Add(RemoteIpHeader, remoteIp);
@@ -114,6 +114,23 @@ namespace Strategies.Api.Tests
             var retryAfter = Assert.Single(rejected.Headers.GetValues("Retry-After"));
             var seconds = int.Parse(retryAfter);
             Assert.InRange(seconds, 1, 600);
+        }
+
+        [Fact]
+        public async Task RequestsWithoutConsent_StillCountTowardsTheLimit()
+        {
+            using var factory = new ApiFactory();
+            using var client = factory.CreateClient();
+            const string withoutConsent = "{\"fullName\":\"Kagiso Molefe\",\"email\":\"kagiso@example.com\",\"immigrationStatus\":1,\"desiredStartDate\":\"2027-01-15T00:00:00Z\",\"consent\":false}";
+
+            for (var i = 0; i < 5; i++)
+            {
+                var refused = await PostLead(client, "198.51.100.12", json: withoutConsent);
+                Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+                Assert.Equal("consent_required", (await refused.Content.ReadFromJsonAsync<ApiErrorResponse>())!.Code);
+            }
+
+            Assert.Equal(HttpStatusCode.TooManyRequests, (await PostLead(client, "198.51.100.12", json: withoutConsent)).StatusCode);
         }
 
         [Fact]
