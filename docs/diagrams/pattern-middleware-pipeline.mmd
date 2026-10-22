@@ -1,0 +1,19 @@
+---
+title: Pattern - middleware pipeline (chain of responsibility, Program.cs order)
+---
+flowchart TB
+    REQ(["HTTP request"])
+    M0["<u>swagger : SwaggerMiddleware</u><br>Development only"]
+    M1["<u>forwarded : ForwardedHeadersMiddleware</u><br>X-Forwarded-For / -Proto<br>all proxies trusted"]
+    M2["<u>cors : CorsMiddleware</u><br>policy AllowFrontend<br>localhost:3000, localhost:5173"]
+    M3["<u>headers : SecurityHeadersMiddleware</u><br>nosniff, X-Frame-Options DENY,<br>Referrer-Policy, Permissions-Policy"]
+    M4["<u>rateLimiter : RateLimitingMiddleware</u><br>auth-strict: 5 per min per IP<br>login, register, forgot, reset"]
+    M5["<u>authn : AuthenticationMiddleware</u><br>JWT bearer HS256, no clock skew"]
+    M6["<u>authz : AuthorizationMiddleware</u><br>[Authorize(Roles = ...)]"]
+    EP["<u>endpoint : Controller action</u><br>MapControllers"]
+
+    REQ --> M0 --> M1 --> M2 --> M3 --> M4 --> M5 --> M6 --> EP
+    M2 -. preflight answered .-> REQ
+    M4 -. 429 .-> REQ
+    M6 -. 401 or 403 .-> REQ
+    EP -->|response passes back through the chain| REQ

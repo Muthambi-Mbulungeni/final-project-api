@@ -210,7 +210,8 @@ namespace Strategies.Api.Tests
                 Email = "thandiwe@example.com",
                 ImmigrationStatus = ImmigrationStatus.Foreigner,
                 NeedsAssistance = true,
-                DesiredStartDate = new DateTime(2027, 1, 15)
+                DesiredStartDate = new DateTime(2027, 1, 15),
+                Consent = true
             }, service);
 
             var body = Assert.Single(handler.Bodies);
@@ -238,7 +239,8 @@ namespace Strategies.Api.Tests
                 Email = "test@example.com",
                 ImmigrationStatus = ImmigrationStatus.Foreigner,
                 NeedsAssistance = true,
-                DesiredStartDate = new DateTime(2027, 1, 15)
+                DesiredStartDate = new DateTime(2027, 1, 15),
+                Consent = true
             }, service);
 
             var lead = Assert.Single(context.Leads);

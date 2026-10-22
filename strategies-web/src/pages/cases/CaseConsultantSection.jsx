@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import ErrorNotice from '../../components/ui/ErrorNotice'
+import { inputClasses } from '../../components/ui/fieldStyles'
 import { useToast } from '../../components/ui/toastContext'
 import { apiPatch } from '../../lib/api'
 import { getInitials } from '../../lib/format'
@@ -96,7 +97,7 @@ export default function CaseConsultantSection({ caseItem, onAssigned }) {
 
       {editable && !staff.error && (
         <form noValidate onSubmit={handleSubmit} className="mt-4 space-y-2">
-          <label htmlFor="case-consultant-select" className="block text-sm font-medium text-stone-900">
+          <label htmlFor="case-consultant-select" className="block text-sm font-medium text-stone-800">
             {assignedName ? 'Reassign to' : 'Assign to'}
           </label>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -111,7 +112,7 @@ export default function CaseConsultantSection({ caseItem, onAssigned }) {
               disabled={busy || staff.loading}
               aria-invalid={errors.field ? true : undefined}
               aria-describedby={errors.field ? 'case-consultant-error' : undefined}
-              className="block w-full min-w-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 aria-[invalid=true]:border-brand-600 sm:flex-1"
+              className={`${inputClasses(Boolean(errors.field))} min-w-0 sm:flex-1`}
             >
               <option value="">{staff.loading ? 'Loading consultants…' : 'Choose a consultant'}</option>
               {consultants.map((consultant) => (
@@ -123,7 +124,7 @@ export default function CaseConsultantSection({ caseItem, onAssigned }) {
             <button
               type="submit"
               disabled={busy || staff.loading}
-              className="shrink-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60"
+              className="shrink-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60"
             >
               {busy ? 'Saving…' : assignedName ? 'Reassign' : 'Assign'}
             </button>

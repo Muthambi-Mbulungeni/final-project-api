@@ -1,4 +1,13 @@
 import { resolveEnum } from '../config/enums'
+import { formatDate } from './format'
+
+// Who wrote a review note, e.g. "Nomvula Zulu, 22 Oct 2026". The API sends reviewedByName and
+// reviewedAt; rows reviewed before it did (or with no reviewer) fall back to "Your consultant".
+export function reviewerSignature(document) {
+  const name = typeof document?.reviewedByName === 'string' ? document.reviewedByName.trim() : ''
+  if (!name) return 'Your consultant'
+  return document.reviewedAt ? `${name}, ${formatDate(document.reviewedAt)}` : name
+}
 
 // How each review status is described to clients. Staff screens keep the API's own wording.
 export const CLIENT_STATUS_LABELS = {

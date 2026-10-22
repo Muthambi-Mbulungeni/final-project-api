@@ -15,3 +15,9 @@ export function inputClasses(hasError) {
     hasError ? 'border-brand-600' : 'border-stone-300 focus:border-stone-500'
   }`
 }
+
+// Multi-line text: the same field as inputClasses, so a textarea and an input side by side match.
+// Only vertical resizing, so a field can never be dragged wider than its container.
+export function textareaClasses(hasError) {
+  return `${inputClasses(hasError)} resize-y`
+}

@@ -23,6 +23,9 @@ namespace Strategies.Api.DTOs
         public DateTime DesiredStartDate { get; set; }
 
         public Guid? VisaCategoryId { get; set; }
+
+        // POPIA: the person ticked the consent box on the enquiry form. Left out of the body means false.
+        public bool Consent { get; set; }
     }
 
     public class UpdateLeadStatusRequest

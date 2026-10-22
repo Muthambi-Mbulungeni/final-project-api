@@ -1,0 +1,76 @@
+---
+title: Design class diagram 3 of 8 - supporting entities (Strategies.Api/Data/Models)
+---
+classDiagram
+    direction LR
+
+    class ChecklistTemplate {
+        <<entity>>
+        +Id: Guid «PK»
+        +VisaCategoryId: Guid «FK VisaCategory»
+        +DocumentTypeId: Guid «FK DocumentType»
+        +IsMandatory: bool
+    }
+    class Message {
+        <<entity>>
+        +Id: Guid «PK»
+        +CaseId: Guid «FK Case»
+        +SenderId: Guid «FK User»
+        +Body: string
+        +IsRead: bool = false
+        +SentAt: DateTime = UtcNow
+    }
+    class VisaRecord {
+        <<entity>>
+        +Id: Guid «PK»
+        +CaseId: Guid «FK Case»
+        +VisaType: string
+        +IssuedDate: DateTime
+        +ExpiryDate: DateTime
+        +RenewalFlagged: bool = false
+    }
+    class AgentRun {
+        <<entity>>
+        +Id: Guid «PK»
+        +CaseId: Guid? «FK Case»
+        +LeadId: Guid? «FK Lead»
+        +AgentType: AgentType
+        +Output: string
+        +Status: RunStatus
+        +RanAt: DateTime = UtcNow
+    }
+    class AuditLog {
+        <<entity>>
+        +Id: Guid «PK»
+        +UserId: Guid? «FK User»
+        +Action: string
+        +EntityType: string
+        +EntityId: Guid
+        +CreatedAt: DateTime = UtcNow
+    }
+    class VisaCategory {
+        <<entity, see diagram 1>>
+    }
+    class DocumentType {
+        <<entity, see diagram 2>>
+    }
+    class Case {
+        <<entity, see diagram 1>>
+    }
+    class Lead {
+        <<entity, see diagram 1>>
+    }
+    class User {
+        <<entity, see diagram 1>>
+    }
+
+    VisaCategory "1" *-- "0..*" ChecklistTemplate
+    DocumentType "1" *-- "0..*" ChecklistTemplate
+    Case "1" *-- "0..*" Message
+    User "1" <-- "0..*" Message : sender
+    Case "1" *-- "0..*" VisaRecord
+    Case "0..1" *-- "0..*" AgentRun
+    Lead "0..1" <-- "0..*" AgentRun
+    User "0..1" <-- "0..*" AuditLog : actor
+
+    note "No methods: these are EF Core property classes.<br>AuditLog.EntityId points at a Case, Document, Lead or User<br>row by value (no foreign key).<br>Messages are listed and marked read as notifications,<br>but no endpoint creates one. AgentRun, VisaRecord and<br>ChecklistTemplate are never read or written by the API."

@@ -5,7 +5,6 @@ import {
   History,
   Inbox,
   LayoutDashboard,
-  MessageSquare,
   UserRound,
   Users,
 } from 'lucide-react'
@@ -30,12 +29,10 @@ export const NAVIGATION = {
     { to: '/consultant/leads', label: 'Lead triage', icon: Inbox, description: 'Qualify new enquiries and convert them into cases.' },
     { to: '/consultant/cases', label: 'My cases', icon: Briefcase, description: 'Cases assigned to you, grouped by stage.' },
     { to: '/consultant/documents', label: 'Documents', icon: FolderOpen, description: 'Client uploads waiting for your review.' },
-    { to: '/consultant/messages', label: 'Messages', icon: MessageSquare, description: 'Conversations with your clients.' },
   ],
   client: [
     { to: '/client', label: 'My case', icon: LayoutDashboard, end: true },
     { to: '/client/documents', label: 'Documents', icon: FolderOpen, description: 'Upload and track the documents your application needs.' },
-    { to: '/client/messages', label: 'Messages', icon: MessageSquare, description: 'Updates and questions from your consultant.' },
     { to: '/client/profile', label: 'Profile', icon: UserRound, description: 'Your personal and contact details.' },
   ],
 }

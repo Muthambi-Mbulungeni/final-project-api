@@ -1,0 +1,44 @@
+---
+title: Pattern - strategy (interfaces with one swappable implementation each; object diagram)
+---
+flowchart TB
+    subgraph AI["AI agent strategy: IAgentService"]
+        direction LR
+        LC["<u>leadsController : LeadsController</u><br>CreateLead(dto, [FromServices] IAgentService)"]
+        IA{{"«interface» IAgentService<br>ProcessLeadAsync(leadData)"}}
+        GA["<u>agent : GeminiAgentService</u><br>Gemini:Url = ...gemini-1.5-flash:generateContent<br>Gemini:ApiKey = (empty in repo)"]
+        R1["<u>result : AgentResponse</u><br>Status = Success<br>ExtractedData = {status, reason}"]
+        R2["<u>result : AgentResponse</u><br>Status = Fallback<br>no key, HTTP error or timeout"]
+        LEAD["<u>lead : Lead</u><br>TriageStatus = parsed status, or NeedsReview<br>TriageReason = reason or null"]
+        LC --> IA
+        IA -. implemented by .-> GA
+        GA --> R1
+        GA --> R2
+        R1 --> LEAD
+        R2 -->|fallback| LEAD
+    end
+
+    subgraph MAIL["Email strategy: IEmailService"]
+        direction LR
+        AC["<u>authController : AuthController</u><br>ForgotPassword"]
+        IE{{"«interface» IEmailService"}}
+        SE["<u>emailService : SmtpEmailService</u><br>Smtp:Host empty = log only (simulated)"]
+        AC --> IE
+        IE -. implemented by .-> SE
+    end
+
+    subgraph TOK["Refresh token store strategy: IRefreshTokenStore"]
+        direction LR
+        AU["<u>authService : AuthService</u>"]
+        IR{{"«interface» IRefreshTokenStore"}}
+        IM["<u>refreshStore : InMemoryRefreshTokenStore</u><br>tokens lost on restart; one instance only"]
+        AU --> IR
+        IR -. implemented by .-> IM
+    end
+
+    note1["Only one implementation exists for each interface.<br>Checklist and Summarisation agents (AgentType enum) are not built,<br>and nothing writes AgentRun rows."]
+    AI ~~~ MAIL ~~~ TOK ~~~ note1
+    classDef iface fill:#eef4ff,stroke:#3b5bdb
+    classDef noteStyle fill:#fff5c2,stroke:#b59f00
+    class IA,IE,IR iface
+    class note1 noteStyle

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -57,11 +58,13 @@ namespace Strategies.Api.Controllers
                 Enum.TryParse<CaseStage>(stage, ignoreCase: true, out var parsedStage))
                 baseQuery = baseQuery.Where(x => x.c.Stage == parsedStage);
 
+            // A consultant's list is their working caseload, so archived cases are left out.
+            // Admins still see every case, archived ones included.
             if (User.IsInRole("Consultant"))
             {
                 var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 Guid.TryParse(userIdStr, out var currentUserId);
-                baseQuery = baseQuery.Where(x => x.c.ConsultantId == currentUserId);
+                baseQuery = baseQuery.Where(x => x.c.ConsultantId == currentUserId && !x.c.IsArchived);
             }
 
             var totalRecords = await baseQuery.CountAsync();
@@ -336,6 +339,14 @@ namespace Strategies.Api.Controllers
         {
             var c = await _context.Cases.FindAsync(id);
             if (c == null) return NotFound(new ApiErrorResponse { Message = "Case not found." });
+
+            var consultant = await _context.Users.FindAsync(request.ConsultantId);
+            if (consultant == null || consultant.Role != UserRole.Consultant || !consultant.IsActive || consultant.DeletedAt != null)
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "Validation failed.",
+                    Errors = new List<string> { "Choose an active consultant." }
+                });
 
             c.ConsultantId = request.ConsultantId;
             c.UpdatedAt = DateTime.UtcNow;

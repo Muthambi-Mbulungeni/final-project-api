@@ -1,4 +1,5 @@
 import { documentStatus } from './documents'
+import { formatDate } from './format'
 
 // PATCH /api/documents/{id}/status takes { status: 'Approved' | 'Rejected', reviewComment }.
 // The API answers 400 when a rejection has no comment, and 403 (empty body) when a consultant
@@ -61,4 +62,15 @@ export function documentsForReview(documents) {
         (REVIEW_ORDER[documentStatus(a)] ?? 3) - (REVIEW_ORDER[documentStatus(b)] ?? 3) ||
         String(b.uploadedAt).localeCompare(String(a.uploadedAt)),
     )
+}
+
+// "Approved by Nomvula Zulu · 22 Oct 2026" for the staff panel, from reviewedByName and reviewedAt.
+// Nothing for a pending document or a decision with no recorded reviewer (the badge shows the status).
+const DECISION_VERBS = { Approved: 'Approved', Rejected: 'Rejected' }
+
+export function reviewDecisionLine(document) {
+  const verb = DECISION_VERBS[documentStatus(document)]
+  const name = typeof document?.reviewedByName === 'string' ? document.reviewedByName.trim() : ''
+  if (!verb || !name) return null
+  return document.reviewedAt ? `${verb} by ${name} · ${formatDate(document.reviewedAt)}` : `${verb} by ${name}`
 }

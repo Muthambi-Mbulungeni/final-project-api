@@ -226,6 +226,9 @@ namespace Strategies.Api.Migrations
                     b.Property<string>("ReviewComment")
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("ReviewedById")
                         .HasColumnType("uuid");
 
@@ -271,6 +274,9 @@ namespace Strategies.Api.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConsentAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("DesiredStartDate")
                         .HasColumnType("timestamp with time zone");
@@ -361,6 +367,9 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text");
@@ -370,6 +379,12 @@ namespace Strategies.Api.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("FailedLoginWindowStart")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -378,6 +393,9 @@ namespace Strategies.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("LockoutEndsAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()

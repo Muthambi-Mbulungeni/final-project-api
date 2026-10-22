@@ -1,0 +1,45 @@
+---
+title: Layered (three-tier) architecture as built
+---
+flowchart TB
+    subgraph PRES["Presentation tier (clients)"]
+        direction LR
+        subgraph WEB["strategies-web (React 19 + Vite)"]
+            direction TB
+            WP["pages/ and components/<br>routes, RequireRole, AppShell"]
+            WL["lib/<br>api.js (fetch + refresh), auth.js, session.js,<br>cases.js, documents.js, leads.js"]
+            WP --> WL
+        end
+        subgraph MOB["strategies-mobile (Kotlin + Compose)"]
+            direction TB
+            MV["ui/<br>Screens + ViewModels (StateFlow)"]
+            MD["data/<br>ApiClient (OkHttp), Models, TokenStore"]
+            MV --> MD
+        end
+    end
+
+    subgraph APPT["Application tier: Strategies.Api (ASP.NET Core, .NET 10)"]
+        direction TB
+        MW["Middleware pipeline<br>forwarded headers, CORS, security headers,<br>rate limiter, JWT authentication, authorization"]
+        CT["Controllers (API layer)<br>Auth, Leads, Cases, Documents, Admin,<br>Stats, Notification, DocumentTypes<br>+ DTOs and validation attributes"]
+        SV["Services (business layer)<br>AuthService, TokenService, PasswordHasherService,<br>InMemoryRefreshTokenStore, SmtpEmailService,<br>GeminiAgentService, CaseManagementService (unused)"]
+        DA["Data access layer<br>ApplicationDbContext (EF Core + Npgsql)<br>Models, Enums, Migrations"]
+        MW --> CT
+        CT -->|"Auth (auth services, email),<br>Leads (IAgentService triage)"| SV
+        CT -->|"Leads, Cases, Documents, Admin, Stats,<br>Notification, DocumentTypes: direct, no service layer"| DA
+        SV --> DA
+    end
+
+    subgraph DATA["Data tier"]
+        direction LR
+        PG[("PostgreSQL<br>12 tables, public schema")]
+        FS[("File system<br>wwwroot/uploads")]
+    end
+
+    EXTS["External: Gemini API, SMTP"]
+
+    WL -->|"HTTPS JSON, Bearer JWT"| MW
+    MD -->|"HTTPS JSON, Bearer JWT"| MW
+    DA --> PG
+    CT -->|"Documents upload/download"| FS
+    SV --> EXTS

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { inputClasses } from '../../components/ui/fieldStyles'
 import StageMarker from '../../components/ui/StageMarker'
 import { useToast } from '../../components/ui/toastContext'
 import { ENUMS, enumOrder, resolveEnum } from '../../config/enums'
@@ -109,7 +110,7 @@ export default function CaseStageSection({ caseItem, onStageChanged }) {
 
       {editable && (
         <form noValidate onSubmit={handleSubmit} className="mt-5 space-y-2">
-          <label htmlFor="case-stage-select" className="block text-sm font-medium text-stone-900">
+          <label htmlFor="case-stage-select" className="block text-sm font-medium text-stone-800">
             Move this case to
           </label>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -124,7 +125,7 @@ export default function CaseStageSection({ caseItem, onStageChanged }) {
               disabled={busy}
               aria-invalid={errors.field ? true : undefined}
               aria-describedby={errors.field ? 'case-stage-error' : undefined}
-              className="block w-full min-w-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 aria-[invalid=true]:border-brand-600 sm:flex-1"
+              className={`${inputClasses(Boolean(errors.field))} min-w-0 sm:flex-1`}
             >
               <option value="">Choose a stage</option>
               {ENUMS.caseStage.map((option) => (
@@ -136,7 +137,7 @@ export default function CaseStageSection({ caseItem, onStageChanged }) {
             <button
               type="submit"
               disabled={busy}
-              className="shrink-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-900 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60"
+              className="shrink-0 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-50 disabled:cursor-wait disabled:opacity-60"
             >
               {busy ? 'Saving…' : stageActionLabel(caseItem.stage, nextStage)}
             </button>

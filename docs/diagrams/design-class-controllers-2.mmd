@@ -1,0 +1,55 @@
+---
+title: Design class diagram 6 of 8 - API controllers, part 2 (Strategies.Api/Controllers)
+---
+classDiagram
+    direction LR
+
+    class DocumentsController {
+        <<controller api/documents>>
+        -_context: ApplicationDbContext
+        +GetDocuments(caseId: Guid?, page: int = 1, pageSize: int = 20) Task~IActionResult~
+        +GetDocument(id: Guid) Task~IActionResult~
+        +DownloadDocument(id: Guid) Task~IActionResult~
+        +UploadDocument(file: IFormFile) Task~IActionResult~
+        +CreateDocument(dto: CreateDocumentRequest) Task~IActionResult~
+        +UpdateDocumentStatus(id: Guid, dto: UpdateDocumentStatusRequest) Task~IActionResult~
+        +ArchiveDocument(id: Guid) Task~IActionResult~
+    }
+    class AdminController {
+        <<controller api/admin>>
+        -_context: ApplicationDbContext
+        +GetUsers(page: int = 1, pageSize: int = 10, search: string?) Task~IActionResult~
+        +SuspendUser(id: Guid) Task~IActionResult~
+        +ReinstateUser(id: Guid) Task~IActionResult~
+        +DeleteUser(id: Guid) Task~IActionResult~
+        +GetAuditLogs(page: int = 1, pageSize: int = 20, userId: Guid?) Task~IActionResult~
+    }
+    class StatsController {
+        <<controller api/stats>>
+        -_context: ApplicationDbContext
+        +GetAdminStats() Task~IActionResult~
+        +GetConsultantStats() Task~IActionResult~
+        +GetClientStats(clientId: Guid) Task~IActionResult~
+    }
+    class NotificationController {
+        <<controller api/notifications>>
+        -_context: ApplicationDbContext
+        +GetNotifications(page: int = 1, pageSize: int = 20) Task~IActionResult~
+        +MarkAsRead(id: Guid) Task~IActionResult~
+    }
+    class DocumentTypesController {
+        <<controller api/DocumentTypes>>
+        -_context: ApplicationDbContext
+        +GetDocumentTypes() Task~IActionResult~
+    }
+    class ApplicationDbContext {
+        <<DbContext, see diagram 8>>
+    }
+
+    DocumentsController --> ApplicationDbContext
+    AdminController --> ApplicationDbContext
+    StatsController --> ApplicationDbContext
+    NotificationController --> ApplicationDbContext
+    DocumentTypesController --> ApplicationDbContext
+
+    note "All five extend ControllerBase, require a signed-in user and<br>query ApplicationDbContext directly (no service layer).<br>Optional parameters default to null. Access rules:<br>DocumentsController: Upload, Create any role; UpdateDocumentStatus,<br>ArchiveDocument Admin or Consultant; case ownership is checked.<br>AdminController: Admin only. DeleteUser is a soft delete<br>(IsActive = false, the same state as SuspendUser).<br>StatsController: GetAdminStats Admin; GetConsultantStats<br>Admin or Consultant; GetClientStats any role."
