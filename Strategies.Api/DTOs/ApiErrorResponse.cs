@@ -15,6 +15,7 @@ namespace Strategies.Api.DTOs
         public string? Code { get; set; }
 
         public const string DuplicateEmailCode = "duplicate_email";
+        public const string ConsentRequiredCode = "consent_required";
 
         public const string InvalidBodyMessage = "The request body is missing or is not valid JSON.";
 

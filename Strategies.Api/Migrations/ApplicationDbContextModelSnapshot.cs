@@ -275,6 +275,9 @@ namespace Strategies.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ConsentAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("DesiredStartDate")
                         .HasColumnType("timestamp with time zone");
 
