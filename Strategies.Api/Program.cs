@@ -8,13 +8,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Strategies.Api.Configuration;
 using Strategies.Api.Data;
 using Strategies.Api.DTOs;
 using Strategies.Api.Middleware;
 using Strategies.Api.Services;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -76,27 +79,56 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireClientRole", policy => policy.RequireRole("Admin", "Consultant", "Client"));
 });
 
-// Configure Forwarded Headers to get the real user IP from the proxy
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
-});
+// Forwarded headers: config-driven, off unless "ForwardedHeaders:Enabled" is true (Production).
+// See ForwardedHeadersSettings for why only the last X-Forwarded-For entry is trusted.
+builder.Services.AddOptions<ForwardedHeadersSettings>()
+    .Bind(builder.Configuration.GetSection(ForwardedHeadersSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "ForwardedHeaders: ForwardLimit must be at least 1 and every KnownProxies / KnownNetworks entry must be a valid address or CIDR range.")
+    .ValidateOnStart();
+builder.Services.AddOptions<ForwardedHeadersOptions>()
+    .Configure<IOptions<ForwardedHeadersSettings>>((options, settings) => settings.Value.Apply(options));
 
-// 6. Rate Limiting
+builder.Services.AddOptions<LeadsRateLimitSettings>()
+    .Bind(builder.Configuration.GetSection(LeadsRateLimitSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "RateLimiting:Leads: PermitLimit and WindowSeconds must be greater than 0.")
+    .ValidateOnStart();
+
+// 6. Rate Limiting (partitioned by client IP, after forwarded headers)
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy("auth-strict", httpContext =>
+    options.OnRejected = async (context, cancellationToken) =>
     {
-        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "global-auth";
-        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = 5,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0
-        });
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            context.HttpContext.Response.Headers.RetryAfter =
+                Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new ApiErrorResponse { Message = "Too many requests. Please try again later." }, cancellationToken);
+    };
+
+    options.AddPolicy("auth-strict", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ClientPartitionKey.From(httpContext.Connection.RemoteIpAddress),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Public enquiry form: limits come from "RateLimiting:Leads".
+    options.AddPolicy(LeadsRateLimitSettings.PolicyName, httpContext =>
+    {
+        var settings = httpContext.RequestServices.GetRequiredService<IOptions<LeadsRateLimitSettings>>().Value;
+        return RateLimitPartition.GetFixedWindowLimiter(
+            ClientPartitionKey.From(httpContext.Connection.RemoteIpAddress),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = settings.PermitLimit,
+                Window = TimeSpan.FromSeconds(settings.WindowSeconds),
+                QueueLimit = 0
+            });
     });
 });
 
@@ -125,18 +157,30 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// First in the pipeline: everything after it reads the client IP and scheme it sets.
+// Azure App Service on Linux sets ASPNETCORE_FORWARDEDHEADERS_ENABLED=true, and the host then adds this
+// middleware itself, ahead of this pipeline and with the options configured above. Adding it a second
+// time would strip one more X-Forwarded-For entry, trusting a value the caller can make up.
+if (!string.Equals(app.Configuration["FORWARDEDHEADERS_ENABLED"], "true", StringComparison.OrdinalIgnoreCase))
+    app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseForwardedHeaders(); // Extract real IP before rate limiting
+app.UseRouting();
 app.UseCors("AllowFrontend");
 app.UseSecurityHeaders();
+// After routing, so the [EnableRateLimiting] policy on an action is known; before authentication,
+// so throttled requests are turned away before any token work.
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Lets the integration tests start the API with WebApplicationFactory<Program>.
+public partial class Program { }

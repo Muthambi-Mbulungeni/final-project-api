@@ -128,6 +128,19 @@ The API listens on http://localhost:5151 and, in Development, serves Swagger at 
 | `Jwt:Issuer`, `Jwt:Audience` | Token issuer and audience | Defaults in `appsettings.json` |
 | `Gemini:ApiKey` | AI triage | No: without it every enquiry is saved as NeedsReview |
 | `Gemini:Url` | Gemini model endpoint | Default in `appsettings.json` |
+| `ForwardedHeaders:*`, `RateLimiting:Leads:*` | Client IP behind a proxy, enquiry form limit | Defaults in `appsettings.json`; see below |
+
+#### Rate limiting and proxies
+
+Rate limits are per client IP. The public enquiry form (`POST /api/leads`) allows `RateLimiting:Leads:PermitLimit` requests per `RateLimiting:Leads:WindowSeconds` (default 5 per 600 seconds); sign-in, registration, forgot password and reset password share a limit of 5 per minute. A rejected request gets `429` with `{ message, errors }` and a `Retry-After` header in seconds. IPv6 clients are counted per /64 block.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `ForwardedHeaders:Enabled` | `false` (`true` in `appsettings.Production.json`) | Read the client IP from `X-Forwarded-For`. Off locally: the connection address is used and the header is ignored |
+| `ForwardedHeaders:ForwardLimit` | `1` | How many `X-Forwarded-For` entries to read, from the right |
+| `ForwardedHeaders:KnownProxies`, `ForwardedHeaders:KnownNetworks` | empty | Proxy addresses / CIDR ranges to trust. When empty, the built-in loopback defaults are cleared |
+
+Why `ForwardLimit = 1` on Azure App Service: Azure's front end appends the real client IP as the last `X-Forwarded-For` entry. Anything to its left was sent by the caller and can be made up, so only the last entry is read; otherwise a caller could send a new address with every request and never hit a limit. The front end's own address is not fixed, so no proxy list is configured. App Service on Linux also sets `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`; the API then lets the host run the middleware (with these settings) instead of adding it a second time, which would read one entry too many. The production settings only load when the app runs with `ASPNETCORE_ENVIRONMENT=Production` (the default when it is not set); App Service application settings such as `ForwardedHeaders__Enabled` override them.
 
 ### 3. Web portal
 
