@@ -11,6 +11,7 @@ using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
 using Strategies.Api.DTOs;
+using Strategies.Api.Services;
 using Xunit;
 
 namespace Strategies.Api.Tests
@@ -37,7 +38,7 @@ namespace Strategies.Api.Tests
                 new Claim(ClaimTypes.Role, role)
             }, "Test");
 
-            return new DocumentsController(ctx)
+            return new DocumentsController(ctx, new LocalFileStorage(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "reviewer-tests-uploads")))
             {
                 ControllerContext = new ControllerContext
                 {
