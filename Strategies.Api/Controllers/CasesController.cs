@@ -57,11 +57,13 @@ namespace Strategies.Api.Controllers
                 Enum.TryParse<CaseStage>(stage, ignoreCase: true, out var parsedStage))
                 baseQuery = baseQuery.Where(x => x.c.Stage == parsedStage);
 
+            // A consultant's list is their working caseload, so archived cases are left out.
+            // Admins still see every case, archived ones included.
             if (User.IsInRole("Consultant"))
             {
                 var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 Guid.TryParse(userIdStr, out var currentUserId);
-                baseQuery = baseQuery.Where(x => x.c.ConsultantId == currentUserId);
+                baseQuery = baseQuery.Where(x => x.c.ConsultantId == currentUserId && !x.c.IsArchived);
             }
 
             var totalRecords = await baseQuery.CountAsync();
