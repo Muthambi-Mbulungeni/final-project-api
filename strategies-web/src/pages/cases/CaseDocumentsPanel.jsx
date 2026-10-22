@@ -13,6 +13,7 @@ import {
   rejectionCommentError,
   reviewBody,
   reviewErrorMessage,
+  reviewDecisionLine,
   reviewPath,
 } from '../../lib/documentReview'
 import { documentSummary, documentsPath } from '../../lib/documents'
@@ -118,6 +119,7 @@ function DocumentsBody({ caseItem, request, headingRef }) {
       <ul className="mt-1 divide-y divide-stone-200">
         {documents.map((document) => {
           const name = documentName(document)
+          const decision = reviewDecisionLine(document)
           const reviewed = reviewedIds.has(document.id)
           const actionable = canReview(document, caseItem.isArchived) && !reviewed
           const busy = busyId === document.id
@@ -162,6 +164,10 @@ function DocumentsBody({ caseItem, request, headingRef }) {
                 <p role="alert" className="mt-2 text-sm text-brand-700">
                   {fileError.message}
                 </p>
+              )}
+
+              {decision && (
+                <p className="mt-2 text-xs text-stone-500">{decision}</p>
               )}
 
               {document.reviewComment && (
