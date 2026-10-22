@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -336,6 +337,14 @@ namespace Strategies.Api.Controllers
         {
             var c = await _context.Cases.FindAsync(id);
             if (c == null) return NotFound(new ApiErrorResponse { Message = "Case not found." });
+
+            var consultant = await _context.Users.FindAsync(request.ConsultantId);
+            if (consultant == null || consultant.Role != UserRole.Consultant || !consultant.IsActive || consultant.DeletedAt != null)
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "Validation failed.",
+                    Errors = new List<string> { "Choose an active consultant." }
+                });
 
             c.ConsultantId = request.ConsultantId;
             c.UpdatedAt = DateTime.UtcNow;
