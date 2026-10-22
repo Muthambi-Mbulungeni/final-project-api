@@ -20,6 +20,7 @@ import { formatDate, shortId } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 import CaseConsultantSection from './CaseConsultantSection'
+import CaseMessages from './CaseMessages'
 import CaseStageSection from './CaseStageSection'
 
 const NO_REJECTION = { id: null, comment: '', error: null }
@@ -312,6 +313,16 @@ function CasePanelBody({ caseItem, onStageChanged, onAssigned }) {
       <CaseStageSection caseItem={caseItem} onStageChanged={onStageChanged} />
       {onAssigned && <CaseConsultantSection caseItem={caseItem} onAssigned={onAssigned} />}
       <DocumentsBody caseItem={caseItem} request={request} headingRef={documentsHeadingRef} />
+      <section aria-labelledby="case-messages-heading" className="mt-6 border-t border-stone-200 pt-6">
+        <h3 id="case-messages-heading" className="mb-3 text-sm font-semibold text-stone-900">
+          Messages
+        </h3>
+        <CaseMessages
+          caseId={caseItem.id}
+          archived={caseItem.isArchived}
+          emptyMessage="Messages you send here are shown to the client on their dashboard."
+        />
+      </section>
     </>
   )
 }

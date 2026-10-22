@@ -13,6 +13,7 @@ import { documentsPath, documentsToReplace, replaceActionLabel } from '../../lib
 import { listItems } from '../../lib/listData'
 import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
+import CaseMessages from '../cases/CaseMessages'
 
 // Only show details the API actually sent.
 function caseDetails(item) {
@@ -208,6 +209,17 @@ export default function ClientDashboard() {
             />
           )}
         </Panel>
+
+        {currentCase?.id && (
+          <Panel title="Messages">
+            <CaseMessages
+              key={currentCase.id}
+              caseId={currentCase.id}
+              archived={currentCase.isArchived}
+              emptyMessage={`Ask ${consultantName ?? 'your consultant'} a question here. Replies appear in this thread.`}
+            />
+          </Panel>
+        )}
       </div>
     </>
   )
