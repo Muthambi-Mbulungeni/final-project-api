@@ -1,0 +1,87 @@
+---
+title: Domain class diagram (business concepts)
+---
+classDiagram
+    direction TB
+
+    class User {
+        fullName
+        email
+        role : Admin | Consultant | Client
+        isActive
+        emailConfirmed
+    }
+    class Lead {
+        fullName
+        email
+        immigrationStatus
+        needsAssistance
+        desiredStartDate
+        triageStatus
+        triageReason
+    }
+    class Case {
+        stage
+        isArchived
+        createdAt
+    }
+    class VisaCategory {
+        name
+        isActive
+    }
+    class DocumentType {
+        name
+    }
+    class ChecklistTemplate {
+        isMandatory
+    }
+    class Document {
+        fileName
+        status
+        reviewComment
+        isArchived
+    }
+    class CaseStageHistory {
+        fromStage
+        toStage
+        changedAt
+    }
+    class Message {
+        body
+        isRead
+    }
+    class VisaRecord {
+        visaType
+        issuedDate
+        expiryDate
+        renewalFlagged
+    }
+    class AgentRun {
+        agentType
+        status
+        output
+    }
+    class AuditLog {
+        action
+        entityType
+        entityId
+    }
+
+    Lead "0..1" -- "0..*" Case : becomes
+    User "1" -- "0..*" Case : client of
+    User "0..1" -- "0..*" Case : consultant for
+    VisaCategory "1" -- "0..*" Case : applied for
+    VisaCategory "0..1" -- "0..*" Lead : interested in
+    User "0..1" -- "0..*" Lead : reviews
+    Case "1" *-- "0..*" Document : holds
+    DocumentType "1" -- "0..*" Document : is of type
+    Case "1" *-- "0..*" CaseStageHistory : records
+    VisaCategory "1" *-- "0..*" ChecklistTemplate : requires
+    DocumentType "1" -- "0..*" ChecklistTemplate : listed in
+    Case "1" *-- "0..*" Message : thread
+    User "1" -- "0..*" Message : sends
+    Case "1" *-- "0..*" VisaRecord : tracks
+    Lead "0..1" -- "0..*" AgentRun : triaged by
+    User "0..1" -- "0..*" AuditLog : performed
+
+    note "Also in the model, left out here for readability:<br>User reviews Document (0..1 to many), User changes CaseStageHistory (0..1 to many),<br>Case processed by AgentRun (0..1 to many). See design-class diagrams."

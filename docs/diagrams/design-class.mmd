@@ -1,0 +1,85 @@
+---
+title: Design class diagram 1 - core entities (Strategies.Api/Data/Models)
+---
+classDiagram
+    direction TB
+
+    class User {
+        +Guid Id «PK»
+        +string FullName
+        +string Email
+        +string PasswordHash
+        +UserRole Role
+        +bool IsActive
+        +bool EmailConfirmed
+        +DateTime CreatedAt
+    }
+    class Lead {
+        +Guid Id «PK»
+        +Guid? ReviewedById «FK User»
+        +Guid? VisaCategoryId «FK VisaCategory»
+        +string FullName
+        +string Email
+        +ImmigrationStatus ImmigrationStatus
+        +bool NeedsAssistance
+        +DateTime DesiredStartDate
+        +TriageStatus TriageStatus
+        +string? TriageReason
+        +DateTime SubmittedAt
+    }
+    class Case {
+        +Guid Id «PK»
+        +Guid? LeadId «FK Lead»
+        +Guid ClientId «FK User»
+        +Guid? ConsultantId «FK User»
+        +Guid VisaCategoryId «FK VisaCategory»
+        +CaseStage Stage
+        +bool IsArchived
+        +DateTime CreatedAt
+        +DateTime UpdatedAt
+    }
+    class Document {
+        +Guid Id «PK»
+        +Guid CaseId «FK Case»
+        +Guid DocumentTypeId «FK DocumentType»
+        +Guid? ReviewedById «FK User»
+        +string FileName
+        +string FilePath
+        +DocumentStatus Status
+        +string? ReviewComment
+        +DateTime UploadedAt
+        +bool IsArchived
+    }
+    class CaseStageHistory {
+        +Guid Id «PK»
+        +Guid CaseId «FK Case»
+        +Guid? ChangedById «FK User»
+        +CaseStage FromStage
+        +CaseStage ToStage
+        +DateTime ChangedAt
+    }
+    class VisaCategory {
+        +Guid Id «PK»
+        +string Name
+        +string? Description
+        +bool IsActive
+    }
+    class DocumentType {
+        +Guid Id «PK»
+        +string Name
+        +string? Description
+    }
+
+    User "1" <-- "0..*" Case : client
+    User "0..1" <-- "0..*" Case : consultant
+    Lead "0..1" <-- "0..*" Case
+    VisaCategory "1" <-- "0..*" Case
+    User "0..1" <-- "0..*" Lead : reviewer
+    VisaCategory "0..1" <-- "0..*" Lead
+    Case "1" *-- "0..*" Document
+    DocumentType "1" <-- "0..*" Document
+    User "0..1" <-- "0..*" Document : reviewer
+    Case "1" *-- "0..*" CaseStageHistory
+    User "0..1" <-- "0..*" CaseStageHistory : changed by
+
+    note for Case "Filled diamond = cascade delete with the case.<br>User and VisaCategory links are Restrict;<br>optional links are SetNull."

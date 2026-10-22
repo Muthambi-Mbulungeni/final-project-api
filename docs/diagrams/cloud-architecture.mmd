@@ -1,0 +1,45 @@
+---
+title: Cloud architecture - network boundaries and protocols (dashed = not found in repo config)
+---
+flowchart LR
+    subgraph INTERNET["Public internet"]
+        direction TB
+        BROWSER["Staff and client browsers<br>React SPA"]
+        PHONE["Android phone<br>Kotlin app (client role)"]
+        PUBUSER["Public enquirer<br>/#/enquire"]
+    end
+
+    subgraph GH["GitHub (public HTTPS)"]
+        direction TB
+        PAGES["GitHub Pages<br>static web build, HashRouter<br>emgprs.github.io/insy7315-...-herculesriaadst10258492/"]
+        ACTIONS["GitHub Actions<br>ci.yml, deploy-pages.yml"]
+    end
+
+    subgraph AZ["API host (ASSUMED Azure App Service: no config in repo)"]
+        direction TB
+        API["Strategies.Api<br>.NET 10, Kestrel behind the host's TLS proxy<br>JWT, CORS, rate limit, security headers<br>uploads on local disk (wwwroot/uploads)<br>refresh tokens in memory"]
+    end
+
+    subgraph SUPA["Database host (Supabase, per database/seed/README.md)"]
+        PG[("PostgreSQL<br>schema public, 12 tables<br>session pooler")]
+    end
+
+    subgraph EXTG["External: Google (public HTTPS)"]
+        GEM["Google Gemini API<br>generativelanguage.googleapis.com<br>gemini-1.5-flash"]
+    end
+
+    subgraph EXTM["External: mail provider"]
+        SMTP["SMTP server<br>Smtp:Host (unset = simulated)"]
+    end
+
+    BROWSER -->|"HTTPS GET static files"| PAGES
+    PUBUSER -->|HTTPS| PAGES
+    BROWSER -.->|"HTTPS JSON + Bearer JWT<br>VITE_API_BASE_URL not set in deploy-pages.yml;<br>CORS allows only localhost"| API
+    PHONE -.->|"HTTPS JSON + Bearer JWT<br>release URL is CHANGE-ME placeholder<br>(debug: HTTP 10.0.2.2:5151)"| API
+    API -->|"PostgreSQL wire protocol (Npgsql)<br>TLS assumed: SSL Mode is in the secret,<br>not in the repo"| PG
+    API -->|"HTTPS POST, API key in query string"| GEM
+    API -->|"SMTP + STARTTLS (EnableSsl), port 587 default"| SMTP
+    ACTIONS -->|"upload-pages-artifact / deploy-pages<br>on push to main"| PAGES
+
+    classDef assumed stroke-dasharray: 6 4,fill:#fafafa
+    class AZ,API assumed

@@ -1,0 +1,32 @@
+---
+title: Sequence diagram - silent token refresh after a 401 (web lib/api.js; mobile ApiClient Authenticator works the same way)
+---
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant W as Web portal<br/>lib/api.js
+    participant AC as AuthController
+    participant AS as AuthService
+    participant RT as InMemoryRefreshTokenStore
+
+    W->>AC: any API call with an expired access token
+    AC-->>W: 401 (JWT bearer: lifetime check, no clock skew)
+    W->>AC: POST /api/auth/refresh {refreshToken} (once per request, concurrent calls share one refresh)
+    alt refresh token missing
+        AC-->>W: 400 "Refresh token is required."
+    else
+        AC->>AS: RefreshTokenAsync(token)
+        AS->>RT: GetTokenAsync(token)
+        alt token unknown, revoked, expired, or user inactive
+            AS-->>AC: null
+            AC-->>W: 401 "Refresh token is invalid or has expired."
+            W-->>U: /#/login with "session expired", return to the page afterwards
+        else token active
+            AS->>RT: RevokeTokenAsync(old, replacedBy new)
+            AS->>RT: SaveTokenAsync(new, 7 days)
+            AS-->>AC: AuthResponse
+            AC-->>W: 200 new access + refresh token
+            W->>AC: retry the original request with the new access token
+        end
+    end
+    Note over RT: Tokens live in API memory: an API restart signs everyone out

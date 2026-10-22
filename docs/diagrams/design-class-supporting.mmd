@@ -1,0 +1,72 @@
+---
+title: Design class diagram 2 - supporting entities (Strategies.Api/Data/Models)
+---
+classDiagram
+    direction TB
+
+    class Case {
+        +Guid Id «PK»
+    }
+    class User {
+        +Guid Id «PK»
+    }
+    class Lead {
+        +Guid Id «PK»
+    }
+    class VisaCategory {
+        +Guid Id «PK»
+    }
+    class DocumentType {
+        +Guid Id «PK»
+    }
+    class ChecklistTemplate {
+        +Guid Id «PK»
+        +Guid VisaCategoryId «FK VisaCategory»
+        +Guid DocumentTypeId «FK DocumentType»
+        +bool IsMandatory
+    }
+    class Message {
+        +Guid Id «PK»
+        +Guid CaseId «FK Case»
+        +Guid SenderId «FK User»
+        +string Body
+        +bool IsRead
+        +DateTime SentAt
+    }
+    class VisaRecord {
+        +Guid Id «PK»
+        +Guid CaseId «FK Case»
+        +string VisaType
+        +DateTime IssuedDate
+        +DateTime ExpiryDate
+        +bool RenewalFlagged
+    }
+    class AgentRun {
+        +Guid Id «PK»
+        +Guid? CaseId «FK Case»
+        +Guid? LeadId «FK Lead»
+        +AgentType AgentType
+        +string Output
+        +RunStatus Status
+        +DateTime RanAt
+    }
+    class AuditLog {
+        +Guid Id «PK»
+        +Guid? UserId «FK User»
+        +string Action
+        +string EntityType
+        +Guid EntityId
+        +DateTime CreatedAt
+    }
+
+    VisaCategory "1" *-- "0..*" ChecklistTemplate
+    DocumentType "1" *-- "0..*" ChecklistTemplate
+    Case "1" *-- "0..*" Message
+    User "1" <-- "0..*" Message : sender
+    Case "1" *-- "0..*" VisaRecord
+    Case "0..1" *-- "0..*" AgentRun
+    Lead "0..1" <-- "0..*" AgentRun
+    User "0..1" <-- "0..*" AuditLog : actor
+
+    note for AuditLog "EntityId points at a Case, Document, Lead or User<br>row by value; there is no foreign key."
+    note for Message "Messages are listed and marked read (notifications)<br>but no endpoint creates one. AgentRun, VisaRecord and<br>ChecklistTemplate are never read or written by the API."

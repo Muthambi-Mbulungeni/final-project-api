@@ -1,0 +1,41 @@
+---
+title: Branching model and CI/CD pipeline (.github/workflows)
+---
+flowchart LR
+    subgraph BR["Branching model"]
+        direction TB
+        FEAT["feature/*, fix/*, docs/*<br>one task per branch"]
+        DEVB["develop<br>integration branch"]
+        MAINB["main<br>release branch (repo default)"]
+        FEAT -->|pull request| DEVB
+        DEVB -->|release pull request| MAINB
+    end
+
+    subgraph CIY["ci.yml: on push to main or develop, and PRs into them"]
+        direction TB
+        subgraph J1["job backend: .NET Build and Test"]
+            direction TB
+            B1[checkout] --> B2["setup-dotnet 10.0.x"] --> B3["cache NuGet"] --> B4["dotnet restore"] --> B5["dotnet build Release"] --> B6["dotnet test<br>Strategies.Api.Tests (xUnit)<br>Jwt__Key = secrets.JWT_KEY_CI"] --> B7["upload TRX results"]
+        end
+        subgraph J2["job frontend: React Lint, Test and Build"]
+            direction TB
+            F1[checkout] --> F2["setup-node 22, npm cache"] --> F3["npm ci"] --> F4["npm run lint (ESLint)"] --> F5["npm test (Vitest)"] --> F6["npm run build (Vite)"]
+        end
+    end
+
+    subgraph DPY["deploy-pages.yml: on push to main or manual run"]
+        direction TB
+        D1["job build: npm ci + npm run build<br>upload-pages-artifact strategies-web/dist"] --> D2["job deploy: deploy-pages<br>environment github-pages"]
+    end
+
+    PAGES[("GitHub Pages<br>web portal")]
+    NOAPI["No workflow builds or deploys<br>the API, database or Android app"]
+
+    FEAT -.->|PR opened| CIY
+    DEVB -.->|push / merge| CIY
+    MAINB -.->|push / merge| CIY
+    MAINB -.->|push / merge| DPY
+    D2 --> PAGES
+
+    classDef gap fill:#fff5c2,stroke:#b59f00
+    class NOAPI gap

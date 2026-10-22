@@ -1,0 +1,83 @@
+---
+title: Design class diagram 2b - enumerations (Strategies.Api/Data/Enums)
+---
+classDiagram
+    direction TB
+
+    class UserRole {
+        <<enumeration>>
+        Admin
+        Consultant
+        Client
+    }
+    class CaseStage {
+        <<enumeration>>
+        InitialIntake
+        DocumentGathering
+        UnderReview
+        SubmittedToAuthority
+        FinalDecision
+    }
+    class DocumentStatus {
+        <<enumeration>>
+        Pending
+        Approved
+        Rejected
+    }
+    class TriageStatus {
+        <<enumeration>>
+        Pending
+        Qualified
+        Unqualified
+        NeedsReview
+    }
+    class ImmigrationStatus {
+        <<enumeration>>
+        Citizen
+        PermanentResident
+        TemporaryResident
+        Foreigner
+    }
+    class AgentType {
+        <<enumeration>>
+        Triage
+        Checklist
+        Summarisation
+    }
+    class RunStatus {
+        <<enumeration>>
+        Success
+        Fallback
+        Error
+    }
+
+    class User {
+        +UserRole Role
+    }
+    class Case {
+        +CaseStage Stage
+    }
+    class CaseStageHistory {
+        +CaseStage FromStage
+        +CaseStage ToStage
+    }
+    class Document {
+        +DocumentStatus Status
+    }
+    class Lead {
+        +ImmigrationStatus ImmigrationStatus
+        +TriageStatus TriageStatus
+    }
+    class AgentRun {
+        +AgentType AgentType
+        +RunStatus Status
+    }
+
+    User ..> UserRole
+    Case ..> CaseStage
+    CaseStageHistory ..> CaseStage
+    Document ..> DocumentStatus
+    Lead ..> ImmigrationStatus
+    Lead ..> TriageStatus
+    AgentRun ..> AgentType
+    AgentRun ..> RunStatus

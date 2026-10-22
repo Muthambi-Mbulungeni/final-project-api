@@ -1,0 +1,41 @@
+---
+title: UX journey - web portal 1 of 2, public routes and sign-in (strategies-web/src/App.jsx)
+---
+flowchart TB
+    subgraph PUB["Public (no sign-in)"]
+        direction TB
+        EMAIL(["Reset email link"])
+        NF["* 404 Not found"]
+        ROOT["/#/<br>redirect by session"]
+        LOGIN["/#/login<br>Sign in"]
+        FORGOT["/#/forgot-password"]
+        RESET["/#/reset-password?token="]
+        ENQ["/#/enquire<br>2-step enquiry + POPIA consent"]
+        PRIV["/#/privacy"]
+    end
+
+    ADMW[["Admin workspace /#/admin<br>see ux-journey-web-workspaces<br>sign out, idle timeout or expiry: back to /#/login"]]
+    CONW[["Consultant workspace /#/consultant<br>see ux-journey-web-workspaces<br>sign out, idle timeout or expiry: back to /#/login"]]
+    CLIW[["Client portal /#/client<br>see ux-journey-web-workspaces<br>sign out, idle timeout or expiry: back to /#/login"]]
+
+    ROOT -->|no session| LOGIN
+    ROOT -->|session| ADMW & CONW & CLIW
+    LOGIN --> FORGOT
+    LOGIN --> ENQ
+    FORGOT --> LOGIN
+    EMAIL -.->|link lacks /#/ today| RESET
+    RESET -->|200| LOGIN
+    RESET --> FORGOT
+    ENQ --> PRIV
+    ENQ --> LOGIN
+    PRIV --> ENQ
+    PRIV --> LOGIN
+    NF --> ROOT
+    NF --> ENQ
+
+    LOGIN -->|role Admin| ADMW
+    LOGIN -->|role Consultant| CONW
+    LOGIN -->|role Client| CLIW
+
+    classDef ws fill:#eef4ff,stroke:#3b5bdb
+    class ADMW,CONW,CLIW ws
