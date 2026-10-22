@@ -34,12 +34,14 @@ export default function ToastProvider({ children }) {
 
   // Follows dialogs as they open and close, so the live region is already inside an open panel
   // before its first toast arrives (a region added together with its message is often not read out).
+  // Removed nodes are watched too: a dialog that unmounts while open is taken out of the page before
+  // its close() runs, so no "open" change is ever seen and the region would stay in the detached node.
   const [host, setHost] = useState(null)
   useEffect(() => {
     const update = () => setHost(toastHost(document))
     update()
     const observer = new MutationObserver(update)
-    observer.observe(document.body, { subtree: true, attributeFilter: ['open'] })
+    observer.observe(document.body, { subtree: true, childList: true, attributeFilter: ['open'] })
     return () => observer.disconnect()
   }, [])
 
