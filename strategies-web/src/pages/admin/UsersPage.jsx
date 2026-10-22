@@ -9,13 +9,16 @@ import { apiPatch } from '../../lib/api'
 import { getInitials } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { usersPath } from '../../lib/listPaths'
+import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import EditUserDialog from './EditUserDialog'
 
 const PAGE_SIZE = 10
 
 // GET /api/admin/users returns { data: [{ id, fullName, email, role, isActive }], totalRecords, totalPages, currentPage }
 // and supports page, pageSize and search (name or email).
+// PATCH /api/admin/users/{id} edits name, email and role (see lib/userEdit.js and EditUserDialog).
 // PATCH /api/admin/users/{id}/suspend and /reinstate change access; both return 409 if already in that state.
 // There is deliberately no Delete: the API returns 405 because user records are retained for POPIA and the audit trail.
 const ACTIONS = {
@@ -46,17 +49,17 @@ export default function UsersPage() {
   const toast = useToast()
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
-  // Status changes made on this page, shown immediately without refetching the list.
-  const [statusOverrides, setStatusOverrides] = useState({})
+  // Changes made on this page (status and edited details), shown immediately without refetching the list.
+  const [overrides, setOverrides] = useState({})
   const [target, setTarget] = useState(null)
   const [action, setAction] = useState({ busy: false, error: '' })
+  const [editing, setEditing] = useState(null)
   const search = useDebouncedValue(searchInput, 400)
 
   const request = useApi(usersPath({ page, pageSize: PAGE_SIZE, search }))
   const response = request.data
-  const users = listItems(response).map((user) =>
-    user.id in statusOverrides ? { ...user, isActive: statusOverrides[user.id] } : user,
-  )
+  const users = listItems(response).map((user) => (user.id in overrides ? { ...user, ...overrides[user.id] } : user))
+  const myId = getSession()?.id
 
   const current = target ? ACTIONS[target.kind] : null
 
@@ -68,6 +71,17 @@ export default function UsersPage() {
   function openAction(user, kind) {
     setAction({ busy: false, error: '' })
     setTarget({ user, kind })
+  }
+
+  function saveOverride(id, changes) {
+    setOverrides((previous) => ({ ...previous, [id]: { ...previous[id], ...changes } }))
+  }
+
+  function handleSaved(updated) {
+    const user = editing
+    saveOverride(user.id, updated)
+    setEditing(null)
+    toast.show(`${displayName({ ...user, ...updated })}: changes saved.`)
   }
 
   function closeDialog() {
@@ -83,7 +97,7 @@ export default function UsersPage() {
 
     try {
       const result = await apiPatch(`/api/admin/users/${encodeURIComponent(user.id)}/${config.endpoint}`)
-      setStatusOverrides((previous) => ({ ...previous, [user.id]: config.isActiveAfter }))
+      saveOverride(user.id, { isActive: config.isActiveAfter })
       toast.show(`${displayName(user)}: ${result?.message ?? config.fallbackMessage}`)
       closeDialog()
     } catch (error) {
@@ -142,6 +156,14 @@ export default function UsersPage() {
 
         return (
           <div className="flex items-center justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => setEditing(user)}
+              aria-label={`Edit ${name}`}
+              className="rounded-md px-2 py-1 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
+            >
+              Edit
+            </button>
             {/* The name travels in router state, not the URL, so it never lands in browser history or access logs. */}
             <Link
               to={{ pathname: '/admin/audit-log', search: `?userId=${encodeURIComponent(user.id)}` }}
@@ -217,6 +239,16 @@ export default function UsersPage() {
         onConfirm={confirmAction}
         onCancel={closeDialog}
       />
+
+      {editing && (
+        <EditUserDialog
+          key={editing.id}
+          user={editing}
+          isSelf={Boolean(myId) && String(editing.id) === String(myId)}
+          onSaved={handleSaved}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   )
 }
