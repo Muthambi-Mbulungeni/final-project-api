@@ -61,7 +61,7 @@ function DocumentsAttention({ caseId, consultantName }) {
       </div>
       <Link
         to="/client/documents"
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
       >
         {replaceActionLabel(toReplace)}
         <ArrowRight className="size-4" strokeWidth={2} aria-hidden="true" />
