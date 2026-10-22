@@ -2,25 +2,34 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import EmptyState from '../../components/ui/EmptyState'
 import ErrorNotice from '../../components/ui/ErrorNotice'
 import { textareaClasses } from '../../components/ui/fieldStyles'
+import StatusBadge from '../../components/ui/StatusBadge'
+import { useToast } from '../../components/ui/toastContext'
 import { resolveEnum } from '../../config/enums'
 import { formatDateTime } from '../../lib/format'
 import {
+  canTakePart,
+  isNewIncoming,
   isOwnMessage,
   loadLatestMessages,
   loadMessagesPage,
+  loadNewerMessages,
+  markThreadRead,
   MESSAGE_MAX_LENGTH,
+  MESSAGES_POLL_MS,
   mergeMessages,
   messageError,
   messageLength,
   sendErrorOutcome,
   sendMessage,
+  threadErrorMessage,
 } from '../../lib/messages'
 import { getSession } from '../../lib/session'
 
 const ARCHIVED_MESSAGE = 'This case is archived, so no new messages can be sent.'
-const LOADING = { status: 'loading', messages: [], page: 1, error: null }
+const READ_ONLY_MESSAGE = 'You can read this thread. Only the client and their consultant send messages here.'
+const LOADING = { status: 'loading', messages: [], page: 1, latestPage: 1, error: null }
 
-function MessageItem({ message, own }) {
+function MessageItem({ message, own, isNew }) {
   const role = resolveEnum('userRole', message.senderRole)?.label
 
   return (
@@ -37,6 +46,7 @@ function MessageItem({ message, own }) {
           </span>
           {role && <span>{role}</span>}
           <time dateTime={message.sentAt}>{formatDateTime(message.sentAt)}</time>
+          {isNew && <StatusBadge label="New" tone="info" />}
         </p>
         <p className="mt-1 text-sm break-words whitespace-pre-wrap text-stone-800">{message.body}</p>
       </article>
@@ -44,12 +54,18 @@ function MessageItem({ message, own }) {
   )
 }
 
-// The message thread for one case and a box to send a new message. Used by staff in the case
-// panel and by the client on their dashboard. Mount it per case (key by case id), so a newly
-// opened case never shows the previous thread. `archived` switches the send box off up front;
-// the API can also refuse a message (400 without field errors), which switches it off the same way.
-export default function CaseMessages({ caseId, archived = false, emptyMessage }) {
-  const userId = getSession()?.id
+// The message thread for one case, oldest first, and a box to send a new message. Used by staff
+// in the case panel and by the client on their dashboard. Mount it per case (key by case id), so a
+// newly opened case never shows the previous thread.
+// The client and the assigned consultant can send; opening the thread marks what others sent as
+// read, and so does each new message that arrives while it is open. Admins only read: no send box,
+// and their visits leave the read state alone. `archived` switches the send box off up front; the
+// API can also refuse a message (400 without field errors), which switches it off the same way.
+export default function CaseMessages({ caseId, archived = false, emptyMessage, pollInterval = MESSAGES_POLL_MS }) {
+  const session = getSession()
+  const userId = session?.id
+  const participant = canTakePart(session?.role)
+  const toast = useToast()
   const [thread, setThread] = useState(LOADING)
   const [attempt, setAttempt] = useState(0)
   const [earlier, setEarlier] = useState({ loading: false, error: null })
@@ -58,9 +74,10 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage })
   const [fieldErrors, setFieldErrors] = useState([])
   const [formError, setFormError] = useState(null)
   const [closedMessage, setClosedMessage] = useState(null)
-  const [announcement, setAnnouncement] = useState('')
   const historyRef = useRef(null)
   const textareaRef = useRef(null)
+  // The thread as last rendered, for the polling timer, which outlives a single render.
+  const threadRef = useRef(thread)
   // Set before earlier messages are added above, so the reader's place in the thread is kept.
   const keepScrollFromBottom = useRef(null)
 
@@ -73,16 +90,62 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage })
   const overLimit = length > MESSAGE_MAX_LENGTH
   const messages = thread.messages
   const lastId = messages.at(-1)?.id
+  const ready = thread.status === 'ready'
+
+  useEffect(() => {
+    threadRef.current = thread
+  }, [thread])
 
   useEffect(() => {
     const controller = new AbortController()
     loadLatestMessages(caseId, { signal: controller.signal })
-      .then(({ messages: loaded, page }) => setThread({ status: 'ready', messages: loaded, page, error: null }))
+      .then(({ messages: loaded, page }) => {
+        setThread({ status: 'ready', messages: loaded, page, latestPage: page, error: null })
+        // A failed mark leaves the messages unread; the next visit tries again.
+        if (participant) markThreadRead(caseId).catch(() => {})
+      })
       .catch((error) => {
         if (error.name !== 'AbortError') setThread({ ...LOADING, status: 'error', error })
       })
     return () => controller.abort()
-  }, [caseId, attempt])
+  }, [caseId, attempt, participant])
+
+  // While the thread is open (and the tab is visible), checks for new messages, adds them at the
+  // bottom and marks the new incoming ones read.
+  useEffect(() => {
+    if (!ready || !pollInterval) return undefined
+    const controller = new AbortController()
+    let checking = false
+
+    async function check() {
+      if (checking || document.visibilityState === 'hidden') return
+      checking = true
+      try {
+        const current = threadRef.current
+        const { messages: newer, page } = await loadNewerMessages(caseId, current.latestPage, { signal: controller.signal })
+        const shown = new Set(current.messages.map((message) => message.id))
+        const arrived = newer.filter((message) => !shown.has(message.id))
+        setThread((latest) => ({
+          ...latest,
+          messages: mergeMessages(latest.messages, newer),
+          latestPage: Math.max(latest.latestPage, page),
+        }))
+        if (participant && arrived.some((message) => isNewIncoming(message, userId))) {
+          markThreadRead(caseId).catch(() => {})
+        }
+      } catch {
+        // A missed check is not worth an error on screen; the next one tries again.
+      } finally {
+        checking = false
+      }
+    }
+
+    const timer = setInterval(check, pollInterval)
+    return () => {
+      clearInterval(timer)
+      controller.abort()
+    }
+  }, [ready, pollInterval, caseId, participant, userId])
 
   // Keeps the newest message in view when the thread loads and after each new one.
   useLayoutEffect(() => {
@@ -117,7 +180,6 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage })
   async function submit() {
     if (sending || closed) return
     setFormError(null)
-    setAnnouncement('')
 
     const error = messageError(draft)
     if (error) {
@@ -132,7 +194,7 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage })
       const created = await sendMessage(caseId, draft)
       setThread((current) => ({ ...current, messages: mergeMessages(current.messages, [created]) }))
       setDraft('')
-      setAnnouncement('Message sent.')
+      toast.show('Message sent.')
     } catch (sendError) {
       const outcome = sendErrorOutcome(sendError)
       if (outcome.kind === 'field') setFieldErrors(outcome.errors)
@@ -160,11 +222,11 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage })
 
   let history
   if (thread.status === 'error') {
-    history = <ErrorNotice message={thread.error.message} onRetry={retry} />
+    history = <ErrorNotice message={threadErrorMessage(thread.error)} onRetry={retry} />
   } else if (thread.status === 'loading') {
     history = <p className="py-6 text-center text-sm text-stone-500">Loading messages…</p>
   } else if (messages.length === 0) {
-    history = <EmptyState title="No messages yet" message={emptyMessage} />
+    history = <EmptyState title="No messages yet" message={participant ? emptyMessage : undefined} />
   } else {
     history = (
       <div
@@ -194,9 +256,23 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage })
         )}
         <ol className="space-y-3">
           {messages.map((message) => (
-            <MessageItem key={message.id} message={message} own={isOwnMessage(message, userId)} />
+            <MessageItem
+              key={message.id}
+              message={message}
+              own={isOwnMessage(message, userId)}
+              isNew={participant && isNewIncoming(message, userId)}
+            />
           ))}
         </ol>
+      </div>
+    )
+  }
+
+  if (!participant) {
+    return (
+      <div className="space-y-4">
+        {history}
+        <p className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">{READ_ONLY_MESSAGE}</p>
       </div>
     )
   }
@@ -267,9 +343,6 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage })
             {sending ? 'Sending…' : 'Send'}
           </button>
         </div>
-        <p role="status" className="sr-only">
-          {announcement}
-        </p>
       </form>
     </div>
   )

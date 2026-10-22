@@ -2,11 +2,14 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deferred, json } from '../../test/dom'
+import ToastProvider from '../../components/ui/ToastProvider'
+import { MESSAGES_READ_EVENT } from '../../lib/messages'
 import { endSession, startSession } from '../../lib/session'
 import CaseMessages from './CaseMessages'
 
 const CASE_ID = 'case-1'
 const ME = 'consultant-1'
+const READ_PATH = `/api/cases/${CASE_ID}/messages/read`
 
 function message(id, overrides = {}) {
   return {
@@ -16,7 +19,7 @@ function message(id, overrides = {}) {
     senderName: 'John Doe',
     senderRole: 'Client',
     body: `Message ${id}`,
-    isRead: false,
+    isRead: true,
     sentAt: '2026-10-20T08:30:00Z',
     ...overrides,
   }
@@ -26,19 +29,47 @@ function page(data, { totalPages = 1, currentPage = 1 } = {}) {
   return { totalRecords: data.length, totalPages, currentPage, data }
 }
 
-// Routes fetch calls by method; `post` decides each send's response.
-function stubApi({ pages = { 1: page([]) }, post = async () => json(message('new'), 201) } = {}) {
+// Routes fetch calls by method. `pages` maps page numbers to responses (or a function that returns
+// the current pages, for a thread that changes); `post` decides each send's response, `read` each
+// PATCH /read response.
+function stubApi({
+  pages = { 1: page([]) },
+  post = async () => json(message('new'), 201),
+  read = async () => json({ message: 'Messages marked as read.', updated: 0 }),
+} = {}) {
   const fetchMock = vi.fn(async (url, options = {}) => {
-    if ((options.method ?? 'GET') === 'POST') return post(JSON.parse(options.body))
+    const method = options.method ?? 'GET'
+    if (method === 'POST') return post(JSON.parse(options.body))
+    if (method === 'PATCH') return read()
     const requested = Number(new URL(url, 'http://test').searchParams.get('page'))
-    return json(pages[requested])
+    const current = typeof pages === 'function' ? pages() : pages
+    return json(current[requested])
   })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
 
-function posts(fetchMock) {
-  return fetchMock.mock.calls.filter(([, options]) => options?.method === 'POST')
+function calls(fetchMock, method) {
+  return fetchMock.mock.calls.filter(([, options]) => (options?.method ?? 'GET') === method)
+}
+
+function signIn(role, userId = ME) {
+  endSession()
+  startSession({ accessToken: 'token', refreshToken: 'refresh', role, userId, displayName: `${role} User` })
+}
+
+function renderThread(props = {}) {
+  return render(
+    <ToastProvider>
+      <CaseMessages caseId={CASE_ID} {...props} />
+    </ToastProvider>,
+  )
+}
+
+function bodies() {
+  return within(screen.getByRole('region', { name: 'Message history' }))
+    .getAllByRole('listitem')
+    .map((item) => item.querySelector('article > p:last-child').textContent)
 }
 
 function box() {
@@ -50,10 +81,7 @@ function type(text) {
 }
 
 describe('CaseMessages', () => {
-  beforeEach(() => {
-    endSession()
-    startSession({ accessToken: 'token', refreshToken: 'refresh', role: 'Consultant', userId: ME, displayName: 'Consultant User' })
-  })
+  beforeEach(() => signIn('Consultant'))
 
   it('lists the thread with sender, role and time, and marks my own messages', async () => {
     stubApi({
@@ -64,7 +92,7 @@ describe('CaseMessages', () => {
         ]),
       },
     })
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
 
     const history = await screen.findByRole('region', { name: 'Message history' })
     const items = within(history).getAllByRole('listitem')
@@ -77,9 +105,25 @@ describe('CaseMessages', () => {
     expect(items[1].querySelector('time').getAttribute('dateTime')).toBe('2026-10-20T08:30:00Z')
   })
 
+  it('shows messages in the order the API sends them, oldest first, never reversed', async () => {
+    stubApi({
+      pages: {
+        1: page([
+          message('a', { body: 'first', sentAt: '2026-10-20T08:00:00Z' }),
+          message('b', { body: 'second', sentAt: '2026-10-20T09:00:00Z' }),
+          message('c', { body: 'third', sentAt: '2026-10-20T10:00:00Z' }),
+        ]),
+      },
+    })
+    renderThread()
+
+    await screen.findByText('third')
+    expect(bodies()).toEqual(['first', 'second', 'third'])
+  })
+
   it('shows the empty state when there are no messages', async () => {
     stubApi()
-    render(<CaseMessages caseId={CASE_ID} emptyMessage="Say hello." />)
+    renderThread({ emptyMessage: 'Say hello.' })
 
     expect(await screen.findByText('No messages yet')).toBeTruthy()
     expect(screen.getByText('Say hello.')).toBeTruthy()
@@ -92,22 +136,111 @@ describe('CaseMessages', () => {
         2: page([message('new')], { totalPages: 2, currentPage: 2 }),
       },
     })
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
 
     expect(await screen.findByText('Message new')).toBeTruthy()
     expect(screen.queryByText('Message old')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Show earlier messages' }))
     expect(await screen.findByText('Message old')).toBeTruthy()
-    const bodies = screen.getAllByRole('listitem').map((item) => item.textContent)
-    expect(bodies[0]).toContain('Message old')
+    expect(bodies()).toEqual(['Message old', 'Message new'])
     expect(screen.queryByRole('button', { name: 'Show earlier messages' })).toBeNull()
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(calls(fetchMock, 'GET')).toHaveLength(3)
+  })
+
+  describe('read state', () => {
+    it('marks the thread read once when it opens, with no body, and tells the header', async () => {
+      const heard = vi.fn()
+      window.addEventListener(MESSAGES_READ_EVENT, heard)
+      const fetchMock = stubApi({
+        pages: { 1: page([message(1, { isRead: false })]) },
+        read: async () => json({ message: 'Messages marked as read.', updated: 1 }),
+      })
+      renderThread()
+
+      await waitFor(() => expect(calls(fetchMock, 'PATCH')).toHaveLength(1))
+      const [url, options] = calls(fetchMock, 'PATCH')[0]
+      expect(url).toBe(READ_PATH)
+      expect(options.body).toBeUndefined()
+      await waitFor(() => expect(heard).toHaveBeenCalledTimes(1))
+      window.removeEventListener(MESSAGES_READ_EVENT, heard)
+    })
+
+    it('tags messages that were unread when the thread opened as new, and only those', async () => {
+      stubApi({
+        pages: {
+          1: page([
+            message('seen', { body: 'Already read' }),
+            message('fresh', { body: 'Just arrived', isRead: false }),
+            message('mine', { senderId: ME, senderName: 'Consultant User', body: 'My reply', isRead: false }),
+          ]),
+        },
+      })
+      renderThread()
+
+      const items = within(await screen.findByRole('region', { name: 'Message history' })).getAllByRole('listitem')
+      expect(items.map((item) => item.textContent.includes('New'))).toEqual([false, true, false])
+    })
+
+    it('keeps the thread usable when marking read fails', async () => {
+      stubApi({
+        pages: { 1: page([message(1, { isRead: false })]) },
+        read: async () => json({ message: 'Server error.' }, 500),
+      })
+      renderThread()
+
+      expect(await screen.findByText('Message 1')).toBeTruthy()
+      await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+      expect(box().disabled).toBe(false)
+    })
+
+    it('adds new messages that arrive while open at the bottom and marks them read again', async () => {
+      let thread = [message(1, { body: 'Earlier', sentAt: '2026-10-20T08:00:00Z' })]
+      const fetchMock = stubApi({ pages: () => ({ 1: page(thread) }) })
+      renderThread({ pollInterval: 20 })
+
+      await screen.findByText('Earlier')
+      await waitFor(() => expect(calls(fetchMock, 'PATCH')).toHaveLength(1))
+
+      thread = [...thread, message(2, { body: 'Reply from the client', isRead: false, sentAt: '2026-10-20T09:00:00Z' })]
+      expect(await screen.findByText('Reply from the client')).toBeTruthy()
+      expect(bodies()).toEqual(['Earlier', 'Reply from the client'])
+      await waitFor(() => expect(calls(fetchMock, 'PATCH')).toHaveLength(2))
+    })
+
+    it('does not mark read again when only my own messages come back from a check', async () => {
+      const thread = [message(1)]
+      const fetchMock = stubApi({ pages: () => ({ 1: page(thread) }) })
+      renderThread({ pollInterval: 20 })
+
+      await screen.findByText('Message 1')
+      thread.push(message(2, { senderId: ME, senderName: 'Consultant User', body: 'Sent elsewhere', isRead: false }))
+      expect(await screen.findByText('Sent elsewhere')).toBeTruthy()
+      await new Promise((resolve) => setTimeout(resolve, 60))
+      expect(calls(fetchMock, 'PATCH')).toHaveLength(1)
+    })
+  })
+
+  describe('as an admin', () => {
+    beforeEach(() => signIn('Admin', 'admin-1'))
+
+    it('shows the thread read-only: no send box, no read call, no new tags', async () => {
+      const fetchMock = stubApi({ pages: { 1: page([message(1, { isRead: false })]) } })
+      renderThread({ emptyMessage: 'Say hello.' })
+
+      expect(await screen.findByText('Message 1')).toBeTruthy()
+      expect(screen.getByText(/You can read this thread\. Only the client and their consultant send messages here\./)).toBeTruthy()
+      expect(screen.queryByLabelText('Your message')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
+      expect(screen.queryByText('New')).toBeNull()
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(calls(fetchMock, 'PATCH')).toHaveLength(0)
+    })
   })
 
   it('does not send an empty or whitespace-only message', async () => {
     const fetchMock = stubApi()
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
     await screen.findByText('No messages yet')
 
     type('   \n ')
@@ -115,12 +248,12 @@ describe('CaseMessages', () => {
 
     expect(screen.getByText('Write a message before sending.')).toBeTruthy()
     expect(box().getAttribute('aria-invalid')).toBe('true')
-    expect(posts(fetchMock)).toHaveLength(0)
+    expect(calls(fetchMock, 'POST')).toHaveLength(0)
   })
 
   it('counts code points and blocks a message over 2000 of them', async () => {
     const fetchMock = stubApi()
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
     await screen.findByText('No messages yet')
 
     type('😀'.repeat(2001))
@@ -128,43 +261,44 @@ describe('CaseMessages', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     expect(screen.getByText(/^Messages can be up to 2\s000 characters\./)).toBeTruthy()
-    expect(posts(fetchMock)).toHaveLength(0)
+    expect(calls(fetchMock, 'POST')).toHaveLength(0)
   })
 
-  it('sends the trimmed text, appends the new message, clears the box and focuses it', async () => {
+  it('sends the trimmed text, appends the new message at the bottom, confirms with a toast and focuses the box', async () => {
     const fetchMock = stubApi({
-      pages: { 1: page([message(1)]) },
-      post: async (body) => json(message(2, { senderId: ME, senderName: 'Consultant User', body: body.body }), 201),
+      pages: { 1: page([message(1, { sentAt: '2026-10-20T08:00:00Z' })]) },
+      post: async (body) =>
+        json(message(2, { senderId: ME, senderName: 'Consultant User', body: body.body, sentAt: '2026-10-21T08:00:00Z' }), 201),
     })
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
     await screen.findByText('Message 1')
 
     type('  Your visa was approved.  ')
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     expect(await screen.findByText('Your visa was approved.')).toBeTruthy()
-    expect(JSON.parse(posts(fetchMock)[0][1].body)).toEqual({ body: 'Your visa was approved.' })
-    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    expect(JSON.parse(calls(fetchMock, 'POST')[0][1].body)).toEqual({ body: 'Your visa was approved.' })
+    expect(bodies()).toEqual(['Message 1', 'Your visa was approved.'])
     expect(box().value).toBe('')
-    expect(screen.getByRole('status').textContent).toBe('Message sent.')
+    expect(within(screen.getByRole('status')).getByText('Message sent.')).toBeTruthy()
     await waitFor(() => expect(document.activeElement).toBe(box()))
   })
 
   it('sends with Ctrl+Enter', async () => {
     const fetchMock = stubApi()
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
     await screen.findByText('No messages yet')
 
     type('Quick question')
     fireEvent.keyDown(box(), { key: 'Enter', ctrlKey: true })
 
-    await waitFor(() => expect(posts(fetchMock)).toHaveLength(1))
+    await waitFor(() => expect(calls(fetchMock, 'POST')).toHaveLength(1))
   })
 
   it('disables Send while the message is on its way', async () => {
     const pending = deferred()
     const fetchMock = stubApi({ post: () => pending.promise })
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
     await screen.findByText('No messages yet')
 
     type('Hello')
@@ -174,7 +308,7 @@ describe('CaseMessages', () => {
     expect(button.disabled).toBe(true)
     // A second Ctrl+Enter while sending must not send twice.
     fireEvent.keyDown(box(), { key: 'Enter', ctrlKey: true })
-    expect(posts(fetchMock)).toHaveLength(1)
+    expect(calls(fetchMock, 'POST')).toHaveLength(1)
 
     pending.resolve(json(message('sent', { body: 'Hello' }), 201))
     expect(await screen.findByRole('button', { name: 'Send' })).toBeTruthy()
@@ -182,36 +316,61 @@ describe('CaseMessages', () => {
 
   it('shows the API field errors under the box', async () => {
     stubApi({
-      post: async () => json({ message: 'Validation failed.', errors: ['Body must be 2000 characters or fewer.'] }, 400),
+      post: async () => json({ message: 'Validation failed.', errors: ['Message body must be 2000 characters or fewer.'] }, 400),
     })
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
     await screen.findByText('No messages yet')
 
     type('Hello')
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    const error = await screen.findByText('Body must be 2000 characters or fewer.')
+    const error = await screen.findByText('Message body must be 2000 characters or fewer.')
     expect(box().getAttribute('aria-describedby')).toContain(error.parentElement.id)
     expect(box().value).toBe('Hello')
     expect(box().disabled).toBe(false)
   })
 
-  it('switches the box off when the API refuses the message without field errors', async () => {
-    stubApi({ post: async () => json({ message: 'This case is archived.' }, 400) })
-    render(<CaseMessages caseId={CASE_ID} />)
+  it('shows the API reason and switches the box off when an archived case refuses the message', async () => {
+    stubApi({ post: async () => json({ message: 'Messages cannot be sent on an archived case.' }, 400) })
+    renderThread()
     await screen.findByText('No messages yet')
 
     type('Hello')
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect((await screen.findByRole('alert')).textContent).toBe('This case is archived.')
+    expect((await screen.findByRole('alert')).textContent).toBe('Messages cannot be sent on an archived case.')
     expect(box().disabled).toBe(true)
     expect(screen.getByRole('button', { name: 'Send' }).disabled).toBe(true)
   })
 
+  it('switches the box off with a plain reason when the API forbids the send', async () => {
+    stubApi({ post: async () => json(null, 403) })
+    renderThread()
+    await screen.findByText('No messages yet')
+
+    type('Hello')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('You no longer have access to messages on this case.')
+    expect(box().disabled).toBe(true)
+  })
+
+  it('keeps the box and the text when the send fails for another reason', async () => {
+    stubApi({ post: async () => json({ message: 'Case not found.' }, 404) })
+    renderThread()
+    await screen.findByText('No messages yet')
+
+    type('Hello')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect((await screen.findByRole('alert')).textContent).toBe('Case not found.')
+    expect(box().value).toBe('Hello')
+    expect(box().disabled).toBe(false)
+  })
+
   it('starts switched off for an archived case', async () => {
     stubApi()
-    render(<CaseMessages caseId={CASE_ID} archived />)
+    renderThread({ archived: true })
     await screen.findByText('No messages yet')
 
     expect(screen.getByText('This case is archived, so no new messages can be sent.')).toBeTruthy()
@@ -222,13 +381,23 @@ describe('CaseMessages', () => {
     let fail = true
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => (fail ? json({ message: 'Case not found.' }, 404) : json(page([message(1)])))),
+      vi.fn(async (_url, options = {}) => {
+        if (options.method === 'PATCH') return json({ updated: 0 })
+        return fail ? json({ message: 'Case not found.' }, 404) : json(page([message(1)]))
+      }),
     )
-    render(<CaseMessages caseId={CASE_ID} />)
+    renderThread()
 
     expect((await screen.findByRole('alert')).textContent).toContain('Case not found.')
     fail = false
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('Message 1')).toBeTruthy()
+  })
+
+  it('words a 403 on loading plainly', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json(null, 403)))
+    renderThread()
+
+    expect((await screen.findByRole('alert')).textContent).toContain('You no longer have access to messages on this case.')
   })
 })
