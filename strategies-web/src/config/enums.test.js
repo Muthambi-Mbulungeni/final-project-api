@@ -40,4 +40,9 @@ describe('immigrationStatus labels', () => {
     expect(resolveEnum('immigrationStatus', 'Foreigner')).toMatchObject({ value: 'Foreigner', label: 'Foreign national' })
     expect(resolveEnum('immigrationStatus', 3)?.label).toBe('Foreign national')
   })
+
+  it('names the Citizen value "South African citizen", the same words as the enquiry form', () => {
+    expect(resolveEnum('immigrationStatus', 'Citizen')).toMatchObject({ value: 'Citizen', label: 'South African citizen' })
+    expect(resolveEnum('immigrationStatus', 0)?.label).toBe('South African citizen')
+  })
 })
