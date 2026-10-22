@@ -162,7 +162,7 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage })
   if (thread.status === 'error') {
     history = <ErrorNotice message={thread.error.message} onRetry={retry} />
   } else if (thread.status === 'loading') {
-    history = <p className="text-sm text-stone-500">Loading messages…</p>
+    history = <p className="py-6 text-center text-sm text-stone-500">Loading messages…</p>
   } else if (messages.length === 0) {
     history = <EmptyState title="No messages yet" message={emptyMessage} />
   } else {
