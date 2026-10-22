@@ -47,9 +47,10 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 **High. No per-account lockout after failed sign-ins.**
 
-- **Problem:** the only protection against password guessing is the per-address rate limit (A2), which does not stop guesses spread across many addresses. Since PR #25 the API takes the address from the `X-Forwarded-For` header and trusts that header from any sender. Behind a hosting proxy that adds the real address, this is correct. If the API can be reached directly, a caller can put a different address in each request and is never limited (A19).
-- **Evidence:** no lockout fields or logic in the `User` model or `AuthService`; `ForwardedHeadersOptions` in `Program.cs` clears `KnownProxies` and `KnownIPNetworks`.
-- **Fix:** count failed sign-ins per user, lock the account for a set time after, for example, 5 failures, and reset the count after a successful sign-in. Make sure the hosted API is only reachable through its proxy, or list the host's proxy addresses in `ForwardedHeadersOptions`.
+- **Problem:** the only protection against password guessing is the per-address rate limit (A2), which does not stop guesses spread across many addresses.
+- **Evidence:** no lockout fields or logic in the `User` model or `AuthService`.
+- **Fix:** count failed sign-ins per user, lock the account for a set time after, for example, 5 failures, and reset the count after a successful sign-in.
+- **Fixed part (spoofed addresses, A19):** after PR #25 the API trusted `X-Forwarded-For` from any sender, so a caller could send a new address with every request and never be limited. The header is now read only when `ForwardedHeaders:Enabled` is true (Production), and then only its last entry, the one Azure's front end appends (`ForwardLimit = 1`). See "Rate limiting and proxies" in the root README; covered by `LeadsRateLimitTests`.
 
 ### ISS-08
 
