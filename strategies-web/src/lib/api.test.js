@@ -330,4 +330,20 @@ describe('unreachable message in production builds', () => {
     expect(error.message).toBe('We cannot reach the service right now. Please try again shortly.')
     expect(error.message).not.toMatch(/API/)
   })
+  it('reads Retry-After as whole seconds, and null when it is missing or not a number', async () => {
+    const locked = () =>
+      new Response(JSON.stringify({ message: 'Locked.', code: 'account_locked' }), { status: 429, headers: { 'Retry-After': '540' } })
+    vi.stubGlobal('fetch', vi.fn(async () => locked()))
+    await expect(apiGet('/api/auth/login')).rejects.toMatchObject({ status: 429, code: 'account_locked', retryAfter: 540 })
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: 'No.' }), { status: 429 })))
+    await expect(apiGet('/api/auth/login')).rejects.toMatchObject({ status: 429, retryAfter: null })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 429, headers: { 'Retry-After': 'Wed, 21 Oct 2026 07:28:00 GMT' } })),
+    )
+    await expect(apiGet('/api/auth/login')).rejects.toMatchObject({ status: 429, retryAfter: null })
+  })
+
 })

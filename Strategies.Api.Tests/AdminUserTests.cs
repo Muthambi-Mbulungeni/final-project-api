@@ -685,7 +685,9 @@ namespace Strategies.Api.Tests
                 })
                 .Build();
             return new AuthService(ctx, new PasswordHasherService(), new TokenService(config),
-                new InMemoryRefreshTokenStore(), NullLogger<AuthService>.Instance);
+                new InMemoryRefreshTokenStore(), NullLogger<AuthService>.Instance,
+                new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+                Microsoft.Extensions.Options.Options.Create(new Strategies.Api.Configuration.LockoutSettings()), TimeProvider.System);
         }
 
         [Fact]

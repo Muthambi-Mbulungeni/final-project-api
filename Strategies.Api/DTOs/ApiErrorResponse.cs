@@ -16,6 +16,7 @@ namespace Strategies.Api.DTOs
 
         public const string DuplicateEmailCode = "duplicate_email";
         public const string ConsentRequiredCode = "consent_required";
+        public const string AccountLockedCode = "account_locked";
 
         public const string InvalidBodyMessage = "The request body is missing or is not valid JSON.";
 

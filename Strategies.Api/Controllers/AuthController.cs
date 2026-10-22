@@ -3,6 +3,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -50,6 +51,7 @@ namespace Strategies.Api.Controllers
         /// <summary>
         /// POST /api/auth/login
         /// Rate-limited to 5 requests/min per IP.
+        /// Also locks an account after repeated failed sign-ins: 429 with code "account_locked" and Retry-After.
         /// Returns an AuthResponse with access token, refresh token, role, and display name.
         /// </summary>
         [HttpPost("login")]
@@ -66,12 +68,22 @@ namespace Strategies.Api.Controllers
                 return BadRequest(new ApiErrorResponse { Message = "Validation failed.", Errors = errors });
             }
 
-            var result = await _authService.LoginAsync(request);
+            var outcome = await _authService.TryLoginAsync(request);
 
-            if (result == null)
+            if (outcome.LockedFor is { } wait)
+            {
+                Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                return StatusCode(StatusCodes.Status429TooManyRequests, new ApiErrorResponse
+                {
+                    Message = "Too many failed sign-in attempts. Try again later, or reset your password.",
+                    Code = ApiErrorResponse.AccountLockedCode
+                });
+            }
+
+            if (outcome.Response == null)
                 return Unauthorized(new ApiErrorResponse { Message = "Invalid email or password." });
 
-            return Ok(result);
+            return Ok(outcome.Response);
         }
 
         /// <summary>

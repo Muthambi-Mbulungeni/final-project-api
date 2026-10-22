@@ -13,7 +13,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | ID | Severity | Issue | Owner |
 |---|---|---|---|
 | [ISS-02](#iss-02) | High | Development secrets committed in `appsettings.json` | Kaan, Mbulungeni |
-| [ISS-05](#iss-05) | High | No per-account lockout after failed sign-ins | Kaan |
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
 | [ISS-10](#iss-10) | Medium | Several API controllers have no automated tests | Marco, Mbulungeni |
@@ -33,15 +32,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Impact:** low while they stay development-only. The values remain in the repository and its history, so anyone with access could sign tokens for a host that uses the same key.
 - **Fix (remaining):** never reuse these values on a host; set each host's own as application settings. If any hosted environment ever used them, rotate the JWT key and the database password there.
 
-### ISS-05
-
-**High. No per-account lockout after failed sign-ins.**
-
-- **Owner:** Kaan. Still open.
-- **Problem:** the only protection against password guessing is the per-address rate limit (A2), which does not stop guesses spread across many addresses.
-- **Evidence:** no lockout fields or logic in the `User` model or `AuthService`.
-- **Fix:** count failed sign-ins per user, lock the account for a set time after, for example, 5 failures, and reset the count after a successful sign-in.
-- **Fixed part (spoofed addresses, A19):** after PR #25 the API trusted `X-Forwarded-For` from any sender, so a caller could send a new address with every request and never be limited. The header is now read only when `ForwardedHeaders:Enabled` is true (Production), and then only its last entry, the one Azure's front end appends (`ForwardLimit = 1`). See "Rate limiting and proxies" in the root README; covered by `LeadsRateLimitTests`.
 
 ### ISS-08
 
@@ -152,7 +142,7 @@ Issues found by testing or review and fixed before submission.
 | Admin delete returned 405 | Now a soft delete: the user is marked inactive and kept for the audit trail |
 | Password reset accepted any non-blank token, so a password could be changed without access to the email (was ISS-01, Critical) | The reset link now carries a signed token that expires after 30 minutes and names its purpose and email; a made-up token is refused (A15). The user's refresh tokens are revoked after a reset (PR #25) |
 | Password reset refused every genuine link, a link could have been reused for 30 minutes, and new passwords had no policy (was ISS-01, High) | `PasswordResetTokenService` reads the claims from the validated token, uses its own `password-reset` audience and a password-hash stamp so each link works once; register and reset apply a NIST-style password policy (12 to 64 characters, common and context-word checks) |
-| Behind a hosting proxy, all users would share one sign-in rate limit (was ISS-03) | The API reads the forwarded client address before the rate limiter (PR #25). See the note in [ISS-05](#iss-05) |
+| Behind a hosting proxy, all users would share one sign-in rate limit (was ISS-03) | The API reads the forwarded client address before the rate limiter (PR #25). See the note under ISS-05 below |
 | Lead review with an empty body `{}` returned 200 and reset the lead to Pending (was ISS-06) | Verdict is required: 400 and the lead is unchanged (PR #25, A12) |
 | Stage change with an empty body would have moved a case back to the first stage, and accepted notes that were never saved | Stage is required: 400 (A17); the unsaved notes field was removed (PR #25). Rest open as [ISS-07](#iss-07) |
 | Uploaded test files could be committed | `Strategies.Api/wwwroot/uploads` added to `.gitignore` (PR #18) |
@@ -161,6 +151,7 @@ Issues found by testing or review and fixed before submission.
 | Sign-in fell back to four built-in accounts, with passwords in the source, when the database was unreachable or the user was not found | Fallback removed: users are read from the database only, and a database outage fails the request without signing anyone in. The demo accounts are unchanged because they come from `database/seed` |
 | Known limitation (not fixed): a client who knew another upload's stored file name could register it on their own case and download that file | Impractical, since names are random GUIDs (122 random bits) that only the uploader and staff ever see. A full fix would record the uploader with each stored file and check it in `POST /api/documents` |
 | POPIA consent was checked in the browser only: the request carried no consent and the API stored none (was ISS-04, High) | `POST /api/leads` now requires `consent: true`. Without it (missing or false) the API answers 400 with the field error "You need to agree before we can assess your enquiry." and `code: "consent_required"`, before anything is sent to the model or saved. The time of consent is stored on the lead (`ConsentAt`, migration `AddLeadConsentAt`; older leads have none). The enquiry form sends `consent` and shows a returned consent error under the checkbox. Tests: `LeadConsentTests.ConsentLeftOut_Returns400ConsentRequired_AndStoresNothing`, `ConsentFalse_Returns400ConsentRequired_AndStoresNothing`, `ConsentTrue_CreatesTheLead_AndStoresWhenConsentWasGiven`, `LeadsRateLimitTests.RequestsWithoutConsent_StillCountTowardsTheLimit` (the rate limit still applies), web `enquiryServerFieldErrors` |
+| Password guessing was limited per address only, and the limit could be avoided by sending a made-up `X-Forwarded-For` header (was ISS-05, High; A19) | Two parts. (1) The API reads `X-Forwarded-For` only when `ForwardedHeaders:Enabled` is true (Production), and then only its last entry, the one Azure's front end appends (`ForwardLimit = 1`); see "Rate limiting and proxies" in the root README and `LeadsRateLimitTests`. (2) Per-account lockout (NFR-1.4): 5 failed sign-ins within 15 minutes lock the account for 15 minutes (`Auth:Lockout:MaxAttempts`, `WindowMinutes`, `DurationMinutes`). While locked, even the correct password is refused with 429, code `account_locked` and a `Retry-After` header. The count lives on the user (`FailedLoginCount`, `FailedLoginWindowStart`, `LockoutEndsAt`, migration `AddUserLockout`); an email that does not exist is counted in memory and answered the same way, after a dummy password check, so lockout does not show which accounts exist. A successful sign-in, a completed password reset or an admin unlock (`PATCH /api/admin/users/{id}/reinstate`) clears it. Audit rows "Account locked" and "Account unlocked" (with the admin's id when an admin unlocked it). Tests: `LoginLockoutTests` (22), `LeadsRateLimitTests.SignInRateLimit_StillLimitsEachIp_NextToTheAccountLockout`, web `signInErrorMessage` |
 | Seed data reused the same id pattern across tables | Distinct seed ids (PR #19) |
 | First-time visitors triggered a failed token refresh and a console error | The web portal only refreshes when a session exists (PR #19) |
 | Admin overview panels were read in a different order from how they look (WCAG 1.3.2, 2.4.3) | Source order now matches the visual order (PR #23) |
