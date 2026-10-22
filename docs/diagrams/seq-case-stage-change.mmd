@@ -1,0 +1,42 @@
+---
+title: Sequence diagram - staff change a case stage
+---
+sequenceDiagram
+    autonumber
+    actor S as Admin or consultant
+    participant W as Web portal<br/>CasesPage.jsx, CaseStageSection.jsx
+    participant MW as API pipeline<br/>JWT bearer + role check
+    participant CC as CasesController
+    participant DB as PostgreSQL<br/>Case, CaseStageHistory, AuditLog
+
+    S->>W: opens a case, chooses a stage in the list
+    Note over W: every stage is offered except the current one
+    alt no stage chosen
+        W-->>S: "Choose a stage", nothing sent
+    else stage chosen
+        W->>MW: PATCH /api/cases/{id}/stage {stage}
+        alt token missing or expired
+            MW-->>W: 401, refresh once and retry
+        else role is Client
+            MW-->>W: 403
+        else Admin or Consultant
+            MW->>CC: UpdateStage(id, request)
+            alt stage missing or not a CaseStage name
+                CC-->>W: 400
+            else
+                CC->>DB: Cases.FindAsync(id)
+                alt case not found
+                    CC-->>W: 404 "Case not found."
+                else consultant is not the assigned consultant
+                    CC-->>W: 403
+                else allowed
+                    CC->>DB: UPDATE Case.Stage, UpdatedAt
+                    CC->>DB: INSERT CaseStageHistory (FromStage, ToStage, ChangedById)
+                    CC->>DB: INSERT AuditLog ("UpdateCaseStage", Case)
+                    CC-->>W: 200 "Stage updated."
+                    W-->>S: toast, list and panel reload
+                end
+            end
+        end
+    end
+    Note over CC,DB: Not checked: stage order (any jump forward or back is accepted),<br/>archived cases, or a change to the same stage

@@ -1,0 +1,38 @@
+---
+title: State diagram - document (Document.Status, Document.IsArchived)
+---
+stateDiagram-v2
+    direction TB
+
+    state "Pending<br>(awaiting review)" as Pending
+    state "Approved" as Approved
+    state "Rejected<br>(ReviewComment required)" as Rejected
+    state "Archived<br>IsArchived = true (soft delete)" as Archived
+
+    [*] --> Pending : POST /api/documents/upload, then POST /api/documents
+    Pending --> Approved : PATCH /api/documents/{id}/status Approved
+    Pending --> Rejected : PATCH status Rejected + comment
+    Approved --> Rejected : PATCH status Rejected + comment
+    Rejected --> Approved : PATCH status Approved
+    Approved --> Pending : PATCH status Pending
+    Rejected --> Pending : PATCH status Pending
+    Pending --> Archived : DELETE /api/documents/{id}
+    Approved --> Archived : DELETE /api/documents/{id}
+    Rejected --> Archived : DELETE /api/documents/{id}
+    Archived --> [*]
+
+    note right of Rejected
+        The client fixes a rejection by uploading a NEW copy
+        (a new Document row in Pending, same case and type).
+        The old row stays Rejected; the web hides it once a
+        newer copy of the same type exists.
+    end note
+
+    note left of Pending
+        Status changes: Admin, or the case's assigned
+        consultant. Any status to any status is accepted;
+        every change writes an AuditLog row.
+        Archive: Admin or assigned consultant; again = 409.
+        Archived is not a hard end: the status PATCH does
+        not check IsArchived, and GET still returns the row.
+    end note

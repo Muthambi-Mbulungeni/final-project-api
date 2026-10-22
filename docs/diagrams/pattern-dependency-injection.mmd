@@ -1,0 +1,23 @@
+---
+title: Pattern - dependency injection (object diagram for one POST /api/auth/login request, Program.cs)
+---
+flowchart LR
+    CTRL["<u>authController : AuthController</u><br>«created per request (not a DI registration)»"]
+    AS["<u>authService : AuthService</u><br>as IAuthService<br>«scoped»"]
+    ES["<u>emailService : SmtpEmailService</u><br>as IEmailService<br>«scoped»"]
+    DB["<u>dbContext : ApplicationDbContext</u><br>Npgsql, DefaultConnection<br>«scoped»"]
+    PH["<u>passwordHasher : PasswordHasherService</u><br>as IPasswordHasherService<br>«singleton»"]
+    TS["<u>tokenService : TokenService</u><br>as ITokenService<br>issuer = StrategiesApi<br>accessMinutes = 60, refreshDays = 7<br>«singleton»"]
+    RT["<u>refreshStore : InMemoryRefreshTokenStore</u><br>as IRefreshTokenStore<br>«singleton»"]
+    CFG["<u>configuration : IConfiguration</u><br>appsettings.json + user-secrets / env vars<br>«singleton»"]
+
+    CTRL -->|_authService| AS
+    CTRL -->|_emailService| ES
+    CTRL -->|_configuration| CFG
+    AS -->|_dbContext| DB
+    AS -->|_passwordHasher| PH
+    AS -->|_tokenService| TS
+    AS -->|_refreshTokenStore| RT
+    ES -->|_configuration| CFG
+    TS -->|reads Jwt:*| CFG
+

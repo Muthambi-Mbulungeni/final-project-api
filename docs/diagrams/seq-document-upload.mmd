@@ -1,0 +1,51 @@
+---
+title: Sequence diagram - client uploads a new copy of a rejected document
+---
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant W as Web portal<br/>ClientDocumentsPage.jsx, lib/documents.js
+    participant MW as API pipeline<br/>JWT bearer + role check
+    participant DC as DocumentsController
+    participant FS as API file system<br/>wwwroot/uploads
+    participant DB as PostgreSQL<br/>Case, DocumentType, Document
+
+    C->>W: picks a file for a rejected document
+    W->>W: uploadFileError: PDF, JPG or PNG, not empty, 5 MB or less
+    alt fails the browser check
+        W-->>C: error under the file picker, nothing sent
+    else passes
+        W->>MW: POST /api/documents/upload (multipart, Bearer token)
+        alt token missing or expired
+            MW-->>W: 401, web refreshes once and retries (see seq-login)
+        else role not Admin, Consultant or Client
+            MW-->>W: 403
+        else authorised
+            MW->>DC: UploadDocument(IFormFile)
+            alt no file or empty
+                DC-->>W: 400 "No file uploaded."
+            else over 5 MB
+                DC-->>W: 400 "File size exceeds the 5MB limit."
+            else extension not .pdf .jpg .jpeg .png
+                DC-->>W: 400 "Invalid file type. Only PDF, JPG, and PNG are allowed."
+            else valid
+                DC->>FS: save as {new Guid}.{ext}
+                DC-->>W: 200 {fileName, filePath: /uploads/{guid}.{ext}}
+                W->>MW: POST /api/documents {caseId, documentTypeId, fileName, filePath}
+                MW->>DC: CreateDocument(dto)
+                alt model invalid
+                    DC-->>W: 400 ApiErrorResponse {errors[]}
+                else client does not own the case (or consultant not assigned)
+                    DC->>DB: Case where Id = caseId and ClientId = user
+                    DC-->>W: 403
+                else case or document type not found
+                    DC-->>W: 404
+                else ok
+                    DC->>DB: INSERT Document (Status = Pending)
+                    DC-->>W: 201 Created
+                    W-->>C: toast, rejected copy hidden, new copy shows "Awaiting review"
+                end
+            end
+        end
+    end
+    Note over W,DC: If the second call fails, the saved file stays in wwwroot/uploads with no Document row.<br/>No audit row is written for an upload.

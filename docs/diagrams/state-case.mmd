@@ -1,0 +1,37 @@
+---
+title: State diagram - case stage (Case.Stage, Case.IsArchived)
+---
+stateDiagram-v2
+    direction TB
+
+    [*] --> InitialIntake : POST /api/cases (Admin or Consultant)<br>active client + active visa category
+
+    state "Not archived (IsArchived = false)" as Live {
+        InitialIntake --> DocumentGathering : advance
+        DocumentGathering --> UnderReview : advance
+        UnderReview --> SubmittedToAuthority : advance
+        SubmittedToAuthority --> FinalDecision : advance
+        FinalDecision --> FinalDecision : advance (no change)
+    }
+
+    Live --> Archived : not implemented, no endpoint sets IsArchived
+    state "Archived (IsArchived = true)" as Archived
+
+    note right of Live
+        Stage order enforcement (lifecycle FR-4.4) exists only in
+        CaseManagementService.AdvanceCaseStageAsync,
+        which no controller calls.
+        The live endpoint PATCH /api/cases/{id}/stage
+        accepts ANY stage from ANY stage, forward or back,
+        including the same stage and archived cases.
+        Each change writes CaseStageHistory + AuditLog.
+    end note
+
+    note left of Archived
+        Column and default exist (false).
+        Stats counts skip archived cases.
+        Nothing in the API or web ever sets it.
+    end note
+
+    classDef missing stroke-dasharray: 6 4,fill:#f5f5f5,color:#555
+    class Archived missing

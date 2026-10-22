@@ -1,0 +1,37 @@
+---
+title: Pattern - MVVM with observable state (Android app, object diagram)
+---
+flowchart LR
+    subgraph VIEW["View (Jetpack Compose)"]
+        direction TB
+        MA["<u>main : MainActivity</u><br>renders by AuthState"]
+        LS["<u>login : LoginScreen</u>"]
+        HS["<u>home : HomeScreen</u><br>tabs: My case, Documents, Messages"]
+    end
+
+    subgraph VM["ViewModel"]
+        direction TB
+        AVM["<u>authVm : AuthViewModel</u><br>state : StateFlow&lt;AuthState&gt;<br>busy, error : StateFlow"]
+        HVM["<u>homeVm : HomeViewModel</u><br>ui : StateFlow&lt;HomeUi&gt;"]
+        ST["<u>state : AuthState.SignedIn</u><br>userId, name"]
+    end
+
+    subgraph MODEL["Model / data"]
+        direction TB
+        APP["<u>app : NexusApp</u><br>companion: api, tokens (one each)"]
+        API["<u>api : ApiClient</u><br>OkHttp + Authenticator (refresh on 401)<br>baseUrl = BuildConfig.API_BASE_URL"]
+        TK["<u>tokens : TokenStore</u><br>EncryptedSharedPreferences"]
+    end
+
+    MA -->|collects| AVM
+    AVM --> ST
+    MA --> LS
+    MA --> HS
+    LS -->|onLogin| AVM
+    HS -->|collects, refresh, markRead| HVM
+    HS -->|onSignOut| AVM
+    AVM --> API
+    HVM --> API
+    APP -->|creates| API
+    APP -->|creates| TK
+    API --> TK

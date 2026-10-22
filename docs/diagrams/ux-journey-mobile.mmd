@@ -1,0 +1,35 @@
+---
+title: UX journey - Android app screens (strategies-mobile, client role only)
+---
+flowchart TB
+    START(["App launch"])
+    RESTORE["Restoring<br>spinner while the stored refresh token is tried"]
+
+    subgraph PUBM["Signed out"]
+        LOGINM["LoginScreen<br>email + password<br>staff told to use the web portal"]
+    end
+
+    subgraph CLIM["Client, signed in: HomeScreen with bottom navigation"]
+        direction TB
+        TOP["Top bar<br>bell with unread count + avatar menu"]
+        T0["My case tab (ProgressTab)<br>5-stage progress, Action needed card"]
+        T1["Documents tab (DocumentsTab)<br>status, rejection note, approved count<br>no upload: 'use the web portal'"]
+        T2["Messages tab (NotificationsTab)<br>notifications, tap marks read"]
+    end
+
+    START --> RESTORE
+    RESTORE -->|token valid, role Client| T0
+    RESTORE -->|no token or refresh failed| LOGINM
+    LOGINM -->|200 and role Client| T0
+    LOGINM -->|Admin or Consultant: token revoked, notice shown| LOGINM
+    LOGINM -->|401 or 429| LOGINM
+    T0 <-->|bottom nav| T1
+    T1 <-->|bottom nav| T2
+    T0 <-->|bottom nav| T2
+    T0 -->|See what's needed| T1
+    TOP -->|bell| T2
+    TOP -->|menu: Sign out, refresh token revoked| LOGINM
+    CLIM -->|session expired| LOGINM
+
+    classDef state fill:#f5f5f5,stroke:#888
+    class START,RESTORE state

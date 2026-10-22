@@ -1,0 +1,32 @@
+---
+title: Pattern - data transfer objects (object diagram for GET /api/cases and POST /api/auth/login)
+---
+flowchart LR
+    subgraph IN["Request DTOs (validated with data annotations)"]
+        direction TB
+        LR1["<u>request : LoginRequest</u><br>Email [Required, EmailAddress]<br>Password [Required, MinLength 6]"]
+    end
+
+    subgraph ENT["Entities (never sent as is, except GET /api/leads)"]
+        direction TB
+        U["<u>user : User</u><br>PasswordHash = $2a$11$..."]
+        C["<u>case : Case</u><br>ClientId, ConsultantId, VisaCategoryId"]
+        CU["<u>client : User</u>"]
+        VC["<u>visa : VisaCategory</u>"]
+    end
+
+    subgraph OUT["Response DTOs"]
+        direction TB
+        AR["<u>response : AuthResponse</u><br>AccessToken, RefreshToken, Role,<br>DisplayName, UserId (no hash)"]
+        CD["<u>dto : CaseDto</u><br>ClientName, ConsultantName,<br>VisaCategoryName, Stage as string"]
+        PR["<u>page : PagedResponse&lt;CaseDto&gt;</u><br>Data, TotalRecords, TotalPages, CurrentPage"]
+        ER["<u>error : ApiErrorResponse</u><br>Message, Errors[]"]
+    end
+
+    LR1 -->|AuthService.LoginAsync| U
+    U -->|mapped| AR
+    LR1 -.->|invalid model| ER
+    C -->|LINQ join + projection| CD
+    CU --> CD
+    VC --> CD
+    CD -->|"1..pageSize"| PR

@@ -1,0 +1,28 @@
+---
+title: State diagram - user account (User.IsActive, User.EmailConfirmed; origin/main, 499c39d)
+---
+stateDiagram-v2
+    direction LR
+
+    state "Registered, unconfirmed<br>IsActive = true<br>EmailConfirmed = false<br>(cannot sign in)" as Unconfirmed
+    state "Active<br>IsActive = true<br>EmailConfirmed = true<br>(can sign in)" as Active
+    state "Inactive<br>IsActive = false<br>(cannot sign in or refresh)" as Inactive
+
+    [*] --> Unconfirmed : register (policy checked)
+    [*] --> Active : seeded
+    Unconfirmed --> Active : confirm (NOT IMPLEMENTED)
+    Active --> Inactive : suspend or soft delete
+    Inactive --> Active : reinstate
+    Active --> Active : reset password
+    Inactive --> Inactive : reset password
+    Unconfirmed --> Unconfirmed : reset password
+
+    note right of Inactive
+        Suspend and soft delete both only set IsActive = false,
+        so they are one stored state and reinstate undoes either.
+        Repeating suspend, delete or reinstate returns 409.
+        Reset password (single-use 30-minute token + policy)
+        changes only the hash and revokes refresh tokens:
+        IsActive and EmailConfirmed are not checked or changed.
+        No lockout state, only the per-IP rate limit (429).
+    end note
