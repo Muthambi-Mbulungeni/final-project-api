@@ -96,7 +96,7 @@ function ReplaceForm({ document, onReplaced }) {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-2">
-      <label htmlFor={inputId} className="block text-sm font-medium text-stone-900">
+      <label htmlFor={inputId} className="block text-sm font-medium text-stone-800">
         Upload a new copy<span className="sr-only"> of {name}</span>
       </label>
       <p id={hintId} className="text-xs text-stone-500">

@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const BUTTON_CLASSES =
-  'inline-flex items-center gap-1 rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex items-center gap-1 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50'
 
 // itemCount (optional) is the number of rows actually shown on this page.
 // When provided, the "Showing x–y" range reflects what the server returned.
