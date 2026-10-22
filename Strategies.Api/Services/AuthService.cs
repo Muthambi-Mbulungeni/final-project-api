@@ -19,61 +19,6 @@ namespace Strategies.Api.Services
         private readonly IRefreshTokenStore _refreshTokenStore;
         private readonly ILogger<AuthService> _logger;
 
-        // Seed users computed exactly once across all requests using Lazy<T>.
-        // AuthService is Scoped (per-request), so without Lazy the BCrypt hash
-        // (workFactor=11) would run 4 times on every single request — unacceptable.
-        private static readonly Lazy<List<User>> _lazySeedUsers = new Lazy<List<User>>(() =>
-        {
-            var hasher = new PasswordHasherService();
-            return new List<User>
-            {
-                new User
-                {
-                    Id             = Guid.Parse("00000000-0000-0000-0000-000000000001"),
-                    FullName       = "System Admin",
-                    Email          = "admin@nexus.com",
-                    PasswordHash   = hasher.HashPassword("AdminPassword123!"),
-                    Role           = UserRole.Admin,
-                    IsActive       = true,
-                    EmailConfirmed = true,
-                    CreatedAt      = DateTime.UtcNow
-                },
-                new User
-                {
-                    Id             = Guid.Parse("33333333-3333-3333-3333-333333333333"),
-                    FullName       = "Riaad",
-                    Email          = "riaad@nexus.com",
-                    PasswordHash   = hasher.HashPassword("ConsultantPassword123!"),
-                    Role           = UserRole.Consultant,
-                    IsActive       = true,
-                    EmailConfirmed = true,
-                    CreatedAt      = DateTime.UtcNow
-                },
-                new User
-                {
-                    Id             = Guid.Parse("33333333-3333-3333-3333-333333333334"),
-                    FullName       = "Consultant User",
-                    Email          = "consultant@nexus.com",
-                    PasswordHash   = hasher.HashPassword("ConsultantPassword123!"),
-                    Role           = UserRole.Consultant,
-                    IsActive       = true,
-                    EmailConfirmed = true,
-                    CreatedAt      = DateTime.UtcNow
-                },
-                new User
-                {
-                    Id             = Guid.Parse("77777777-7777-7777-7777-777777777777"),
-                    FullName       = "John Doe",
-                    Email          = "client@nexus.com",
-                    PasswordHash   = hasher.HashPassword("ClientPassword123!"),
-                    Role           = UserRole.Client,
-                    IsActive       = true,
-                    EmailConfirmed = true,
-                    CreatedAt      = DateTime.UtcNow
-                }
-            };
-        });
-
         public AuthService(
             ApplicationDbContext dbContext,
             IPasswordHasherService passwordHasher,
@@ -88,73 +33,23 @@ namespace Strategies.Api.Services
             _logger             = logger;
         }
 
-        private bool _dbConnectionChecked = false;
-        private bool _dbAvailable         = false;
-
-        private async Task<bool> IsDbAvailableAsync()
-        {
-            if (!_dbConnectionChecked)
-            {
-                try
-                {
-                    _dbAvailable = await _dbContext.Database.CanConnectAsync();
-                }
-                catch
-                {
-                    _dbAvailable = false;
-                }
-                _dbConnectionChecked = true;
-            }
-            return _dbAvailable;
-        }
-
         public async Task<User?> GetUserByEmailAsync(string email)
         {
             if (string.IsNullOrWhiteSpace(email)) return null;
 
             var normalizedEmail = email.Trim().ToLowerInvariant();
 
-            if (await IsDbAvailableAsync())
-            {
-                try
-                {
-                    var dbUser = await _dbContext.Users
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
-
-                    if (dbUser != null)
-                        return dbUser;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not query database for user, falling back to seed store.");
-                }
-            }
-
-            return _lazySeedUsers.Value.FirstOrDefault(u =>
-                u.Email.ToLowerInvariant() == normalizedEmail);
+            // Database only. If it is unreachable the exception surfaces; nobody is authenticated.
+            return await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
         }
 
         public async Task<User?> GetUserByIdAsync(Guid userId)
         {
-            if (await IsDbAvailableAsync())
-            {
-                try
-                {
-                    var dbUser = await _dbContext.Users
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(u => u.Id == userId);
-
-                    if (dbUser != null)
-                        return dbUser;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not query database for user by id, falling back to seed store.");
-                }
-            }
-
-            return _lazySeedUsers.Value.FirstOrDefault(u => u.Id == userId);
+            return await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
         }
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
@@ -260,13 +155,9 @@ namespace Strategies.Api.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            if (await IsDbAvailableAsync())
-            {
-                _dbContext.Users.Add(user);
-                await _dbContext.SaveChangesAsync();
-                return true;
-            }
-            return false;
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+            return true;
         }
 
         /// <summary>
@@ -278,15 +169,11 @@ namespace Strategies.Api.Services
         {
             user.PasswordHash = _passwordHasher.HashPassword(newPassword);
 
-            if (await IsDbAvailableAsync())
-            {
-                _dbContext.Users.Update(user);
-                await _dbContext.SaveChangesAsync();
+            _dbContext.Users.Update(user);
+            await _dbContext.SaveChangesAsync();
 
-                await _refreshTokenStore.RevokeAllUserTokensAsync(user.Id);
-                return true;
-            }
-            return false;
+            await _refreshTokenStore.RevokeAllUserTokensAsync(user.Id);
+            return true;
         }
     }
 }

@@ -64,8 +64,8 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 **Medium. Uploaded files are stored on the API server's disk.**
 
-- **Problem:** uploads are saved to `wwwroot/uploads` on the API server, not to cloud storage (R2 was planned).
-- **Evidence:** `DocumentsController` upload and file endpoints.
+- **Problem:** uploads are saved to the API server's disk, not to cloud storage (R2 was planned).
+- **Evidence:** `LocalFileStorage`, rooted at `Storage:UploadsRoot` (default `wwwroot/uploads`). A host can point it at a persistent folder outside the deploy folder, such as `/home/data/uploads` on Azure App Service.
 - **Impact:** on a host whose disk is reset on each deploy, files would be lost while their database rows remain.
 - **Fix:** move uploads to R2 or another object store, or use a host with a persistent disk.
 
@@ -160,6 +160,10 @@ Issues found by testing or review and fixed before submission.
 | Lead review with an empty body `{}` returned 200 and reset the lead to Pending (was ISS-06) | Verdict is required: 400 and the lead is unchanged (PR #25, A12) |
 | Stage change with an empty body would have moved a case back to the first stage, and accepted notes that were never saved | Stage is required: 400 (A17); the unsaved notes field was removed (PR #25). Rest open as [ISS-07](#iss-07) |
 | Uploaded test files could be committed | `Strategies.Api/wwwroot/uploads` added to `.gitignore` (PR #18) |
+| Seeded documents could not be downloaded: no file existed for any seeded `FilePath` | Placeholder PDFs for all five seeded documents are in `Strategies.Api/SeedFiles` and ship with the API. On every startup, any that are missing are copied into `Storage:UploadsRoot` (existing files are never overwritten), so a fresh or redeployed host needs no manual step |
+| Path traversal in document storage (Critical, found in code review): `POST /api/documents` stored any `FilePath` from the request, and the download served `wwwroot/` plus that path, so a signed-in client could register `../appsettings.json` on their own case and download the JWT key and database password; `//etc/passwd` escaped `wwwroot` entirely | Upload returns only the generated `{Guid}{ext}` name. `POST /api/documents` accepts only such a name for a file that exists (otherwise 400 "Invalid file reference."). The download resolves only the file name inside `Storage:UploadsRoot`, checks the canonical path stays inside the root, and otherwise returns 404. Unit, controller and in-process API tests cover the traversal values |
+| Sign-in fell back to four built-in accounts, with passwords in the source, when the database was unreachable or the user was not found | Fallback removed: users are read from the database only, and a database outage fails the request without signing anyone in. The demo accounts are unchanged because they come from `database/seed` |
+| Known limitation (not fixed): a client who knew another upload's stored file name could register it on their own case and download that file | Impractical, since names are random GUIDs (122 random bits) that only the uploader and staff ever see. A full fix would record the uploader with each stored file and check it in `POST /api/documents` |
 | Seed data reused the same id pattern across tables | Distinct seed ids (PR #19) |
 | First-time visitors triggered a failed token refresh and a console error | The web portal only refreshes when a session exists (PR #19) |
 | Admin overview panels were read in a different order from how they look (WCAG 1.3.2, 2.4.3) | Source order now matches the visual order (PR #23) |
