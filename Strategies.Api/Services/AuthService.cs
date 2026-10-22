@@ -160,7 +160,7 @@ namespace Strategies.Api.Services
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
             var user = await GetUserByEmailAsync(request.Email);
-            if (user == null || !user.IsActive || !user.EmailConfirmed)
+            if (user == null || !user.IsActive || !user.EmailConfirmed || user.DeletedAt != null)
                 return null;
 
             if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))

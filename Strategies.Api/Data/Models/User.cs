@@ -13,5 +13,7 @@ namespace Strategies.Api.Data.Models
         public bool IsActive { get; set; } = true;
         public bool EmailConfirmed { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        // Set when an admin deletes the account (soft delete). Suspend only clears IsActive.
+        public DateTime? DeletedAt { get; set; }
     }
 }
