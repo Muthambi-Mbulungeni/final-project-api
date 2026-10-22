@@ -133,17 +133,7 @@ export default function UsersPage() {
       header: 'Status',
       cardInline: true,
       render: (user) =>
-        user.isActive === false ? (
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200 ring-inset">
-            <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden="true" />
-            Suspended
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200 ring-inset">
-            <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden="true" />
-            Active
-          </span>
-        ),
+        user.isActive === false ? <StatusBadge tone="danger" label="Suspended" /> : <StatusBadge tone="success" label="Active" />,
     },
     {
       key: 'actions',
@@ -160,7 +150,7 @@ export default function UsersPage() {
               type="button"
               onClick={() => setEditing(user)}
               aria-label={`Edit ${name}`}
-              className="rounded-md px-2 py-1 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
             >
               Edit
             </button>
@@ -169,7 +159,7 @@ export default function UsersPage() {
               to={{ pathname: '/admin/audit-log', search: `?userId=${encodeURIComponent(user.id)}` }}
               state={{ userName: name }}
               aria-label={`Activity for ${name}`}
-              className="rounded-md px-2 py-1 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900"
             >
               Activity
             </Link>
@@ -178,7 +168,7 @@ export default function UsersPage() {
                 type="button"
                 onClick={() => openAction(user, 'reinstate')}
                 aria-label={`Reinstate ${name}`}
-                className="rounded-md px-2 py-1 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
               >
                 Reinstate
               </button>
@@ -187,7 +177,7 @@ export default function UsersPage() {
                 type="button"
                 onClick={() => openAction(user, 'suspend')}
                 aria-label={`Suspend ${name}`}
-                className="rounded-md px-2 py-1 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
               >
                 Suspend
               </button>
