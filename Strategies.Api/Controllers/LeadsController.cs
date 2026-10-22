@@ -17,6 +17,8 @@ namespace Strategies.Api.Controllers
     [Route("api/[controller]")]
     public class LeadsController : ControllerBase
     {
+        private const int MaxAgentOutputLength = 2000;
+
         private readonly ApplicationDbContext _context;
 
         public LeadsController(ApplicationDbContext context)
@@ -83,39 +85,23 @@ namespace Strategies.Api.Controllers
                 return BadRequest(new ApiErrorResponse { Message = "Validation failed.", Errors = errors });
             }
 
-            var aiResult = await agentService.ProcessLeadAsync(
-                $"Name: {dto.FullName}, Immigration status: {dto.ImmigrationStatus}, Needs assistance: {dto.NeedsAssistance}");
+            // Id is generated before the AI call so the AgentRun row can reference it.
+            var leadId = Guid.NewGuid();
 
-            var triageStatus = TriageStatus.NeedsReview;
-            string? triageReason = null;
+            string? visaCategoryName = null;
+            if (dto.VisaCategoryId.HasValue)
+                visaCategoryName = await _context.VisaCategories
+                    .Where(c => c.Id == dto.VisaCategoryId.Value)
+                    .Select(c => c.Name)
+                    .FirstOrDefaultAsync();
 
-            if (aiResult.Status == RunStatus.Success.ToString() && !string.IsNullOrWhiteSpace(aiResult.ExtractedData))
-            {
-                try
-                {
-                    using var jsonDoc = System.Text.Json.JsonDocument.Parse(aiResult.ExtractedData);
-                    if (jsonDoc.RootElement.TryGetProperty("status", out var statusElement))
-                    {
-                        var statusStr = statusElement.GetString();
-                        if (Enum.TryParse<TriageStatus>(statusStr, true, out var parsedStatus))
-                        {
-                            triageStatus = parsedStatus;
-                        }
-                    }
-                    if (jsonDoc.RootElement.TryGetProperty("reason", out var reasonElement))
-                    {
-                        triageReason = reasonElement.GetString();
-                    }
-                }
-                catch
-                {
-                    // Fall back to NeedsReview if parsing fails
-                }
-            }
+            // Name and email are not sent to the model (POPIA data minimisation).
+            var aiResult = await agentService.TriageLeadAsync(new LeadTriageInput(
+                dto.ImmigrationStatus, dto.NeedsAssistance, dto.DesiredStartDate, visaCategoryName));
 
             var lead = new Lead
             {
-                Id = Guid.NewGuid(),
+                Id = leadId,
                 FullName = dto.FullName.Trim(),
                 Email = dto.Email.Trim().ToLowerInvariant(),
                 ImmigrationStatus = dto.ImmigrationStatus,
@@ -123,21 +109,36 @@ namespace Strategies.Api.Controllers
                 DesiredStartDate = dto.DesiredStartDate,
                 VisaCategoryId = dto.VisaCategoryId,
                 SubmittedAt = DateTime.UtcNow,
-                TriageStatus = triageStatus,
-                TriageReason = triageReason
+                TriageStatus = aiResult.TriageStatus,
+                TriageReason = aiResult.Reason
             };
 
+            var agentRun = new AgentRun
+            {
+                Id = Guid.NewGuid(),
+                LeadId = leadId,
+                AgentType = AgentType.Triage,
+                Status = aiResult.Status,
+                RanAt = DateTime.UtcNow,
+                Output = aiResult.Output.Length > MaxAgentOutputLength
+                    ? aiResult.Output[..MaxAgentOutputLength]
+                    : aiResult.Output
+            };
+
+            // One SaveChangesAsync: EF inserts the Lead before the AgentRun because of the LeadId foreign key.
             _context.Leads.Add(lead);
+            _context.AgentRuns.Add(agentRun);
             await _context.SaveChangesAsync();
 
+            var aiAvailable = aiResult.Status == RunStatus.Success;
             return CreatedAtAction(nameof(GetLeads), new { id = lead.Id }, new
             {
                 Message = "Lead successfully submitted.",
                 LeadId = lead.Id,
                 TriageStatus = lead.TriageStatus.ToString(),
-                AiAvailable = aiResult.Status == RunStatus.Success.ToString(),
-                AiAnalysis = aiResult.Status == RunStatus.Success.ToString() ? aiResult.ExtractedData : null,
-                FallbackNote = aiResult.Status != RunStatus.Success.ToString() ? aiResult.Message : null
+                AiAvailable = aiAvailable,
+                TriageReason = aiAvailable ? lead.TriageReason : null,
+                FallbackNote = aiAvailable ? null : aiResult.Message
             });
         }
 

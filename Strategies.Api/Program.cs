@@ -34,7 +34,8 @@ builder.Services.AddScoped<IPasswordResetTokenService, PasswordResetTokenService
 builder.Services.AddScoped<IPasswordPolicy, PasswordPolicy>();
 
 // 3. Core Domain & AI Services (Marco - Single clean registration, no duplicates)
-builder.Services.AddHttpClient<IAgentService, GeminiAgentService>();
+// 10-second timeout so a slow AI falls back to NeedsReview instead of hanging the enquiry form (FR-2.3).
+builder.Services.AddHttpClient<IAgentService, GeminiAgentService>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddScoped<CaseManagementService>();
 
 // 4. JWT Authentication
