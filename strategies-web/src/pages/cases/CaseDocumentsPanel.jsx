@@ -144,8 +144,12 @@ function DocumentsBody({ caseItem, request, headingRef }) {
                   >
                     {name}
                   </h4>
-                  <p className="truncate text-xs text-stone-500">
-                    {document.fileName || 'No file name'} · Uploaded {formatDate(document.uploadedAt)}
+                  {/* A long file name is cut short (full name on hover); the upload date always stays visible. */}
+                  <p className="flex min-w-0 gap-1 text-xs text-stone-500">
+                    <span className="truncate" title={document.fileName || undefined}>
+                      {document.fileName || 'No file name'}
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap">· Uploaded {formatDate(document.uploadedAt)}</span>
                   </p>
                   <button
                     type="button"
