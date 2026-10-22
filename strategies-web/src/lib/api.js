@@ -3,7 +3,8 @@
 // A hosted build served from another origin (e.g. GitHub Pages) sets VITE_API_BASE_URL
 // at build time, and every request is sent to that address instead.
 // Every failure becomes an ApiError with a readable message, using the API's
-// standard error shape { message, errors } when the server provides it.
+// standard error shape { message, errors } when the server provides it, plus the optional
+// machine-readable `code` some errors carry (e.g. "duplicate_email").
 //
 // Authentication: every request carries the in-memory access token as a Bearer header.
 // When the API answers 401, the token is refreshed once and the request is retried.
@@ -13,11 +14,12 @@
 import { endSession, getAccessToken, getStoredRefreshToken, startSession } from './session'
 
 export class ApiError extends Error {
-  constructor(message, { status = 0, errors = [] } = {}) {
+  constructor(message, { status = 0, errors = [], code = null } = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.errors = errors
+    this.code = code
   }
 }
 
@@ -72,6 +74,7 @@ function toApiError(response, body) {
   return new ApiError(message, {
     status: response.status,
     errors: Array.isArray(body?.errors) ? body.errors : [],
+    code: typeof body?.code === 'string' ? body.code : null,
   })
 }
 
