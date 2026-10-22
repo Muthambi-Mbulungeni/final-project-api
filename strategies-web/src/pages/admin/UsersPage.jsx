@@ -16,10 +16,11 @@ import EditUserDialog from './EditUserDialog'
 
 const PAGE_SIZE = 10
 
-// GET /api/admin/users returns { data: [{ id, fullName, email, role, isActive }], totalRecords, totalPages, currentPage }
+// GET /api/admin/users returns { data: [{ id, fullName, email, role, isActive, isLocked, lockoutEndsAt }], totalRecords, totalPages, currentPage }
 // and supports page, pageSize and search (name or email).
 // PATCH /api/admin/users/{id} edits name, email and role (see lib/userEdit.js and EditUserDialog).
 // PATCH /api/admin/users/{id}/suspend and /reinstate change access; both return 409 if already in that state.
+// isLocked is true while repeated failed sign-ins keep an account out; "Unlock" calls /reinstate, which also clears the lockout.
 // There is deliberately no Delete: the API returns 405 because user records are retained for POPIA and the audit trail.
 const ACTIONS = {
   suspend: {
@@ -28,7 +29,7 @@ const ACTIONS = {
       `${name} will not be able to sign in until their account is reinstated. Their records and case history are kept.`,
     confirmLabel: 'Suspend user',
     endpoint: 'suspend',
-    isActiveAfter: false,
+    after: { isActive: false },
     fallbackMessage: 'User suspended.',
   },
   reinstate: {
@@ -36,8 +37,17 @@ const ACTIONS = {
     message: (name) => `${name} will be able to sign in again with their existing password.`,
     confirmLabel: 'Reinstate user',
     endpoint: 'reinstate',
-    isActiveAfter: true,
+    after: { isActive: true, isLocked: false, lockoutEndsAt: null },
     fallbackMessage: 'User reinstated.',
+  },
+  unlock: {
+    title: 'Unlock this account?',
+    message: (name) =>
+      `${name} was locked after repeated failed sign-ins. Unlocking lets them try again straight away with their existing password.`,
+    confirmLabel: 'Unlock account',
+    endpoint: 'reinstate',
+    after: { isLocked: false, lockoutEndsAt: null },
+    fallbackMessage: 'Account unlocked.',
   },
 }
 
@@ -97,7 +107,7 @@ export default function UsersPage() {
 
     try {
       const result = await apiPatch(`/api/admin/users/${encodeURIComponent(user.id)}/${config.endpoint}`)
-      saveOverride(user.id, { isActive: config.isActiveAfter })
+      saveOverride(user.id, config.after)
       toast.show(`${displayName(user)}: ${result?.message ?? config.fallbackMessage}`)
       closeDialog()
     } catch (error) {
@@ -133,7 +143,13 @@ export default function UsersPage() {
       header: 'Status',
       cardInline: true,
       render: (user) =>
-        user.isActive === false ? <StatusBadge tone="danger" label="Suspended" /> : <StatusBadge tone="success" label="Active" />,
+        user.isActive === false ? (
+          <StatusBadge tone="danger" label="Suspended" />
+        ) : user.isLocked ? (
+          <StatusBadge tone="warning" label="Locked" />
+        ) : (
+          <StatusBadge tone="success" label="Active" />
+        ),
     },
     {
       key: 'actions',
@@ -143,6 +159,7 @@ export default function UsersPage() {
         if (!user.id) return null
         const name = displayName(user)
         const suspended = user.isActive === false
+        const locked = !suspended && user.isLocked === true
 
         return (
           <div className="flex items-center justify-end gap-1">
@@ -163,6 +180,16 @@ export default function UsersPage() {
             >
               Activity
             </Link>
+            {locked && (
+              <button
+                type="button"
+                onClick={() => openAction(user, 'unlock')}
+                aria-label={`Unlock ${name}`}
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
+              >
+                Unlock
+              </button>
+            )}
             {suspended ? (
               <button
                 type="button"
@@ -193,7 +220,7 @@ export default function UsersPage() {
       <PageHeader
         eyebrow="Administration"
         title="Users"
-        description="Find accounts by name or email, suspend or reinstate access, and review what each user has changed."
+        description="Find accounts by name or email, suspend, reinstate or unlock access, and review what each user has changed."
       />
 
       <div className="mt-8">
