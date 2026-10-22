@@ -208,6 +208,21 @@ describe('CaseMessages', () => {
       await waitFor(() => expect(calls(fetchMock, 'PATCH')).toHaveLength(2))
     })
 
+    it('marks an arrived message read once, however quickly the checks follow one another', async () => {
+      let thread = [message(1, { sentAt: '2026-10-20T08:00:00Z' })]
+      const fetchMock = stubApi({ pages: () => ({ 1: page(thread) }) })
+      // Checks every millisecond start again before React has rendered the one before.
+      renderThread({ pollInterval: 1 })
+
+      await screen.findByText('Message 1')
+      await waitFor(() => expect(calls(fetchMock, 'PATCH')).toHaveLength(1))
+
+      thread = [...thread, message(2, { body: 'Reply from the client', isRead: false, sentAt: '2026-10-20T09:00:00Z' })]
+      await screen.findByText('Reply from the client')
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(calls(fetchMock, 'PATCH')).toHaveLength(2)
+    })
+
     it('does not mark read again when only my own messages come back from a check', async () => {
       const thread = [message(1)]
       const fetchMock = stubApi({ pages: () => ({ 1: page(thread) }) })
