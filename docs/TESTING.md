@@ -27,7 +27,7 @@ Each requirement from the brief, with the tests that prove it. Test IDs refer to
 | Role-based access on the server | A3 (consultant sees own cases only), A11 (client gets 403) | Pass |
 | JWT authentication and refresh | `TokenServiceTests`, `AuthServiceTests` (refresh and revoke), A1, B3 | Pass |
 | Passwords hashed with bcrypt | Login tests verify against stored bcrypt hashes (`PasswordHasherService`, work factor 11) | Pass |
-| Brute-force protection | A2 (5 sign-ins per minute per address), A19 | Pass for rate limiting, but **no per-account lockout**, and a caller that reaches the API directly can avoid the limit (A19, [ISS-05](ISSUES.md#iss-05)) |
+| Brute-force protection (NFR-1.4) | A2 (5 sign-ins per minute per address), A19, A20; `LoginLockoutTests` (lock after 5 failed sign-ins in 15 minutes, correct password refused while locked, unlock after 15 minutes, success and password reset and admin unlock clear it, unknown email answered the same way) | Pass: per-address rate limit and per-account lockout (was [ISS-05](ISSUES.md#fixed-during-the-project)) |
 | Password reset | A15, A16 | Made-up tokens refused (A15), but **genuine reset links are refused too** (A16, [ISS-01](ISSUES.md#iss-01)) |
 | Client and server validation | B1, B5 (client side); A4, A6, A7, A10, A11 (server side); `validation` tests | Pass |
 | File upload with server validation | A6, A7, B4, B5 | Pass |
@@ -130,7 +130,8 @@ Run against the local API with the seeded database, 2026-10-03 and 2026-10-04. A
 | A16 | Password reset with a valid token, made by the same code and key the API uses | 200 | **Fail**: 400 "Invalid token claims" ([ISS-01](ISSUES.md#iss-01)) |
 | A17 | Stage change with an empty body `{}` | 400 | Pass |
 | A18 | Stage change to the stage the case already has | 400 | **Fail**: 200, with a history row and an audit row ([ISS-07](ISSUES.md#iss-07)) |
-| A19 | Seven failed sign-ins sent straight to the API, each with a different `X-Forwarded-For` header | 429 after 5 | **Fail**: no 429; the same seven without the header were stopped with 429 ([ISS-05](ISSUES.md#iss-05)) |
+| A19 | Seven failed sign-ins sent straight to the API, each with a different `X-Forwarded-For` header | 429 after 5 | Was **Fail** (no 429); fixed: the header is read only behind the configured proxy (`LeadsRateLimitTests`) |
+| A20 | Five wrong passwords for `client@nexus.com`, then the right one (local API) | 5th answer 429 `account_locked` with `Retry-After: 900`; the right password is still refused, with the time left | Pass |
 
 ## 6. Browser checks per role
 

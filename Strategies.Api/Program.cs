@@ -99,6 +99,13 @@ builder.Services.AddOptions<ForwardedHeadersSettings>()
 builder.Services.AddOptions<ForwardedHeadersOptions>()
     .Configure<IOptions<ForwardedHeadersSettings>>((options, settings) => settings.Value.Apply(options));
 
+builder.Services.AddOptions<LockoutSettings>()
+    .Bind(builder.Configuration.GetSection(LockoutSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "Auth:Lockout: MaxAttempts, WindowMinutes and DurationMinutes must be greater than 0.")
+    .ValidateOnStart();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton(TimeProvider.System);
+
 builder.Services.AddOptions<LeadsRateLimitSettings>()
     .Bind(builder.Configuration.GetSection(LeadsRateLimitSettings.SectionName))
     .Validate(settings => settings.IsValid(), "RateLimiting:Leads: PermitLimit and WindowSeconds must be greater than 0.")
@@ -151,6 +158,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(corsOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
+              .WithExposedHeaders("Retry-After")
               .AllowCredentials());
 });
 

@@ -47,7 +47,9 @@ namespace Strategies.Api.Tests
             var tokenService = CreateTokenService();
             var tokenStore   = new InMemoryRefreshTokenStore();
             var logger       = NullLogger<AuthService>.Instance;
-            return new AuthService(ctx, hasher, tokenService, tokenStore, logger);
+            return new AuthService(ctx, hasher, tokenService, tokenStore, logger,
+                new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+                Microsoft.Extensions.Options.Options.Create(new Strategies.Api.Configuration.LockoutSettings()), TimeProvider.System);
         }
 
         // Same accounts as database/seed/1-reference-and-users.sql
