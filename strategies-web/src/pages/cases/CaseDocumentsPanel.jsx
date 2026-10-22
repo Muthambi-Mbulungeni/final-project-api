@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ExternalLink, X } from 'lucide-react'
 import ErrorNotice from '../../components/ui/ErrorNotice'
+import { textareaClasses } from '../../components/ui/fieldStyles'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { useToast } from '../../components/ui/toastContext'
 import { apiOpenFile, apiPatch } from '../../lib/api'
@@ -21,6 +22,7 @@ import { formatDate, shortId } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { useApi } from '../../lib/useApi'
 import CaseConsultantSection from './CaseConsultantSection'
+import CaseMessages from './CaseMessages'
 import CaseStageSection from './CaseStageSection'
 
 const NO_REJECTION = { id: null, comment: '', error: null }
@@ -111,7 +113,7 @@ function DocumentsBody({ caseItem, request, headingRef }) {
     const message = request.error.status === 403 ? reviewErrorMessage(request.error) : request.error.message
     content = <ErrorNotice className="mt-3" message={message} onRetry={request.reload} />
   } else if (request.loading && !request.data) {
-    content = <p className="mt-3 text-sm text-stone-500">Loading documents…</p>
+    content = <p className="py-6 text-center text-sm text-stone-500">Loading documents…</p>
   } else if (documents.length === 0) {
     content = <p className="mt-3 text-sm text-stone-600">No documents on this case yet.</p>
   } else {
@@ -143,8 +145,12 @@ function DocumentsBody({ caseItem, request, headingRef }) {
                   >
                     {name}
                   </h4>
-                  <p className="truncate text-xs text-stone-500">
-                    {document.fileName || 'No file name'} · Uploaded {formatDate(document.uploadedAt)}
+                  {/* A long file name is cut short (full name on hover); the upload date always stays visible. */}
+                  <p className="flex min-w-0 gap-1 text-xs text-stone-500">
+                    <span className="truncate" title={document.fileName || undefined}>
+                      {document.fileName || 'No file name'}
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap">· Uploaded {formatDate(document.uploadedAt)}</span>
                   </p>
                   <button
                     type="button"
@@ -205,7 +211,7 @@ function DocumentsBody({ caseItem, request, headingRef }) {
 
               {actionable && isRejecting && (
                 <div className="mt-3 space-y-2">
-                  <label htmlFor={commentId} className="block text-sm font-medium text-stone-900">
+                  <label htmlFor={commentId} className="block text-sm font-medium text-stone-800">
                     What does the client need to fix?
                   </label>
                   <p id={hintId} className="text-xs text-stone-500">
@@ -219,7 +225,7 @@ function DocumentsBody({ caseItem, request, headingRef }) {
                     onChange={(event) => setRejecting((current) => ({ ...current, comment: event.target.value, error: null }))}
                     aria-invalid={rejecting.error ? true : undefined}
                     aria-describedby={rejecting.error ? `${hintId} ${errorId}` : hintId}
-                    className="block w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 aria-[invalid=true]:border-brand-600"
+                    className={textareaClasses(Boolean(rejecting.error))}
                   />
                   {rejecting.error && (
                     <p id={errorId} className="text-sm text-brand-700">
@@ -318,6 +324,16 @@ function CasePanelBody({ caseItem, onStageChanged, onAssigned }) {
       <CaseStageSection caseItem={caseItem} onStageChanged={onStageChanged} />
       {onAssigned && <CaseConsultantSection caseItem={caseItem} onAssigned={onAssigned} />}
       <DocumentsBody caseItem={caseItem} request={request} headingRef={documentsHeadingRef} />
+      <section aria-labelledby="case-messages-heading" className="mt-6 border-t border-stone-200 pt-6">
+        <h3 id="case-messages-heading" className="mb-3 text-sm font-semibold text-stone-900">
+          Messages
+        </h3>
+        <CaseMessages
+          caseId={caseItem.id}
+          archived={caseItem.isArchived}
+          emptyMessage="Messages you send here are shown to the client on their dashboard."
+        />
+      </section>
     </>
   )
 }

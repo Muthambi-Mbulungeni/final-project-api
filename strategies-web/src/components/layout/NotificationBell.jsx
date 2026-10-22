@@ -4,6 +4,7 @@ import RequestState from '../ui/RequestState'
 import { apiPatch } from '../../lib/api'
 import { formatDateTime } from '../../lib/format'
 import { listItems } from '../../lib/listData'
+import { MESSAGES_READ_EVENT } from '../../lib/messages'
 import { isUnread, notificationDate, notificationText, unreadCountLabel, unreadTotal } from '../../lib/notifications'
 import { useApi } from '../../lib/useApi'
 
@@ -26,6 +27,13 @@ export default function NotificationBell() {
   const unread = notifications.filter((notification) => isUnread(notification, readIds))
   const unreadCount = unreadTotal(request.data?.unreadCount, notifications, readIds)
   const countLabel = unreadCountLabel(unreadCount)
+  const { reload } = request
+
+  // Opening a case's message thread marks its messages read: reload so the badge drops them.
+  useEffect(() => {
+    window.addEventListener(MESSAGES_READ_EVENT, reload)
+    return () => window.removeEventListener(MESSAGES_READ_EVENT, reload)
+  }, [reload])
 
   useEffect(() => {
     if (!open) return undefined

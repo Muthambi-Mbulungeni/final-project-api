@@ -13,6 +13,7 @@ import { documentsPath, documentsToReplace, replaceActionLabel } from '../../lib
 import { listItems } from '../../lib/listData'
 import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
+import CaseMessages from '../cases/CaseMessages'
 
 // Only show details the API actually sent.
 function caseDetails(item) {
@@ -60,7 +61,7 @@ function DocumentsAttention({ caseId, consultantName }) {
       </div>
       <Link
         to="/client/documents"
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
       >
         {replaceActionLabel(toReplace)}
         <ArrowRight className="size-4" strokeWidth={2} aria-hidden="true" />
@@ -208,6 +209,17 @@ export default function ClientDashboard() {
             />
           )}
         </Panel>
+
+        {currentCase?.id && (
+          <Panel title="Messages">
+            <CaseMessages
+              key={currentCase.id}
+              caseId={currentCase.id}
+              archived={currentCase.isArchived}
+              emptyMessage={`Ask ${consultantName ?? 'your consultant'} a question here. Replies appear in this thread.`}
+            />
+          </Panel>
+        )}
       </div>
     </>
   )
