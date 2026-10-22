@@ -20,7 +20,7 @@ sequenceDiagram
         alt token unknown, revoked, expired, or user inactive
             AS-->>AC: null
             AC-->>W: 401 "Refresh token is invalid or has expired."
-            W-->>U: /#/login with "session expired", return to the page afterwards
+            W-->>U: /#35;/login with "session expired", return to the page afterwards
         else token active
             AS->>RT: RevokeTokenAsync(old, replacedBy new)
             AS->>RT: SaveTokenAsync(new, 7 days)

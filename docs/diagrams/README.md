@@ -1,6 +1,6 @@
 # Report diagrams
 
-Mermaid sources (`.mmd`) drawn from the code on `develop` (98ff559), each rendered to `.svg` and to a 3x `.png` on a white background for the Word/PDF report. Section numbers refer to the INSY7315 module manual, Task 1 documentation (9.1).
+Mermaid sources (`.mmd`) drawn from the code on `develop` (98ff559), except `seq-password-reset` and `state-user-account`, which follow `origin/main` (499c39d, single-use reset tokens and password policy; that commit is not on develop yet). Each is rendered to `.svg` and to a 3x `.png` on a white background for the Word/PDF report. Section numbers refer to the INSY7315 module manual, Task 1 documentation (9.1).
 
 Dashed boxes mean one of two things, and each diagram says which: either assumed (not found in the repo's config), or hidden or not implemented.
 
@@ -35,6 +35,27 @@ Dashed boxes mean one of two things, and each diagram says which: either assumed
 | [pipeline](pipeline.mmd) | feature -> develop -> main, CI jobs, where tests run, Pages deploy | 9.1.14 GitHub Actions Pipeline |
 
 Not a design pattern here: Repository. Controllers query `ApplicationDbContext` directly, so it has no diagram.
+
+Still drawn from develop, so they lack 499c39d: `design-class-services`, `design-class-controllers` and `pattern-dependency-injection` (no `PasswordResetTokenService` or `PasswordPolicy`), and `seq-register` (no password policy check).
+
+## Where the code differs from the requirements
+
+IDs are from the client requirements list. Checked against `develop`, plus `origin/main` for password reset.
+
+| Area | Requirement | What the code does |
+|---|---|---|
+| Case stages | FR-4.4 five milestones | Any stage can be set from any stage, including the same stage and archived cases. Only the unused `CaseManagementService.AdvanceCaseStageAsync` enforces the order |
+| Case archive | FR-8.2 soft delete | `Case.IsArchived` exists, but no endpoint sets it |
+| Registration | FR-1.2 | Accounts start with `EmailConfirmed = false`, no confirmation email or endpoint exists, and sign-in requires it, so a self-registered account cannot sign in. On main the password policy now applies at registration |
+| Password reset | FR-1.2 | Works on main: single-use 30-minute token, own audience, `/#/` link, policy, refresh tokens revoked. Not yet on develop. `App:BaseUrl` is set only for Development, so production sends no email until it is configured. A suspended or deleted user can still reset (cannot sign in) |
+| Account states | NFR-1.3 | No lockout, only a per-IP limit of 5 requests per minute. Suspend and soft delete are the same stored state |
+| User management | FR-3.1 | No create or edit endpoint |
+| Checklists, expiry, messages | FR-5.1, FR-7.1, FR-7.2 | ChecklistTemplate, VisaRecord and AgentRun are never used. No endpoint creates a Message. Email only for password reset |
+| Architecture | NFR-2.1, NFR-2.2 | ASP.NET Core API, not Node/Express. No `/api/v1` versioning |
+| Data protection | NFR-1.1 | Uploads are stored unencrypted on the API's local disk. Refresh tokens are kept in memory |
+| Audit | FR-1.4 | Uploads and AI triage write no audit row. No role column |
+| Data integrity | none | No unique index on `User.Email` |
+| Branching | 9.1.14 flow | PR #4 (499c39d) merged a feature branch straight into main, so main is ahead of develop |
 
 ## Re-rendering
 
