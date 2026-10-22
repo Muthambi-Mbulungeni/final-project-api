@@ -38,6 +38,7 @@ namespace Strategies.Api.Controllers
                 query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
 
             var totalRecords = await query.CountAsync();
+            var now = DateTime.UtcNow;
             var users = await query
                 .OrderBy(u => u.FullName)
                 .Skip((page - 1) * pageSize)
@@ -48,7 +49,9 @@ namespace Strategies.Api.Controllers
                     FullName = u.FullName,
                     Email = u.Email,
                     Role = u.Role.ToString(),
-                    IsActive = u.IsActive
+                    IsActive = u.IsActive,
+                    IsLocked = u.LockoutEndsAt != null && u.LockoutEndsAt > now,
+                    LockoutEndsAt = u.LockoutEndsAt > now ? u.LockoutEndsAt : null
                 })
                 .ToListAsync();
 
@@ -295,7 +298,9 @@ namespace Strategies.Api.Controllers
                 FullName = user.FullName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                IsLocked = user.LockoutEndsAt > DateTime.UtcNow,
+                LockoutEndsAt = user.LockoutEndsAt > DateTime.UtcNow ? user.LockoutEndsAt : null
             });
         }
 
