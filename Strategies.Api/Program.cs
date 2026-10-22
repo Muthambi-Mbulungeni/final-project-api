@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -111,7 +112,12 @@ builder.Services.AddCors(options =>
 
 // 8. Controllers & JSON
 builder.Services.AddControllers()
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    // Automatic model validation (missing body, bad JSON, [Required] fields) returns the same
+    // ApiErrorResponse shape as the controllers instead of ASP.NET's ProblemDetails.
+    .ConfigureApiBehaviorOptions(options =>
+        options.InvalidModelStateResponseFactory = context => new BadRequestObjectResult(
+            ApiErrorResponse.FromModelState(context.ModelState)));
 
 // 9. Swagger (Simplified & Error-Free)
 builder.Services.AddEndpointsApiExplorer();
