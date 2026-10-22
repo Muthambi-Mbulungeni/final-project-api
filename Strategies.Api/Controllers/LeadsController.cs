@@ -4,7 +4,9 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Strategies.Api.Configuration;
 using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
@@ -70,6 +72,7 @@ namespace Strategies.Api.Controllers
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
+        [EnableRateLimiting(LeadsRateLimitSettings.PolicyName)]
         public async Task<IActionResult> CreateLead(
             [FromBody] CreateLeadRequest dto,
             [FromServices] IAgentService agentService)
