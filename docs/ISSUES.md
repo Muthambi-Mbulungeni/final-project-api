@@ -29,10 +29,10 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 **High. Development secrets committed in `appsettings.json`.**
 
-- **Problem:** `Strategies.Api/appsettings.json` contains a database password and the JWT signing key.
-- **Evidence:** `ConnectionStrings:DefaultConnection` and `Jwt:Key` in that file.
-- **Impact:** if a hosted deployment uses these values, anyone with access to the repository can sign valid tokens for any role.
-- **Fix:** remove the values from the file, set them as environment variables (or user secrets locally) on each host, and rotate the JWT key and the database password.
+- **Problem:** the development database password and JWT signing key were committed in `Strategies.Api/appsettings.json`.
+- **Evidence:** both are now only in `appsettings.Development.json`, which is never loaded outside Development. Outside Development the API refuses to start unless `ConnectionStrings:DefaultConnection`, `Jwt:Key`, `App:BaseUrl` and `Cors:AllowedOrigins` are set, so a hosted deployment cannot fall back to the committed values (`RequiredSettings`, `StartupConfigurationTests`).
+- **Impact:** low while they stay development-only. The values remain in the repository and its history, so anyone with access could sign tokens for a host that uses the same key.
+- **Fix (remaining):** never reuse these values on a host; set each host's own as application settings. If any hosted environment ever used them, rotate the JWT key and the database password there.
 
 ### ISS-04
 
