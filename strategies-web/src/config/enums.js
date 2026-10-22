@@ -25,7 +25,7 @@ export const ENUMS = {
     { value: 'Citizen', label: 'Citizen', tone: 'neutral' },
     { value: 'PermanentResident', label: 'Permanent resident', tone: 'neutral' },
     { value: 'TemporaryResident', label: 'Temporary resident', tone: 'neutral' },
-    { value: 'Foreigner', label: 'Foreigner', tone: 'neutral' },
+    { value: 'Foreigner', label: 'Foreign national', tone: 'neutral' },
   ],
   userRole: [
     { value: 'Admin', label: 'Administrator', tone: 'neutral' },

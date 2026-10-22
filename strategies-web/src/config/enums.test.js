@@ -34,3 +34,10 @@ describe('enumFilter', () => {
     expect(filter.getValue({ triageStatus: 'Qualified' })).toBe('Qualified')
   })
 })
+
+describe('immigrationStatus labels', () => {
+  it('names the Foreigner value "Foreign national", the same words as the enquiry form', () => {
+    expect(resolveEnum('immigrationStatus', 'Foreigner')).toMatchObject({ value: 'Foreigner', label: 'Foreign national' })
+    expect(resolveEnum('immigrationStatus', 3)?.label).toBe('Foreign national')
+  })
+})
