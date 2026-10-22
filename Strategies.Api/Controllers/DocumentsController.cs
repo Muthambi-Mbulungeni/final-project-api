@@ -58,9 +58,12 @@ namespace Strategies.Api.Controllers
                 if (!owns) return Forbid();
             }
 
+            // The reviewer is joined without a deleted filter: a decision is history, so the name stays.
             var query = from d in _context.Documents
                         join dt in _context.DocumentTypes on d.DocumentTypeId equals dt.Id into dtGroup
                         from docType in dtGroup.DefaultIfEmpty()
+                        join rv in _context.Users on d.ReviewedById equals (Guid?)rv.Id into reviewerGroup
+                        from reviewer in reviewerGroup.DefaultIfEmpty()
                         where d.CaseId == caseId
                         select new
                         {
@@ -71,6 +74,8 @@ namespace Strategies.Api.Controllers
                             d.FileName,
                             d.Status,
                             d.ReviewComment,
+                            ReviewedByName = reviewer != null ? reviewer.FullName : null,
+                            d.ReviewedAt,
                             d.IsArchived,
                             d.UploadedAt
                         };
@@ -101,6 +106,8 @@ namespace Strategies.Api.Controllers
             var doc = await (from d in _context.Documents
                              join dt in _context.DocumentTypes on d.DocumentTypeId equals dt.Id into dtGroup
                              from docType in dtGroup.DefaultIfEmpty()
+                             join rv in _context.Users on d.ReviewedById equals (Guid?)rv.Id into reviewerGroup
+                             from reviewer in reviewerGroup.DefaultIfEmpty()
                              where d.Id == id
                              select new
                              {
@@ -111,6 +118,8 @@ namespace Strategies.Api.Controllers
                                  d.FileName,
                                  d.Status,
                                  d.ReviewComment,
+                                 ReviewedByName = reviewer != null ? reviewer.FullName : null,
+                                 d.ReviewedAt,
                                  d.IsArchived,
                                  d.UploadedAt
                              }).FirstOrDefaultAsync();
@@ -348,7 +357,10 @@ namespace Strategies.Api.Controllers
 
             document.Status = parsedStatus;
             document.ReviewComment = dto.ReviewComment?.Trim();
-            document.ReviewedById = reviewerId;
+            // Who decided and when, shown to the client and staff. Back to Pending means no decision.
+            var decided = parsedStatus != DocumentStatus.Pending;
+            document.ReviewedById = decided ? reviewerId : null;
+            document.ReviewedAt = decided ? DateTime.UtcNow : null;
 
             _context.AuditLogs.Add(new AuditLog
             {
