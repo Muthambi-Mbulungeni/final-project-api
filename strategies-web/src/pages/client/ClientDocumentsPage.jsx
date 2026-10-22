@@ -16,6 +16,7 @@ import {
   documentsForClient,
   documentsPath,
   replacementBody,
+  reviewerSignature,
   uploadFileError,
 } from '../../lib/documents'
 import { formatDate, formatFileSize } from '../../lib/format'
@@ -183,7 +184,7 @@ function ActionNeeded({ documents, onReplaced }) {
               {comment ? (
                 <figure className="mt-3 border-l-2 border-brand-500 pl-3">
                   <blockquote className="text-sm leading-relaxed text-stone-800">{comment}</blockquote>
-                  <figcaption className="mt-1 text-xs text-stone-500">Your consultant</figcaption>
+                  <figcaption className="mt-1 text-xs text-stone-500">{reviewerSignature(document)}</figcaption>
                 </figure>
               ) : (
                 <p className="mt-3 text-sm text-stone-600">Your consultant will contact you about this document.</p>

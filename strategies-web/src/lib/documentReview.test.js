@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { formatDate } from './format'
 import {
   awaitingDecisionCount,
+  reviewDecisionLine,
   canReview,
   documentFileErrorMessage,
   documentFilePath,
@@ -95,5 +97,28 @@ describe('documentsForReview', () => {
       { id: 'e', status: 'Pending', uploadedAt: '2026-09-06', isArchived: true },
     ]
     expect(documentsForReview(documents).map((document) => document.id)).toEqual(['d', 'b', 'c', 'a'])
+  })
+})
+
+describe('reviewDecisionLine', () => {
+  const reviewedAt = '2026-10-22T10:00:00Z'
+
+  it('says who approved or rejected a document, and when', () => {
+    expect(reviewDecisionLine({ status: 'Approved', reviewedByName: 'Nomvula Zulu', reviewedAt })).toBe(
+      `Approved by Nomvula Zulu · ${formatDate(reviewedAt)}`,
+    )
+    expect(reviewDecisionLine({ status: 2, reviewedByName: 'System Admin', reviewedAt })).toMatch(
+      /^Rejected by System Admin · 22 Oct 2026$/,
+    )
+  })
+
+  it('leaves the date out when it is missing', () => {
+    expect(reviewDecisionLine({ status: 'Approved', reviewedByName: 'Nomvula Zulu' })).toBe('Approved by Nomvula Zulu')
+  })
+
+  it('shows nothing for a pending document or when no reviewer is recorded', () => {
+    expect(reviewDecisionLine({ status: 'Pending', reviewedByName: 'Nomvula Zulu', reviewedAt })).toBeNull()
+    expect(reviewDecisionLine({ status: 'Rejected', reviewedByName: null, reviewedAt })).toBeNull()
+    expect(reviewDecisionLine({ status: 'Approved' })).toBeNull()
   })
 })

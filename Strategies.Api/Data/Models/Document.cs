@@ -13,6 +13,7 @@ namespace Strategies.Api.Data.Models
         public string FilePath { get; set; } = string.Empty;
         public DocumentStatus Status { get; set; }
         public string? ReviewComment { get; set; }
+        public DateTime? ReviewedAt { get; set; }
         public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
         public bool IsArchived { get; set; } = false;
     }

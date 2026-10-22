@@ -226,6 +226,9 @@ namespace Strategies.Api.Migrations
                     b.Property<string>("ReviewComment")
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid?>("ReviewedById")
                         .HasColumnType("uuid");
 
