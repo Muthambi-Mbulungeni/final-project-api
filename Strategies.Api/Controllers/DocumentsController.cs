@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
 using Strategies.Api.DTOs;
+using Strategies.Api.Services;
 
 namespace Strategies.Api.Controllers
 {
@@ -18,10 +20,12 @@ namespace Strategies.Api.Controllers
     public class DocumentsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IFileStorage _fileStorage;
 
-        public DocumentsController(ApplicationDbContext context)
+        public DocumentsController(ApplicationDbContext context, IFileStorage fileStorage)
         {
             _context = context;
+            _fileStorage = fileStorage;
         }
 
         /// <summary>
@@ -179,18 +183,11 @@ namespace Strategies.Api.Controllers
                 if (!owns) return Forbid();
             }
 
-            var relativePath = document.FilePath.StartsWith("/") ? document.FilePath.Substring(1) : document.FilePath;
-            var filePath = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", relativePath);
-            if (!System.IO.File.Exists(filePath))
+            // Resolved inside the storage root only; any refusal looks the same as a missing file.
+            var filePath = _fileStorage.ResolveExisting(document.FilePath);
+            if (filePath == null)
                 return NotFound(new ApiErrorResponse { Message = "Physical file not found." });
 
-            var memory = new System.IO.MemoryStream();
-            using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read))
-            {
-                await stream.CopyToAsync(memory);
-            }
-            memory.Position = 0;
-            
             var ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
             var contentType = ext switch
             {
@@ -201,7 +198,10 @@ namespace Strategies.Api.Controllers
                 _ => "application/octet-stream"
             };
 
-            return File(memory, contentType, document.FileName);
+            // Streamed from disk; FileStreamResult disposes the stream after the response.
+            var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read,
+                System.IO.FileShare.Read, bufferSize: 64 * 1024, useAsync: true);
+            return File(stream, contentType, document.FileName);
         }
 
         /// <summary>
@@ -219,29 +219,23 @@ namespace Strategies.Api.Controllers
             if (file.Length > maxFileSize)
                 return BadRequest(new ApiErrorResponse { Message = "File size exceeds the 5MB limit." });
 
-            var allowedExtensions = new[] { ".pdf", ".jpg", ".jpeg", ".png" };
             var extension = System.IO.Path.GetExtension(file.FileName).ToLowerInvariant();
 
-            if (!allowedExtensions.Contains(extension))
+            if (!LocalFileStorage.AllowedExtensions.Contains(extension))
                 return BadRequest(new ApiErrorResponse { Message = "Invalid file type. Only PDF, JPG, and PNG are allowed." });
 
-            var uploadsFolder = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-            if (!System.IO.Directory.Exists(uploadsFolder))
-                System.IO.Directory.CreateDirectory(uploadsFolder);
-
-            var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-            var physicalPath = System.IO.Path.Combine(uploadsFolder, uniqueFileName);
-
-            using (var stream = new System.IO.FileStream(physicalPath, System.IO.FileMode.Create))
+            string storedName;
+            await using (var upload = file.OpenReadStream())
             {
-                await file.CopyToAsync(stream);
+                storedName = await _fileStorage.SaveAsync(upload, extension);
             }
 
+            // FilePath is the bare stored name; the web passes it straight back to POST /api/documents.
             return Ok(new
             {
                 Message = "File uploaded successfully.",
                 FileName = file.FileName,
-                FilePath = $"/uploads/{uniqueFileName}"
+                FilePath = storedName
             });
         }
 
@@ -283,6 +277,16 @@ namespace Strategies.Api.Controllers
                 if (!owns) return Forbid();
             }
 
+            // Only a name the upload endpoint generated, for a file that exists. Checked after ownership
+            // so a caller without access to the case cannot probe which file names exist.
+            var storedName = dto.FilePath.Trim();
+            if (!_fileStorage.IsValidStoredName(storedName) || _fileStorage.ResolveExisting(storedName) == null)
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "Validation failed.",
+                    Errors = new List<string> { "Invalid file reference." }
+                });
+
             var caseExists = await _context.Cases.AnyAsync(c => c.Id == dto.CaseId);
             if (!caseExists)
                 return NotFound(new ApiErrorResponse { Message = "Case not found." });
@@ -297,7 +301,7 @@ namespace Strategies.Api.Controllers
                 CaseId = dto.CaseId,
                 DocumentTypeId = dto.DocumentTypeId,
                 FileName = dto.FileName.Trim(),
-                FilePath = dto.FilePath.Trim(),
+                FilePath = storedName,
                 Status = DocumentStatus.Pending,
                 UploadedAt = DateTime.UtcNow,
                 IsArchived = false

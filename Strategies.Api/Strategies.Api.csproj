@@ -28,4 +28,9 @@
     <Folder Include="Services\" />
   </ItemGroup>
 
+  <!-- Placeholder PDFs for the seeded documents; SeedFileInstaller copies them into Storage:UploadsRoot at startup. -->
+  <ItemGroup>
+    <None Include="SeedFiles\**\*" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
