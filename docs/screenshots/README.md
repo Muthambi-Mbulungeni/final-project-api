@@ -4,11 +4,11 @@ Screenshots of the web portal for the EXPO deck, the poster board and the [user 
 
 ## How they were taken
 
-- **Code:** `develop` at commit `98ff559` (web and API unchanged).
+- **Code:** `develop` at commit `98ff559` (web and API unchanged). The 24 screens touched by the UI polish pass were retaken on 22 Oct 2026 from `develop` `765d506` plus the polish commits on `feature/riaad-ui-polish`, the two polish commits on `feature/riaad-messaging-web` (without the message thread itself) and the Users page polish on `feature/riaad-admin-edit-user` (without Edit user). Retaken: `public-02-enquiry-errors-mobile`, `client-01` to `client-06`, `consultant-01` to `consultant-09` and `admin-03` to `admin-10`. The earlier versions are in the history of this folder.
 - **Build:** production build of `strategies-web` served by `vite preview`, so the development-only role switcher does not appear. `/api` is proxied to the API on `http://localhost:5151`.
 - **Data:** a local PostgreSQL database with the five migrations and the demo seed in [`database/seed`](../../database/seed). For the pictures only, three placeholder seed names were changed in that local database: "John Doe" became Lerato Mahlangu, "Consultant User" became Nomvula Zulu and "Riaad" became Pieter van Wyk (pieter.vanwyk@nexus.com). The seed files themselves are unchanged. All people, emails and files are made up.
 - **AI triage:** no Gemini key was set, so the new enquiry (Kagiso Molefe) shows the agent's fallback verdict, "Needs review". The seeded leads carry seeded verdicts.
-- **Browser:** Microsoft Edge driven by Playwright, light theme, reduced motion, South African locale and time zone.
+- **Browser:** Microsoft Edge driven by Playwright, light theme, reduced motion, South African locale and time zone. Phone shots emulate a touch screen, so no hover style shows (the first phone enquiry shot had one where the mouse pointer was left).
 - **Size:** desktop 1440 × 900, phone 390 × 844, both at 2× pixel density (2880 × 1800 and 780 px wide). Files ending in `-full` and the phone shots show the whole page, not only the first screen.
 - **Accounts:** the demo accounts in [`database/seed/README.md`](../../database/seed/README.md) (admin@nexus.com, consultant@nexus.com, client@nexus.com).
 
@@ -61,7 +61,7 @@ User-guide sections refer to [USER_GUIDE.md](../USER_GUIDE.md). Each deck sugges
 | `consultant-06-case-documents.png` | Case panel scrolled to the documents | 4 Review documents | |
 | `consultant-07-reject-note-required.png` | Rejecting without a note is blocked | 4 Review documents, 6 | Validation |
 | `consultant-08-stage-change.png` | "Under review" chosen for Ayesha Patel's case | 4 Manage a case | State machine |
-| `consultant-09-stage-changed.png` | Case moved from Document gathering to Under review | 4 Manage a case | State machine |
+| `consultant-09-stage-changed.png` | Case moved from Document gathering to Under review, with confirmation message | 4 Manage a case | State machine |
 
 ### Admin (System Admin, admin@nexus.com)
 
