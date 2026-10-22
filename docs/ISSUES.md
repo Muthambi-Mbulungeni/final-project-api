@@ -55,10 +55,10 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 **Medium. Gemini model name may be retired; live call not tested.**
 
-- **Problem:** the API calls `gemini-1.5-flash`, which may no longer be available. The test environment has no Gemini key, so a live call was not tested.
-- **Evidence:** `Gemini:Url` in `appsettings.json`; A14 shows the fallback.
+- **Problem:** the API called `gemini-1.5-flash`, which may no longer be available. The test environment has no Gemini key, so a live call was not tested.
+- **Evidence:** `Gemini:Model` in `appsettings.json`; A14 shows the fallback.
 - **Impact:** if the call fails, every enquiry is saved as NeedsReview, so no enquiry is lost but none is triaged automatically.
-- **Fix:** update the model name and test one real call with a key.
+- **Fix:** the code fix is done. The model is now set by `Gemini:Model` (`gemini-3.8-flash-lite`), the key is sent in the `x-goog-api-key` header, the call has a 10-second timeout, instructions are in `systemInstruction` with applicant data treated as untrusted, name and email are not sent, the reply is checked against a JSON schema, and every run is logged to `AgentRun`. Unit tests in `GeminiAgentServiceTests.cs` cover each fallback path. **Remaining:** test one real call with a key.
 
 ### ISS-09
 
