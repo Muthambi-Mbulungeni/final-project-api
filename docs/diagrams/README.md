@@ -75,7 +75,9 @@ IDs are from the client requirements list. Checked against `develop`, plus `orig
 
 ## Re-rendering
 
-From `docs/diagrams`, with Node 22:
+How to re-render: from `docs/diagrams`, with Node 22, run `npm i --no-save --no-package-lock @mermaid-js/mermaid-cli@11` once, then `node render.mjs` (all diagrams) or `node render.mjs NAME ...`. It uses the installed Edge (set `BROWSER_PATH` for Chrome) and writes the `.svg` and 3x `.png` with the settings below in one browser session.
+
+The same output one diagram at a time, without the script:
 
 ```
 npx -y @mermaid-js/mermaid-cli@11 -c mermaid-config.json -b white -w 1600 -i NAME.mmd -o NAME.svg
