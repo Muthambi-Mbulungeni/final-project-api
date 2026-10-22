@@ -1,5 +1,5 @@
 ---
-title: Cloud architecture - network boundaries and protocols (dashed = not found in repo config)
+title: Cloud architecture - network boundaries and protocols (dashed = not in the repo's config, or not running)
 ---
 flowchart LR
     subgraph INTERNET["Public internet"]
@@ -12,17 +12,21 @@ flowchart LR
     subgraph GH["GitHub (public HTTPS)"]
         direction TB
         PAGES["GitHub Pages<br>static web build, HashRouter<br>emgprs.github.io/insy7315-...-herculesriaadst10258492/"]
-        ACTIONS["GitHub Actions<br>ci.yml, deploy-pages.yml"]
+        ACTIONS["GitHub Actions<br>ci.yml, deploy-pages.yml<br>SUSPENDED: org billing,<br>every run since 21 Oct fails"]
     end
 
-    subgraph AZ["API host (ASSUMED Azure App Service: no config in repo)"]
+    DEVPC["Developer PC<br>dotnet publish + CLI deploy<br>(per team: no publish profile<br>or workflow in the repo)"]
+
+    subgraph AZ["API host: Azure App Service (per team; no host config in the repo)"]
         direction TB
-        API["Strategies.Api<br>.NET 10, Kestrel behind the host's TLS proxy<br>JWT, CORS, rate limit, security headers<br>uploads on local disk (wwwroot/uploads)<br>refresh tokens in memory"]
+        API["Strategies.Api<br>.NET 10, Kestrel behind the host's TLS proxy<br>JWT, CORS, rate limit, security headers<br>uploads on the App Service local disk (wwwroot/uploads)<br>refresh tokens in memory"]
     end
 
-    subgraph SUPA["Database host (Supabase, per database/seed/README.md)"]
-        PG[("PostgreSQL<br>schema public, 12 tables<br>session pooler")]
+    subgraph SUPA["Database host: Supabase (PostgreSQL), per database/seed/README.md"]
+        PG[("PostgreSQL via Npgsql<br>schema public, 12 tables<br>session pooler")]
     end
+
+    CFG[/"Production config in the repo: none.<br>appsettings.json DefaultConnection = Postgres on localhost:5432 (strategies_db);<br>no appsettings.Production.json. The hosted connection string must come from<br>the App Service setting ConnectionStrings__DefaultConnection."/]
 
     subgraph EXTG["External: Google (public HTTPS)"]
         GEM["Google Gemini API<br>generativelanguage.googleapis.com<br>gemini-1.5-flash"]
@@ -39,7 +43,9 @@ flowchart LR
     API -->|"PostgreSQL wire protocol (Npgsql)<br>TLS assumed: SSL Mode is in the secret,<br>not in the repo"| PG
     API -->|"HTTPS POST, API key in query string"| GEM
     API -->|"SMTP + STARTTLS (EnableSsl), port 587 default"| SMTP
-    ACTIONS -->|"upload-pages-artifact / deploy-pages<br>on push to main"| PAGES
+    ACTIONS -.->|"upload-pages-artifact / deploy-pages<br>on push to main (not running while suspended)"| PAGES
+    DEVPC -.->|"HTTPS deploy of the publish output"| API
+    CFG -.-> API
 
     classDef assumed stroke-dasharray: 6 4,fill:#fafafa
-    class AZ,API assumed
+    class AZ,API,DEVPC,ACTIONS,CFG assumed

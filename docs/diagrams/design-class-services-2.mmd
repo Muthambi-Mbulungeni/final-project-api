@@ -1,0 +1,66 @@
+---
+title: Design class diagram 8 of 8 - email, AI triage, case service, data access, middleware
+---
+classDiagram
+    direction LR
+
+    class SmtpEmailService {
+        <<service, scoped>>
+        -_configuration: IConfiguration
+        -_logger: ILogger~SmtpEmailService~
+        +SendPasswordResetEmailAsync(toEmail: string, resetLink: string) Task
+        +SendAccountConfirmationEmailAsync(toEmail: string, confirmationLink: string) Task
+        -SendEmailAsync(toEmail: string, subject: string, htmlBody: string) Task
+    }
+    class GeminiAgentService {
+        <<service, typed HttpClient>>
+        -_httpClient: HttpClient
+        -_config: IConfiguration
+        -_logger: ILogger~GeminiAgentService~
+        +ProcessLeadAsync(leadData: string) Task~AgentResponse~
+    }
+    class AgentResponse {
+        +Status: string
+        +Message: string
+        +ExtractedData: string?
+    }
+    class CaseManagementService {
+        <<service, scoped>>
+        -_context: ApplicationDbContext
+        +AdvanceCaseStageAsync(caseId: Guid) Task~bool~
+    }
+    class ApplicationDbContext {
+        <<scoped>>
+        +Users: DbSet~User~
+        +Leads: DbSet~Lead~
+        +Cases: DbSet~Case~
+        +Documents: DbSet~Document~
+        +VisaCategories: DbSet~VisaCategory~
+        +DocumentTypes: DbSet~DocumentType~
+        +ChecklistTemplates: DbSet~ChecklistTemplate~
+        +CaseStageHistories: DbSet~CaseStageHistory~
+        +VisaRecords: DbSet~VisaRecord~
+        +Messages: DbSet~Message~
+        +AgentRuns: DbSet~AgentRun~
+        +AuditLogs: DbSet~AuditLog~
+        #OnModelCreating(modelBuilder: ModelBuilder) void
+    }
+    class DbContext {
+        <<EF Core>>
+    }
+    class SecurityHeadersMiddlewareExtensions {
+        <<static>>
+        +UseSecurityHeaders(app: IApplicationBuilder)$ IApplicationBuilder
+    }
+    class SecurityHeadersMiddleware {
+        -_next: RequestDelegate
+        +InvokeAsync(context: HttpContext) Task
+    }
+
+    SmtpEmailService --() IEmailService
+    GeminiAgentService --() IAgentService
+    GeminiAgentService ..> AgentResponse : «create»
+    ApplicationDbContext --|> DbContext
+    SecurityHeadersMiddlewareExtensions ..> SecurityHeadersMiddleware : «register»
+
+    note "Lollipop = interface the class provides; IEmailService and<br>IAgentService declare exactly the public operations listed.<br>ProcessLeadAsync returns Status Fallback when Gemini:ApiKey is empty<br>or the call fails; LeadsController then saves the lead as NeedsReview.<br>SendAccountConfirmationEmailAsync is never called.<br>CaseManagementService is registered and unit tested,<br>but no controller calls it.<br>ApplicationDbContext uses Npgsql (PostgreSQL). OnModelCreating sets<br>keys, required fields, foreign keys and delete rules."

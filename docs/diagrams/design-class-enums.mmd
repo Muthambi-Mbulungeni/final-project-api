@@ -1,8 +1,8 @@
 ---
-title: Design class diagram 2b - enumerations (Strategies.Api/Data/Enums)
+title: Design class diagram 4 of 8 - enumerations (Strategies.Api/Data/Enums)
 ---
 classDiagram
-    direction TB
+    direction LR
 
     class UserRole {
         <<enumeration>>
@@ -51,33 +51,13 @@ classDiagram
         Error
     }
 
-    class User {
-        +UserRole Role
-    }
-    class Case {
-        +CaseStage Stage
-    }
-    class CaseStageHistory {
-        +CaseStage FromStage
-        +CaseStage ToStage
-    }
-    class Document {
-        +DocumentStatus Status
-    }
-    class Lead {
-        +ImmigrationStatus ImmigrationStatus
-        +TriageStatus TriageStatus
-    }
-    class AgentRun {
-        +AgentType AgentType
-        +RunStatus Status
-    }
+    User ..> UserRole : Role
+    Case ..> CaseStage : Stage
+    CaseStageHistory ..> CaseStage : FromStage, ToStage
+    Document ..> DocumentStatus : Status
+    Lead ..> ImmigrationStatus : ImmigrationStatus
+    Lead ..> TriageStatus : TriageStatus
+    AgentRun ..> AgentType : AgentType
+    AgentRun ..> RunStatus : Status
 
-    User ..> UserRole
-    Case ..> CaseStage
-    CaseStageHistory ..> CaseStage
-    Document ..> DocumentStatus
-    Lead ..> ImmigrationStatus
-    Lead ..> TriageStatus
-    AgentRun ..> AgentType
-    AgentRun ..> RunStatus
+    note "Labels name the property that holds the value.<br>Only Triage is implemented (GeminiAgentService).<br>RunStatus is reused as a string in AgentResponse.Status;<br>no AgentRun row is ever written."

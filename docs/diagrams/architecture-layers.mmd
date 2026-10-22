@@ -25,7 +25,7 @@ flowchart TB
         SV["Services (business layer)<br>AuthService, TokenService, PasswordHasherService,<br>InMemoryRefreshTokenStore, SmtpEmailService,<br>GeminiAgentService, CaseManagementService (unused)"]
         DA["Data access layer<br>ApplicationDbContext (EF Core + Npgsql)<br>Models, Enums, Migrations"]
         MW --> CT
-        CT -->|"Auth only"| SV
+        CT -->|"Auth (auth services, email),<br>Leads (IAgentService triage)"| SV
         CT -->|"Leads, Cases, Documents, Admin, Stats,<br>Notification, DocumentTypes: direct, no service layer"| DA
         SV --> DA
     end

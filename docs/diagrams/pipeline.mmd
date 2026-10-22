@@ -29,7 +29,8 @@ flowchart LR
     end
 
     PAGES[("GitHub Pages<br>web portal")]
-    NOAPI["No workflow builds or deploys<br>the API, database or Android app"]
+    NOAPI["No workflow builds or deploys<br>the API, database or Android app.<br>API: dotnet publish + CLI deploy to<br>Azure App Service from a dev PC (per team)"]
+    SUSP["Actions SUSPENDED (org billing):<br>every CI and Pages run since 21 Oct<br>fails before a job starts, so checks<br>run locally before each PR"]
 
     FEAT -.->|PR opened| CIY
     DEVB -.->|push / merge| CIY
@@ -38,4 +39,4 @@ flowchart LR
     D2 --> PAGES
 
     classDef gap fill:#fff5c2,stroke:#b59f00
-    class NOAPI gap
+    class NOAPI,SUSP gap

@@ -2,7 +2,7 @@
 title: Pattern - dependency injection (object diagram for one POST /api/auth/login request, Program.cs)
 ---
 flowchart LR
-    CTRL["<u>authController : AuthController</u><br>«scoped, per request»"]
+    CTRL["<u>authController : AuthController</u><br>«created per request (not a DI registration)»"]
     AS["<u>authService : AuthService</u><br>as IAuthService<br>«scoped»"]
     ES["<u>emailService : SmtpEmailService</u><br>as IEmailService<br>«scoped»"]
     DB["<u>dbContext : ApplicationDbContext</u><br>Npgsql, DefaultConnection<br>«scoped»"]

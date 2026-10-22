@@ -1,0 +1,51 @@
+---
+title: Design class diagram 2 of 8 - case documents and stage history (Strategies.Api/Data/Models)
+---
+classDiagram
+    direction TB
+
+    class Case {
+        <<entity, see diagram 1>>
+        +Id: Guid «PK»
+        +Stage: CaseStage
+    }
+    class Document {
+        <<entity>>
+        +Id: Guid «PK»
+        +CaseId: Guid «FK Case»
+        +DocumentTypeId: Guid «FK DocumentType»
+        +ReviewedById: Guid? «FK User»
+        +FileName: string
+        +FilePath: string
+        +Status: DocumentStatus
+        +ReviewComment: string?
+        +UploadedAt: DateTime = UtcNow
+        +IsArchived: bool = false
+    }
+    class CaseStageHistory {
+        <<entity>>
+        +Id: Guid «PK»
+        +CaseId: Guid «FK Case»
+        +ChangedById: Guid? «FK User»
+        +FromStage: CaseStage
+        +ToStage: CaseStage
+        +ChangedAt: DateTime = UtcNow
+    }
+    class DocumentType {
+        <<entity>>
+        +Id: Guid «PK»
+        +Name: string
+        +Description: string?
+    }
+    class User {
+        <<entity, see diagram 1>>
+        +Id: Guid «PK»
+    }
+
+    Case "1" *-- "0..*" Document
+    Case "1" *-- "0..*" CaseStageHistory
+    DocumentType "1" <-- "0..*" Document
+    User "0..1" <-- "0..*" Document : reviewer
+    User "0..1" <-- "0..*" CaseStageHistory : changed by
+
+    note "No methods: EF Core property classes.<br>Filled diamond = deleted with the case (Cascade).<br>Document to DocumentType: Restrict. Reviewer and<br>changed-by links: SetNull.<br>FilePath is a path on the API host's local disk<br>(wwwroot/uploads); files are not stored in the database."

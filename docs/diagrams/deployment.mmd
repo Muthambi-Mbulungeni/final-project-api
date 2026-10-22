@@ -1,5 +1,5 @@
 ---
-title: Deployment diagram - nodes, artefacts, environments and config sources (dashed = assumed)
+title: Deployment diagram - nodes, artefacts, environments and config sources (dashed = not in the repo, or not running)
 ---
 flowchart TB
     subgraph DEV["Development environment (each developer PC)"]
@@ -8,7 +8,7 @@ flowchart TB
         DEVAPI["«execution env» dotnet run<br>launch profile http :5151<br>ASPNETCORE_ENVIRONMENT = Development<br>Swagger on"]
         DEVDB[("«database» PostgreSQL<br>native :5432 or Docker smp-postgres<br>(docker-compose.yml postgres:15)")]
         EMU["«device» Android emulator<br>debug APK -> http://10.0.2.2:5151"]
-        SECRETS[/"«config» .NET user-secrets<br>ConnectionStrings:DefaultConnection<br>Jwt:Key, Gemini:ApiKey"/]
+        SECRETS[/"«config» .NET user-secrets<br>ConnectionStrings:DefaultConnection<br>Jwt:Key, Gemini:ApiKey"/]
         DEVWEB --> DEVAPI
         EMU --> DEVAPI
         DEVAPI --> DEVDB
@@ -18,24 +18,27 @@ flowchart TB
     subgraph PROD["Production environment"]
         direction LR
         PAGESN["«node» GitHub Pages<br>artefact: strategies-web/dist<br>(vite build, base = repo path)"]
-        APPSVC["«node» API host<br>ASSUMED Azure App Service<br>artefact: Strategies.Api (no publish workflow)"]
-        SUPAN[("«node» Supabase PostgreSQL<br>migrated with dotnet ef from a dev PC<br>seeded via SQL editor")]
+        APPSVC["«node» Azure App Service (per team)<br>artefact: Strategies.Api publish output<br>uploads on its local disk (wwwroot/uploads)"]
+        SUPAN[("«node» Supabase PostgreSQL (Npgsql)<br>migrated with dotnet ef from a dev PC<br>seeded via SQL editor")]
         APK["«artefact» release APK<br>API_BASE_URL = https://CHANGE-ME.example.com/<br>not built or distributed"]
-        APPSET[/"«config» App Service settings<br>ConnectionStrings__DefaultConnection<br>Jwt__Key, Gemini__ApiKey, Smtp__*, App__BaseUrl<br>(ASSUMED: nothing in repo)"/]
+        APPSET[/"«config» App Service settings<br>ConnectionStrings__DefaultConnection<br>Jwt__Key, Gemini__ApiKey, Smtp__*, App__BaseUrl<br>(not in repo: appsettings.json has only<br>a localhost Postgres fallback;<br>no appsettings.Production.json)"/]
         PAGESN -.->|"no VITE_API_BASE_URL at build"| APPSVC
         APK -.-> APPSVC
         APPSVC --> SUPAN
         APPSET -.-> APPSVC
     end
 
-    subgraph CI["GitHub Actions runners (ubuntu-latest)"]
-        BUILD["ci.yml: dotnet build/test, npm lint/test/build"]
+    subgraph CI["GitHub Actions (ubuntu-latest): SUSPENDED, org billing"]
+        BUILD["ci.yml: dotnet build/test, npm lint/test/build<br>every run since 21 Oct fails:<br>job not started (billing)"]
         GHSEC[/"«config» GitHub secrets<br>JWT_KEY_CI (CI tests only)"/]
         DEPLOY["deploy-pages.yml: build + deploy-pages<br>on push to main"]
     end
 
+    PUBLISH["«process» dotnet publish + CLI deploy<br>run on a developer PC<br>(per team: no publish profile<br>or workflow in the repo)"]
+
     GHSEC -.-> BUILD
-    DEPLOY -->|"github-pages environment"| PAGESN
+    DEPLOY -.->|"github-pages environment"| PAGESN
+    PUBLISH -.->|"publish output (per team)"| APPSVC
 
     classDef assumed stroke-dasharray: 6 4,fill:#fafafa
-    class APPSVC,APPSET,APK assumed
+    class APPSVC,APPSET,APK,PUBLISH,BUILD,DEPLOY assumed
