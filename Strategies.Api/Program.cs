@@ -38,6 +38,13 @@ builder.Services.AddScoped<IPasswordPolicy, PasswordPolicy>();
 builder.Services.AddHttpClient<IAgentService, GeminiAgentService>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddScoped<CaseManagementService>();
 
+// Document storage root, resolved once against the content root. Production sets an absolute path
+// outside the deploy folder (e.g. /home/data/uploads on Azure) so uploads survive redeploys.
+var uploadsRoot = Path.GetFullPath(Path.Combine(
+    builder.Environment.ContentRootPath,
+    builder.Configuration["Storage:UploadsRoot"] ?? "wwwroot/uploads"));
+builder.Services.AddSingleton<IFileStorage>(new LocalFileStorage(uploadsRoot));
+
 // 4. JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
@@ -119,6 +126,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Placeholder files for the seeded documents: copied into the storage root if missing, on every startup.
+SeedFileInstaller.EnsureSeedFiles(
+    Path.Combine(app.Environment.ContentRootPath, "SeedFiles"), uploadsRoot, app.Logger);
 
 if (app.Environment.IsDevelopment())
 {
