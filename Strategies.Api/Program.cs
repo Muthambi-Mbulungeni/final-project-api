@@ -24,6 +24,9 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Outside Development: stop now, naming every missing required setting (connection string, JWT key, app URL, CORS origins).
+RequiredSettings.EnsurePresent(builder.Configuration, builder.Environment);
+
 // 1. Database Context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -132,11 +135,12 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
-// 7. CORS Policy
+// 7. CORS Policy: origins from "Cors:AllowedOrigins" (scheme and host only; checked at startup).
+var corsOrigins = CorsSettings.ReadValidatedOrigins(builder.Configuration);
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173")
+    options.AddPolicy(CorsSettings.PolicyName, policy =>
+        policy.WithOrigins(corsOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
@@ -151,9 +155,17 @@ builder.Services.AddControllers()
         options.InvalidModelStateResponseFactory = context => new BadRequestObjectResult(
             ApiErrorResponse.FromModelState(context.ModelState)));
 
-// 9. Swagger (Simplified & Error-Free)
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// 9. Swagger: on when "Swagger:Enabled" is true (Development by default; Azure sets it explicitly).
+var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled");
+if (swaggerEnabled)
+{
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+}
+
+// 10. Health check: GET /health, anonymous, with a database connectivity check.
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database");
 
 var app = builder.Build();
 
@@ -164,14 +176,14 @@ var app = builder.Build();
 if (!string.Equals(app.Configuration["FORWARDEDHEADERS_ENABLED"], "true", StringComparison.OrdinalIgnoreCase))
     app.UseForwardedHeaders();
 
-if (app.Environment.IsDevelopment())
+if (swaggerEnabled)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
 app.UseRouting();
-app.UseCors("AllowFrontend");
+app.UseCors(CorsSettings.PolicyName);
 app.UseSecurityHeaders();
 // After routing, so the [EnableRateLimiting] policy on an action is known; before authentication,
 // so throttled requests are turned away before any token work.
@@ -179,6 +191,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health");
 
 app.Run();
 

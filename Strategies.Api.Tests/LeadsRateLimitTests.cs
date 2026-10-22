@@ -35,7 +35,10 @@ namespace Strategies.Api.Tests
 
             public ApiFactory(Dictionary<string, string?>? settings = null, string environment = "Testing")
             {
-                _settings = settings ?? new Dictionary<string, string?>();
+                // Outside Development these have no defaults and the API refuses to start without them.
+                _settings = new Dictionary<string, string?>(StartupConfigurationTests.RequiredTestSettings);
+                foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
+                    _settings[key] = value;
                 _environment = environment;
             }
 
