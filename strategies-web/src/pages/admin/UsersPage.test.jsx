@@ -149,7 +149,9 @@ describe('UsersPage: edit user', () => {
   })
 
   it('shows a duplicate email (409) under the email field', async () => {
-    stubApi(async () => json({ message: 'Another account already uses this email address.' }, 409))
+    stubApi(async () =>
+      json({ message: 'Another account already uses this email address.', errors: [], code: 'duplicate_email' }, 409),
+    )
     renderPage()
     const { dialog } = await openEdit('Sipho Ndlovu')
 
@@ -160,7 +162,25 @@ describe('UsersPage: edit user', () => {
     const email = field(dialog, 'Email address')
     expect(email.getAttribute('aria-describedby')).toBe(error.id)
     expect(email.getAttribute('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(email)
     expect(dialog.queryByRole('alert')).toBeNull()
+  })
+
+  it('shows other 409s (active cases) above the buttons, not under the email field', async () => {
+    const message =
+      'This consultant has 4 active assigned cases. Reassign them to another consultant before changing the role.'
+    stubApi(async () => json({ message, errors: [] }, 409))
+    renderPage()
+    const { dialog } = await openEdit('Sipho Ndlovu')
+
+    fireEvent.change(field(dialog, 'Role'), { target: { value: 'Client' } })
+    fireEvent.click(saveButton(dialog))
+
+    expect((await dialog.findByRole('alert')).textContent).toBe(message)
+    const email = field(dialog, 'Email address')
+    expect(email.getAttribute('aria-invalid')).not.toBe('true')
+    expect(email.getAttribute('aria-describedby')).toBeNull()
+    expect(saveButton(dialog).disabled).toBe(false)
   })
 
   it('does not let administrators change their own role', async () => {

@@ -1,13 +1,15 @@
 // Editing a user's details as an administrator.
 // PATCH /api/admin/users/{id} with { fullName?, email?, role? } (only the fields that changed)
 // returns 200 and the updated user { id, fullName, email, role, isActive }.
-// 400 { message, errors } is a validation problem; 409 { message } means another account already
-// uses that email address. Contract agreed with the API team; the endpoint is not built yet.
+// 400 { message, errors } is a validation problem. 409 { message, code: "duplicate_email" } means
+// another account already uses that email address; any other 409 (last active admin, a consultant
+// with active cases) is a rule the change breaks, explained in the message.
 // Access (active / suspended) is not edited here: it has its own suspend and reinstate actions.
 import { resolveEnum } from '../config/enums'
 import { emailError } from './validation'
 
 const FIELDS = ['fullName', 'email', 'role']
+export const DUPLICATE_EMAIL_CODE = 'duplicate_email'
 
 export function userEditPath(id) {
   return `/api/admin/users/${encodeURIComponent(id)}`
@@ -54,10 +56,11 @@ export function validateUserEdit({ fullName, email, role }) {
 }
 
 // Turns a failed save into what the dialog shows: { email } for a duplicate address (under the
-// email field), or { form: [messages] } above the buttons. The 400 errors are plain sentences with
-// no field names, so they are listed together rather than guessed onto a field.
+// email field), or { form: [messages] } above the buttons. Only the API's duplicate_email code
+// goes to the email field; other 409s show their message as it is. The 400 errors are plain
+// sentences with no field names, so they are listed together rather than guessed onto a field.
 export function userEditErrorOutcome(error) {
-  if (error?.status === 409) {
+  if (error?.status === 409 && error.code === DUPLICATE_EMAIL_CODE) {
     return { email: error.message || 'Another account already uses this email address.' }
   }
   const errors = Array.isArray(error?.errors) ? error.errors.filter(Boolean) : []

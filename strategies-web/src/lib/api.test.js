@@ -283,6 +283,15 @@ describe('error messages', () => {
       message: expect.stringContaining('could not be reached'),
     })
   })
+
+  it('keeps the API’s machine-readable code when there is one, and null otherwise', async () => {
+    const body = { message: 'Another account already uses this email address.', errors: [], code: 'duplicate_email' }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 409 })))
+    await expect(apiGet('/api/admin/users')).rejects.toMatchObject({ status: 409, code: 'duplicate_email' })
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: 'No.', code: 42 }), { status: 409 })))
+    await expect(apiGet('/api/admin/users')).rejects.toMatchObject({ status: 409, code: null })
+  })
 })
 
 describe('gateway errors', () => {

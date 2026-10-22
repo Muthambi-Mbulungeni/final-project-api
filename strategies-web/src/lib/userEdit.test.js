@@ -71,9 +71,19 @@ describe('validateUserEdit', () => {
 })
 
 describe('userEditErrorOutcome', () => {
-  it('puts a 409 under the email field', () => {
-    const error = new ApiError('That email address is already in use.', { status: 409 })
+  it('puts a duplicate email 409 under the email field', () => {
+    const error = new ApiError('That email address is already in use.', { status: 409, code: 'duplicate_email' })
     expect(userEditErrorOutcome(error)).toEqual({ email: 'That email address is already in use.' })
+  })
+
+  it('shows any other 409 above the buttons with the API message as it is', () => {
+    const lastAdmin = 'This is the last active administrator. Make another user an administrator first.'
+    const activeCases =
+      'This consultant has 4 active assigned cases. Reassign them to another consultant before changing the role.'
+    expect(userEditErrorOutcome(new ApiError(lastAdmin, { status: 409 }))).toEqual({ form: [lastAdmin] })
+    expect(userEditErrorOutcome(new ApiError(activeCases, { status: 409, code: 'something_else' }))).toEqual({
+      form: [activeCases],
+    })
   })
 
   it('lists 400 field errors together', () => {
