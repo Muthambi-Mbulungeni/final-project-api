@@ -20,7 +20,7 @@ Class diagrams use UML notation: `+name: Type = default` for attributes, `+Opera
 | Diagram | What it shows | Report section | Verified against |
 |---|---|---|---|
 | [ux-journey-web](ux-journey-web.mmd) | Web portal public routes, sign-in and the redirect into each role workspace | 9.1.7 User Experience Journey Map | develop 98ff559 |
-| [ux-journey-web-workspaces](ux-journey-web-workspaces.mmd) | Admin, consultant and client screens, panels and hidden placeholder routes | 9.1.7 User Experience Journey Map | develop 98ff559 |
+| [ux-journey-web-workspaces](ux-journey-web-workspaces.mmd) | Admin, consultant and client screens, panels and hidden placeholder routes | 9.1.7 User Experience Journey Map | develop aff26b0 |
 | [ux-journey-mobile](ux-journey-mobile.mmd) | Android app screens (client only): restore, login, three tabs, sign out | 9.1.7 User Experience Journey Map | develop 98ff559 |
 | [domain-class](domain-class.mmd) | Business concepts, key attributes and multiplicities, no methods | 9.1.9 Domain modelling | develop 98ff559 |
 | [design-class](design-class.mmd) | Design class 1 of 8: User, Lead, Case, VisaCategory with typed attributes, PK/FK, multiplicities | 9.1.9 Design artifacts | develop 98ff559 |
