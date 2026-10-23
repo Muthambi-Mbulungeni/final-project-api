@@ -1,5 +1,5 @@
-# Use the official .NET 8 SDK image to build the app
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# Use the official .NET 10 SDK image to build the app
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution and project files first to restore dependencies
@@ -11,8 +11,8 @@ COPY . .
 WORKDIR "/src/Strategies.Api"
 RUN dotnet publish "Strategies.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# Use the lighter ASP.NET Core runtime image to run the app
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+# Use the lighter ASP.NET Core 10 runtime image to run the app
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
