@@ -131,11 +131,8 @@ var app = builder.Build();
 SeedFileInstaller.EnsureSeedFiles(
     Path.Combine(app.Environment.ContentRootPath, "SeedFiles"), uploadsRoot, app.Logger);
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseForwardedHeaders(); // Extract real IP before rate limiting
 app.UseCors("AllowFrontend");
