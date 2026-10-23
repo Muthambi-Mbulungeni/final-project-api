@@ -24,8 +24,8 @@ android {
         }
         release {
             isMinifyEnabled = false
-            // Production MUST be HTTPS. Replace with the deployed API address.
-            buildConfigField("String", "API_BASE_URL", "\"https://CHANGE-ME.example.com/\"")
+            // Production MUST be HTTPS: the hosted API on Render.
+            buildConfigField("String", "API_BASE_URL", "\"https://final-project-api-zm3s.onrender.com/\"")
         }
     }
 
