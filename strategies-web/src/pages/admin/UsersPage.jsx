@@ -9,14 +9,18 @@ import { apiPatch } from '../../lib/api'
 import { getInitials } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { usersPath } from '../../lib/listPaths'
+import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
 import { useDebouncedValue } from '../../lib/useDebouncedValue'
+import EditUserDialog from './EditUserDialog'
 
 const PAGE_SIZE = 10
 
-// GET /api/admin/users returns { data: [{ id, fullName, email, role, isActive }], totalRecords, totalPages, currentPage }
+// GET /api/admin/users returns { data: [{ id, fullName, email, role, isActive, isLocked, lockoutEndsAt }], totalRecords, totalPages, currentPage }
 // and supports page, pageSize and search (name or email).
+// PATCH /api/admin/users/{id} edits name, email and role (see lib/userEdit.js and EditUserDialog).
 // PATCH /api/admin/users/{id}/suspend and /reinstate change access; both return 409 if already in that state.
+// isLocked is true while repeated failed sign-ins keep an account out; "Unlock" calls /reinstate, which also clears the lockout.
 // There is deliberately no Delete: the API returns 405 because user records are retained for POPIA and the audit trail.
 const ACTIONS = {
   suspend: {
@@ -25,7 +29,7 @@ const ACTIONS = {
       `${name} will not be able to sign in until their account is reinstated. Their records and case history are kept.`,
     confirmLabel: 'Suspend user',
     endpoint: 'suspend',
-    isActiveAfter: false,
+    after: { isActive: false },
     fallbackMessage: 'User suspended.',
   },
   reinstate: {
@@ -33,8 +37,17 @@ const ACTIONS = {
     message: (name) => `${name} will be able to sign in again with their existing password.`,
     confirmLabel: 'Reinstate user',
     endpoint: 'reinstate',
-    isActiveAfter: true,
+    after: { isActive: true, isLocked: false, lockoutEndsAt: null },
     fallbackMessage: 'User reinstated.',
+  },
+  unlock: {
+    title: 'Unlock this account?',
+    message: (name) =>
+      `${name} was locked after repeated failed sign-ins. Unlocking lets them try again straight away with their existing password.`,
+    confirmLabel: 'Unlock account',
+    endpoint: 'reinstate',
+    after: { isLocked: false, lockoutEndsAt: null },
+    fallbackMessage: 'Account unlocked.',
   },
 }
 
@@ -46,17 +59,17 @@ export default function UsersPage() {
   const toast = useToast()
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
-  // Status changes made on this page, shown immediately without refetching the list.
-  const [statusOverrides, setStatusOverrides] = useState({})
+  // Changes made on this page (status and edited details), shown immediately without refetching the list.
+  const [overrides, setOverrides] = useState({})
   const [target, setTarget] = useState(null)
   const [action, setAction] = useState({ busy: false, error: '' })
+  const [editing, setEditing] = useState(null)
   const search = useDebouncedValue(searchInput, 400)
 
   const request = useApi(usersPath({ page, pageSize: PAGE_SIZE, search }))
   const response = request.data
-  const users = listItems(response).map((user) =>
-    user.id in statusOverrides ? { ...user, isActive: statusOverrides[user.id] } : user,
-  )
+  const users = listItems(response).map((user) => (user.id in overrides ? { ...user, ...overrides[user.id] } : user))
+  const myId = getSession()?.id
 
   const current = target ? ACTIONS[target.kind] : null
 
@@ -68,6 +81,17 @@ export default function UsersPage() {
   function openAction(user, kind) {
     setAction({ busy: false, error: '' })
     setTarget({ user, kind })
+  }
+
+  function saveOverride(id, changes) {
+    setOverrides((previous) => ({ ...previous, [id]: { ...previous[id], ...changes } }))
+  }
+
+  function handleSaved(updated) {
+    const user = editing
+    saveOverride(user.id, updated)
+    setEditing(null)
+    toast.show(`${displayName({ ...user, ...updated })}: changes saved.`)
   }
 
   function closeDialog() {
@@ -83,7 +107,7 @@ export default function UsersPage() {
 
     try {
       const result = await apiPatch(`/api/admin/users/${encodeURIComponent(user.id)}/${config.endpoint}`)
-      setStatusOverrides((previous) => ({ ...previous, [user.id]: config.isActiveAfter }))
+      saveOverride(user.id, config.after)
       toast.show(`${displayName(user)}: ${result?.message ?? config.fallbackMessage}`)
       closeDialog()
     } catch (error) {
@@ -120,15 +144,11 @@ export default function UsersPage() {
       cardInline: true,
       render: (user) =>
         user.isActive === false ? (
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200 ring-inset">
-            <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden="true" />
-            Suspended
-          </span>
+          <StatusBadge tone="danger" label="Suspended" />
+        ) : user.isLocked ? (
+          <StatusBadge tone="warning" label="Locked" />
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200 ring-inset">
-            <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden="true" />
-            Active
-          </span>
+          <StatusBadge tone="success" label="Active" />
         ),
     },
     {
@@ -139,24 +159,43 @@ export default function UsersPage() {
         if (!user.id) return null
         const name = displayName(user)
         const suspended = user.isActive === false
+        const locked = !suspended && user.isLocked === true
 
         return (
           <div className="flex items-center justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => setEditing(user)}
+              aria-label={`Edit ${name}`}
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
+            >
+              Edit
+            </button>
             {/* The name travels in router state, not the URL, so it never lands in browser history or access logs. */}
             <Link
               to={{ pathname: '/admin/audit-log', search: `?userId=${encodeURIComponent(user.id)}` }}
               state={{ userName: name }}
               aria-label={`Activity for ${name}`}
-              className="rounded-md px-2 py-1 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-900"
             >
               Activity
             </Link>
+            {locked && (
+              <button
+                type="button"
+                onClick={() => openAction(user, 'unlock')}
+                aria-label={`Unlock ${name}`}
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
+              >
+                Unlock
+              </button>
+            )}
             {suspended ? (
               <button
                 type="button"
                 onClick={() => openAction(user, 'reinstate')}
                 aria-label={`Reinstate ${name}`}
-                className="rounded-md px-2 py-1 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100 hover:text-stone-900"
               >
                 Reinstate
               </button>
@@ -165,7 +204,7 @@ export default function UsersPage() {
                 type="button"
                 onClick={() => openAction(user, 'suspend')}
                 aria-label={`Suspend ${name}`}
-                className="rounded-md px-2 py-1 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
               >
                 Suspend
               </button>
@@ -181,7 +220,7 @@ export default function UsersPage() {
       <PageHeader
         eyebrow="Administration"
         title="Users"
-        description="Find accounts by name or email, suspend or reinstate access, and review what each user has changed."
+        description="Find accounts by name or email, suspend, reinstate or unlock access, and review what each user has changed."
       />
 
       <div className="mt-8">
@@ -217,6 +256,16 @@ export default function UsersPage() {
         onConfirm={confirmAction}
         onCancel={closeDialog}
       />
+
+      {editing && (
+        <EditUserDialog
+          key={editing.id}
+          user={editing}
+          isSelf={Boolean(myId) && String(editing.id) === String(myId)}
+          onSaved={handleSaved}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </>
   )
 }

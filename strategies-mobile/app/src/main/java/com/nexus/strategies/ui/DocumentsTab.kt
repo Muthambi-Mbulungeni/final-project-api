@@ -1,6 +1,13 @@
 package com.nexus.strategies.ui
 
+import android.content.ActivityNotFoundException
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +18,16 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import java.io.File
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,10 +39,19 @@ import androidx.compose.ui.unit.sp
 import com.nexus.strategies.R
 import com.nexus.strategies.data.DocStatus
 import com.nexus.strategies.data.DocumentDto
+import com.nexus.strategies.data.DocumentTypeDto
+import com.nexus.strategies.data.sizeLabel
 import com.nexus.strategies.data.formatDate
 
 @Composable
-fun DocumentsTab(ui: HomeUi, onRetry: () -> Unit) {
+fun DocumentsTab(
+    ui: HomeUi,
+    onRetry: () -> Unit,
+    onPhoto: (Uri?, Boolean) -> Unit,
+    onDiscardPhoto: () -> Unit,
+    onSend: (DocumentTypeDto) -> Unit,
+    onUploadProblem: (String) -> Unit,
+) {
     val docs = ui.documents
     val toReplace = docs.filter { it.state == DocStatus.NeedsReplacing }
 
@@ -50,6 +76,17 @@ fun DocumentsTab(ui: HomeUi, onRetry: () -> Unit) {
         }
 
         if (toReplace.isNotEmpty()) item { ActionNeededCard(toReplace) }
+        item {
+            SendDocumentCard(
+                ui = ui,
+                suggestedTypeId = toReplace.firstOrNull()?.documentTypeId,
+                onRetry = onRetry,
+                onPhoto = onPhoto,
+                onDiscardPhoto = onDiscardPhoto,
+                onSend = onSend,
+                onUploadProblem = onUploadProblem,
+            )
+        }
         item { YourDocuments(docs) }
         item { HowReviewWorks() }
     }
@@ -76,18 +113,13 @@ private fun ActionNeededCard(docs: List<DocumentDto>) {
                     Spacer(Modifier.width(10.dp))
                     Column {
                         Text(note)
-                        Text("Your consultant", fontSize = 12.sp, color = Stone600)
+                        Text(d.reviewerCredit, fontSize = 12.sp, color = Stone600)
                     }
                 }
             }
         }
         Spacer(Modifier.height(14.dp))
-        // The app can't upload yet; clients upload new copies on the web portal (POST /api/documents/upload).
-        Text(
-            "To send a new copy, sign in on the web portal and open Documents. Uploading from the app is coming soon.",
-            fontSize = 13.sp,
-            color = Stone600,
-        )
+        Text("Send a new copy with a photo, in the card below.", fontSize = 13.sp, color = Stone600)
     }
 }
 
@@ -206,8 +238,8 @@ private fun HowReviewWorks() {
             Column(Modifier.weight(1f)) {
                 Text("Sending documents", fontWeight = FontWeight.SemiBold)
                 Text(
-                    "If a document needs replacing, upload a new copy on the web portal. " +
-                        "Your consultant adds your other documents to your case, and they appear here once added.",
+                    "Take a photo of a document, or choose one from your gallery, and send it from this screen. " +
+                        "It shows here as awaiting review until your consultant has checked it.",
                     fontSize = 13.sp,
                     color = Stone600,
                 )
@@ -224,6 +256,150 @@ private fun Explain(state: DocStatus, title: String, body: String) {
         Column(Modifier.weight(1f)) {
             Text(title, fontWeight = FontWeight.SemiBold)
             Text(body, fontSize = 13.sp, color = Stone600)
+        }
+    }
+}
+
+/**
+ * "Send a document": pick the document type, take a photo or choose one, check it, send it.
+ * The camera app and the gallery photo picker need no permission from us; the photo is shrunk to fit
+ * the API's 5 MB limit before it is shown here (see data/PhotoPrep.kt).
+ */
+@Composable
+private fun SendDocumentCard(
+    ui: HomeUi,
+    suggestedTypeId: String?,
+    onRetry: () -> Unit,
+    onPhoto: (Uri?, Boolean) -> Unit,
+    onDiscardPhoto: () -> Unit,
+    onSend: (DocumentTypeDto) -> Unit,
+    onUploadProblem: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    var chosenTypeId by rememberSaveable { mutableStateOf<String?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
+    // Kept across rotation: the camera app can restart this screen while it is open.
+    var cameraUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+        val uri = cameraUri
+        cameraUri = null
+        if (saved && uri != null) onPhoto(uri, true)
+        else if (uri != null) runCatching { context.contentResolver.delete(uri, null, null) }
+    }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> onPhoto(uri, false) }
+
+    fun takePhoto() {
+        try {
+            val dir = File(context.cacheDir, "camera").apply { mkdirs() }
+            val file = File.createTempFile("photo-", ".jpg", dir)
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            cameraUri = uri
+            camera.launch(uri)
+        } catch (_: ActivityNotFoundException) {
+            onUploadProblem("No camera app was found. Choose a photo from your gallery instead.")
+        } catch (_: java.io.IOException) {
+            onUploadProblem("We couldn't start the camera. Try again, or choose a photo from your gallery.")
+        }
+    }
+
+    val types = ui.docTypes
+    val selected = types.firstOrNull { it.id == (chosenTypeId ?: suggestedTypeId) }
+    val busy = ui.uploadBusy
+
+    SectionCard(title = "Send a document") {
+        Text(
+            "Take a clear photo in good light, with the whole page in view. We shrink it for you before it is sent.",
+            fontSize = 13.sp,
+            color = Stone600,
+        )
+        Spacer(Modifier.height(14.dp))
+
+        Text("Document type", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Stone600)
+        Spacer(Modifier.height(6.dp))
+        when {
+            ui.docTypesError != null && types.isEmpty() -> ErrorBanner(ui.docTypesError, onRetry)
+            else -> Box {
+                OutlinedButton(
+                    onClick = { menuOpen = true },
+                    enabled = types.isNotEmpty() && !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(
+                        selected?.name ?: "Choose a document type",
+                        modifier = Modifier.weight(1f),
+                        color = if (selected == null) Stone600 else Stone900,
+                    )
+                    Text("▾", color = Stone600)
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, containerColor = Color.White) {
+                    types.forEach { t ->
+                        DropdownMenuItem(text = { Text(t.name) }, onClick = { chosenTypeId = t.id; menuOpen = false })
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+
+        val photo = ui.photo
+        if (photo == null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = ::takePhoto, enabled = !busy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
+                    Text("Take photo")
+                }
+                OutlinedButton(
+                    onClick = { gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                ) { Text("Choose photo") }
+            }
+        } else {
+            // A small preview so the client can check it is readable before sending.
+            val preview = remember(photo) {
+                BitmapFactory.decodeByteArray(photo.bytes, 0, photo.bytes.size, BitmapFactory.Options().apply { inSampleSize = 4 })
+                    ?.asImageBitmap()
+            }
+            if (preview != null) {
+                Image(
+                    bitmap = preview,
+                    contentDescription = "Preview of the photo you are about to send",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(8.dp)).background(Stone100),
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+            Text("Photo ready · ${sizeLabel(photo.bytes.size)}", fontSize = 12.sp, color = Stone600)
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { selected?.let(onSend) },
+                    enabled = selected != null && !busy,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                ) { Text(if (busy) "Sending…" else "Send") }
+                OutlinedButton(onClick = onDiscardPhoto, enabled = !busy, modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp)) {
+                    Text("Discard")
+                }
+            }
+            if (selected == null) {
+                Spacer(Modifier.height(6.dp))
+                Text("Choose the document type above to send this photo.", fontSize = 12.sp, color = Stone600)
+            }
+        }
+
+        if (busy) {
+            Spacer(Modifier.height(12.dp))
+            LinearProgressIndicator(Modifier.fillMaxWidth(), color = Brand)
+        }
+        ui.uploadError?.let {
+            Spacer(Modifier.height(10.dp))
+            Text(it, color = BrandDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        ui.uploadMessage?.let {
+            Spacer(Modifier.height(10.dp))
+            Text(it, color = Emerald700, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

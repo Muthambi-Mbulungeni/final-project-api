@@ -88,6 +88,8 @@ namespace Strategies.Api.Data
 
                 user.Property(account => account.CreatedAt)
                     .HasDefaultValueSql("now()");
+
+                user.Property(account => account.DeletedAt);
             });
 
             modelBuilder.Entity<Lead>(lead =>

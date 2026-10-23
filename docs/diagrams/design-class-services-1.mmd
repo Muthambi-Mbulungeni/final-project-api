@@ -1,0 +1,72 @@
+---
+title: Design class diagram 7 of 8 - authentication services (Strategies.Api/Services)
+---
+classDiagram
+    direction LR
+
+    class AuthService {
+        <<service, scoped>>
+        -_dbContext: ApplicationDbContext
+        -_passwordHasher: IPasswordHasherService
+        -_tokenService: ITokenService
+        -_refreshTokenStore: IRefreshTokenStore
+        -_logger: ILogger~AuthService~
+        -_lazySeedUsers: Lazy~List~User~~$
+        -_dbConnectionChecked: bool = false
+        -_dbAvailable: bool = false
+        +LoginAsync(request: LoginRequest) Task~AuthResponse?~
+        +RefreshTokenAsync(refreshTokenString: string) Task~AuthResponse?~
+        +RevokeTokenAsync(refreshTokenString: string) Task~bool~
+        +GetUserByIdAsync(userId: Guid) Task~User?~
+        +GetUserByEmailAsync(email: string) Task~User?~
+        +RegisterAsync(request: RegisterRequest) Task~bool~
+        +ResetPasswordAsync(request: ResetPasswordRequest) Task~bool~
+        -IsDbAvailableAsync() Task~bool~
+    }
+    class TokenService {
+        <<service, singleton>>
+        -_config: IConfiguration
+        -_key: SymmetricSecurityKey
+        -_issuer: string
+        -_audience: string
+        -_accessTokenExpirationMinutes: int
+        -_refreshTokenExpirationDays: int
+        +AccessTokenExpirationMinutes: int «get»
+        +RefreshTokenExpirationDays: int «get»
+        +GenerateAccessToken(user: User) ValueTuple~string, DateTime~
+        +GenerateRefreshToken() string
+    }
+    class PasswordHasherService {
+        <<service, singleton>>
+        +HashPassword(password: string) string
+        +VerifyPassword(password: string, hashedPassword: string) bool
+    }
+    class InMemoryRefreshTokenStore {
+        <<service, singleton>>
+        -_tokens: ConcurrentDictionary~string, RefreshToken~
+        -EvictionGracePeriod: TimeSpan = 24 h$
+        +SaveTokenAsync(token: RefreshToken) Task
+        +GetTokenAsync(token: string) Task~RefreshToken?~
+        +RevokeTokenAsync(token: string, replacedByToken: string? = null) Task
+        +RevokeAllUserTokensAsync(userId: Guid) Task
+        -EvictStaleTokens() void
+    }
+    class RefreshToken {
+        +Token: string
+        +UserId: Guid
+        +CreatedAt: DateTime = UtcNow
+        +ExpiresAt: DateTime
+        +IsRevoked: bool
+        +RevokedAt: DateTime?
+        +ReplacedByToken: string?
+        +IsExpired: bool «get, derived»
+        +IsActive: bool «get, derived»
+    }
+
+    AuthService --() IAuthService
+    TokenService --() ITokenService
+    PasswordHasherService --() IPasswordHasherService
+    InMemoryRefreshTokenStore --() IRefreshTokenStore
+    InMemoryRefreshTokenStore "1" o-- "0..*" RefreshToken
+
+    note "Lollipop = interface the class provides. Each interface declares<br>exactly the public operations listed in its class (IAuthService,<br>ITokenService, IPasswordHasherService, IRefreshTokenStore).<br>AuthService uses the other three through its private fields<br>(constructor injection). Lifetimes are from Program.cs.<br>GenerateAccessToken returns the named tuple (Token, Expiration).<br>PasswordHasherService: BCrypt, work factor 11.<br>Refresh tokens live in memory and are lost on restart.<br>If the database is unreachable, AuthService reads the<br>in-code _lazySeedUsers list instead (IsDbAvailableAsync)."

@@ -1,0 +1,59 @@
+---
+title: Design class diagram 5 of 8 - API controllers, part 1 (Strategies.Api/Controllers)
+---
+classDiagram
+    direction LR
+
+    class AuthController {
+        <<controller api/auth>>
+        -_authService: IAuthService
+        -_emailService: IEmailService
+        -_configuration: IConfiguration
+        +Login(request: LoginRequest) Task~IActionResult~
+        +Refresh(request: RevokeTokenRequest) Task~IActionResult~
+        +Revoke(request: RevokeTokenRequest) Task~IActionResult~
+        +ForgotPassword(request: ForgotPasswordRequest) Task~IActionResult~
+        +Register(request: RegisterRequest) Task~IActionResult~
+        +ResetPassword(request: ResetPasswordRequest) Task~IActionResult~
+        +Me() Task~IActionResult~
+    }
+    class LeadsController {
+        <<controller api/leads>>
+        -_context: ApplicationDbContext
+        +GetLeads(page: int = 1, pageSize: int = 10, search: string?, status: string?) Task~IActionResult~
+        +CreateLead(dto: CreateLeadRequest, agentService: IAgentService) Task~IActionResult~
+        +UpdateLeadStatus(id: Guid, request: UpdateLeadStatusRequest) Task~IActionResult~
+    }
+    class CasesController {
+        <<controller api/cases>>
+        -_context: ApplicationDbContext
+        +GetCases(page: int = 1, pageSize: int = 10, search: string?, stage: string?) Task~IActionResult~
+        +CreateCase(request: CreateCaseRequest) Task~IActionResult~
+        +GetCase(id: Guid) Task~IActionResult~
+        +ExportCases() Task~IActionResult~
+        +GetClientCases(clientId: Guid, page: int = 1, pageSize: int = 10) Task~IActionResult~
+        +UpdateStage(id: Guid, request: UpdateCaseStageRequest) Task~IActionResult~
+        +AssignConsultant(id: Guid, request: AssignConsultantRequest) Task~IActionResult~
+        -EscapeCsv(value: string)$ string
+    }
+
+    class IAuthService {
+        <<interface, see diagram 7>>
+    }
+    class IEmailService {
+        <<interface, see diagram 8>>
+    }
+    class IAgentService {
+        <<interface, see diagram 8>>
+    }
+    class ApplicationDbContext {
+        <<DbContext, see diagram 8>>
+    }
+
+    AuthController --> IAuthService
+    AuthController --> IEmailService
+    LeadsController ..> IAgentService : «use» per request
+    LeadsController --> ApplicationDbContext
+    CasesController --> ApplicationDbContext
+
+    note "All controllers extend ControllerBase; dependencies arrive by<br>constructor injection (the private fields). Optional string<br>parameters default to null. Access rules:<br>AuthController: anonymous, except Me (signed in). Login,<br>ForgotPassword, Register, ResetPassword: auth-strict rate limit.<br>LeadsController: CreateLead anonymous (agentService from<br>FromServices); GetLeads, UpdateLeadStatus Admin or Consultant.<br>CasesController: signed in. AssignConsultant Admin only;<br>GetCase, GetClientCases any role; the rest Admin or Consultant."

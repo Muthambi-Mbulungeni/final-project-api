@@ -1,0 +1,43 @@
+---
+title: Sequence diagram - client registration (API only)
+---
+sequenceDiagram
+    autonumber
+    participant C as HTTP client<br/>(no web or mobile screen calls this yet)
+    participant RL as Rate limiter<br/>auth-strict, 5 per min per IP
+    participant AC as AuthController
+    participant AS as AuthService
+    participant PH as PasswordHasherService
+    participant DB as PostgreSQL<br/>User table
+
+    C->>RL: POST /api/auth/register {email, password, firstName, lastName}
+    alt more than 5 requests this minute from this IP
+        RL-->>C: 429 Too Many Requests
+    else within limit
+        RL->>AC: Register(RegisterRequest)
+        alt a field missing or email format invalid
+            AC-->>C: 400 "Validation failed."
+            Note right of AC: no password length or strength rule
+        else valid
+            AC->>AS: RegisterAsync(request)
+            AS->>DB: SELECT user by lower(email)
+            DB-->>AS: User or null
+            alt email already used (DB or built-in seed user)
+                AS-->>AC: false
+                AC-->>C: 400 "Registration failed or email already exists."
+            else new email
+                AS->>PH: HashPassword(password) BCrypt work factor 11
+                AS->>AS: new User: Role = Client, IsActive = true, EmailConfirmed = false
+                alt database reachable
+                    AS->>DB: INSERT User
+                    AS-->>AC: true
+                    AC-->>C: 201 "Registration successful. Please check your email to confirm your account."
+                else database unreachable
+                    AS-->>AC: false
+                    AC-->>C: 400 "Registration failed or email already exists."
+                end
+            end
+        end
+    end
+
+    Note over C,DB: No confirmation email is sent and no confirm endpoint exists.<br/>LoginAsync rejects EmailConfirmed = false, so a self-registered account cannot sign in.

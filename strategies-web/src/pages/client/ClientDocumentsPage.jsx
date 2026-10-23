@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { AlertCircle, Check, Clock, Mail, Paperclip, Upload } from 'lucide-react'
+import ClosedCaseNotice from '../../components/ui/ClosedCaseNotice'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
 import RequestState from '../../components/ui/RequestState'
@@ -16,6 +17,7 @@ import {
   documentsForClient,
   documentsPath,
   replacementBody,
+  reviewerSignature,
   uploadFileError,
 } from '../../lib/documents'
 import { formatDate, formatFileSize } from '../../lib/format'
@@ -48,7 +50,8 @@ function StatusIcon({ status }) {
   )
 }
 
-function legendText(status, count) {
+function legendText(status, count, archived) {
+  if (status === 'Rejected' && archived) return `${count} not accepted`
   if (status === 'Rejected') return `${count} ${count === 1 ? 'needs' : 'need'} replacing`
   return `${count} ${CLIENT_STATUS_LABELS[status].toLowerCase()}`
 }
@@ -96,7 +99,7 @@ function ReplaceForm({ document, onReplaced }) {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-2">
-      <label htmlFor={inputId} className="block text-sm font-medium text-stone-900">
+      <label htmlFor={inputId} className="block text-sm font-medium text-stone-800">
         Upload a new copy<span className="sr-only"> of {name}</span>
       </label>
       <p id={hintId} className="text-xs text-stone-500">
@@ -183,7 +186,7 @@ function ActionNeeded({ documents, onReplaced }) {
               {comment ? (
                 <figure className="mt-3 border-l-2 border-brand-500 pl-3">
                   <blockquote className="text-sm leading-relaxed text-stone-800">{comment}</blockquote>
-                  <figcaption className="mt-1 text-xs text-stone-500">Your consultant</figcaption>
+                  <figcaption className="mt-1 text-xs text-stone-500">{reviewerSignature(document)}</figcaption>
                 </figure>
               ) : (
                 <p className="mt-3 text-sm text-stone-600">Your consultant will contact you about this document.</p>
@@ -202,7 +205,7 @@ function ActionNeeded({ documents, onReplaced }) {
   )
 }
 
-function Progress({ summary, total }) {
+function Progress({ summary, total, archived }) {
   const segments = [
     ['Approved', summary.approved],
     ['Pending', summary.pending],
@@ -224,7 +227,7 @@ function Progress({ summary, total }) {
         {segments.map(([status, count]) => (
           <li key={status} className="flex items-center gap-1.5">
             <span className={`size-2 rounded-full ${STATUS_STYLES[status].bar}`} aria-hidden="true" />
-            {legendText(status, count)}
+            {legendText(status, count, archived)}
           </li>
         ))}
       </ul>
@@ -253,7 +256,7 @@ function DocumentRow({ document }) {
   )
 }
 
-function ReviewGuide() {
+function ReviewGuide({ archived }) {
   return (
     <Panel title="How review works">
       <ul className="space-y-4">
@@ -262,7 +265,7 @@ function ReviewGuide() {
             <StatusIcon status={item.status} />
             <div>
               <p className="text-sm font-medium text-stone-900">{CLIENT_STATUS_LABELS[item.status]}</p>
-              <p className="mt-0.5 text-sm text-stone-600">{item.text}</p>
+              <p className="mt-0.5 text-sm text-stone-600">{archived && item.status === 'Rejected' ? 'Your consultant explained what was wrong. The case is closed, so no new copy is needed.' : item.text}</p>
             </div>
           </li>
         ))}
@@ -278,8 +281,9 @@ function ReviewGuide() {
         <div>
           <p className="text-sm font-medium text-stone-900">Sending documents</p>
           <p className="mt-0.5 text-sm text-stone-600">
-            If a document needs replacing, upload a new copy on this page. Your consultant adds your other
-            documents to your case, and they appear here once added.
+            {archived
+              ? 'This case is archived, so documents can no longer be sent. Everything already sent stays here to read.'
+              : 'If a document needs replacing, upload a new copy on this page. Your consultant adds your other documents to your case, and they appear here once added.'}
           </p>
         </div>
       </div>
@@ -289,7 +293,7 @@ function ReviewGuide() {
 
 // Rendered only once the case is known, because the documents request needs its id.
 // While reloading after an upload, the previous list stays on screen so the page does not flash.
-function DocumentsOverview({ caseId }) {
+function DocumentsOverview({ caseId, archived }) {
   const request = useApi(documentsPath(caseId))
   const documents = documentsForClient(listItems(request.data))
   const ready = !request.error && documents.length > 0
@@ -324,14 +328,19 @@ function DocumentsOverview({ caseId }) {
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
       <div className="min-w-0 space-y-6">
-        {toReplace.length > 0 && <ActionNeeded documents={toReplace} onReplaced={handleReplaced} />}
+        {archived && (
+          <ClosedCaseNotice headingId="closed-case-heading">
+            Your documents and their review results stay here to read. Nothing more is needed from you, and no new copies can be sent.
+          </ClosedCaseNotice>
+        )}
+        {!archived && toReplace.length > 0 && <ActionNeeded documents={toReplace} onReplaced={handleReplaced} />}
 
         <Panel title="Your documents">
           {/* tabIndex -1: focus lands here after an upload; not a control, so no outline. */}
           <div ref={summaryRef} tabIndex={-1} className="outline-none">
-            <Progress summary={summary} total={total} />
+            <Progress summary={summary} total={total} archived={archived} />
           </div>
-          {summary.approved === total && (
+          {summary.approved === total && !archived && (
             <p className="mt-4 text-sm text-stone-600">
               All your documents are approved. Nothing more is needed from you right now.
             </p>
@@ -344,7 +353,7 @@ function DocumentsOverview({ caseId }) {
         </Panel>
       </div>
 
-      <ReviewGuide />
+      <ReviewGuide archived={archived} />
     </div>
   )
 }
@@ -366,7 +375,7 @@ export default function ClientDocumentsPage() {
       />
 
       {currentCase ? (
-        <DocumentsOverview caseId={currentCase.id} />
+        <DocumentsOverview caseId={currentCase.id} archived={Boolean(currentCase.isArchived)} />
       ) : (
         <Panel title="Your documents" className="mt-8">
           <RequestState

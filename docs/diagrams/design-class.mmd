@@ -1,0 +1,59 @@
+---
+title: Design class diagram 1 of 8 - users, leads and cases (Strategies.Api/Data/Models)
+---
+classDiagram
+    direction TB
+
+    class User {
+        <<entity>>
+        +Id: Guid «PK»
+        +FullName: string
+        +Email: string
+        +PasswordHash: string
+        +Role: UserRole
+        +IsActive: bool = true
+        +EmailConfirmed: bool = false
+        +CreatedAt: DateTime = UtcNow
+    }
+    class Lead {
+        <<entity>>
+        +Id: Guid «PK»
+        +ReviewedById: Guid? «FK User»
+        +VisaCategoryId: Guid? «FK VisaCategory»
+        +FullName: string
+        +Email: string
+        +ImmigrationStatus: ImmigrationStatus
+        +NeedsAssistance: bool
+        +DesiredStartDate: DateTime
+        +TriageStatus: TriageStatus
+        +TriageReason: string?
+        +SubmittedAt: DateTime = UtcNow
+    }
+    class Case {
+        <<entity>>
+        +Id: Guid «PK»
+        +LeadId: Guid? «FK Lead»
+        +ClientId: Guid «FK User»
+        +ConsultantId: Guid? «FK User»
+        +VisaCategoryId: Guid «FK VisaCategory»
+        +Stage: CaseStage
+        +IsArchived: bool = false
+        +CreatedAt: DateTime = UtcNow
+        +UpdatedAt: DateTime = UtcNow
+    }
+    class VisaCategory {
+        <<entity>>
+        +Id: Guid «PK»
+        +Name: string
+        +Description: string?
+        +IsActive: bool = true
+    }
+
+    User "1" <-- "0..*" Case : client
+    User "0..1" <-- "0..*" Case : consultant
+    Lead "0..1" <-- "0..*" Case : converted from
+    VisaCategory "1" <-- "0..*" Case
+    User "0..1" <-- "0..*" Lead : reviewer
+    VisaCategory "0..1" <-- "0..*" Lead
+
+    note "Entities are EF Core classes with public properties only:<br>they declare no methods. Behaviour is in the controllers<br>and services (diagrams 5 to 8).<br>Case to client User and to VisaCategory: Restrict.<br>Optional links (Guid?): SetNull.<br>The classes hold foreign key ids, no navigation properties;<br>ApplicationDbContext.OnModelCreating configures the links."

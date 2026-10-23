@@ -25,6 +25,7 @@ Only the real API is used for the results in [TESTING.md](TESTING.md); `mock-api
 | Silent restore | `POST /api/auth/refresh` | On launch, using the stored refresh token |
 | Progress | `GET /api/cases/client/{userId}` | Newest case; reference = first 8 chars of id, upper case; 5-stage vertical stepper + "What happens next" |
 | Documents | `GET /api/documents?caseId=` | Read-only list with status (Pending / Approved / Rejected); a rejected copy is hidden once a newer copy of the same type exists, as on the web |
+| Send a document | `GET /api/DocumentTypes`, `POST /api/Documents/upload`, then `POST /api/Documents` | Take a photo (camera app) or choose one (gallery picker), no permissions needed. Shrunk to a JPEG under 4.5 MB (API limit is 5 MB), rotated upright, previewed, then sent as the chosen document type; it shows as "Awaiting review". See `data/PhotoPrep.kt` |
 | Messages | `GET /api/notifications`, `PATCH /api/notifications/{id}/read` | Unread badge from `unreadCount` |
 | Sign out | `POST /api/auth/revoke` | Local tokens are cleared even if offline |
 
@@ -54,7 +55,7 @@ set the real address in `app/build.gradle.kts` (`release` > `API_BASE_URL`).
 real API are in [TESTING.md](TESTING.md).
 
 ## Known gaps
-- Document **upload** is not in the app yet. The API has it (`POST /api/documents/upload`, used by the web portal), so the app
-  tells clients to send new copies there.
+- Messages are read-only. Sending a message needs an API endpoint that does not exist yet (the API only has
+  `GET /api/notifications` and `PATCH /api/notifications/{id}/read`).
 - Registration and password reset are not in the app. Password reset waits for the API fix in
   [ISS-01](../docs/ISSUES.md#iss-01).

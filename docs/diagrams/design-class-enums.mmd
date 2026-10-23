@@ -1,0 +1,63 @@
+---
+title: Design class diagram 4 of 8 - enumerations (Strategies.Api/Data/Enums)
+---
+classDiagram
+    direction LR
+
+    class UserRole {
+        <<enumeration>>
+        Admin
+        Consultant
+        Client
+    }
+    class CaseStage {
+        <<enumeration>>
+        InitialIntake
+        DocumentGathering
+        UnderReview
+        SubmittedToAuthority
+        FinalDecision
+    }
+    class DocumentStatus {
+        <<enumeration>>
+        Pending
+        Approved
+        Rejected
+    }
+    class TriageStatus {
+        <<enumeration>>
+        Pending
+        Qualified
+        Unqualified
+        NeedsReview
+    }
+    class ImmigrationStatus {
+        <<enumeration>>
+        Citizen
+        PermanentResident
+        TemporaryResident
+        Foreigner
+    }
+    class AgentType {
+        <<enumeration>>
+        Triage
+        Checklist
+        Summarisation
+    }
+    class RunStatus {
+        <<enumeration>>
+        Success
+        Fallback
+        Error
+    }
+
+    User ..> UserRole : Role
+    Case ..> CaseStage : Stage
+    CaseStageHistory ..> CaseStage : FromStage, ToStage
+    Document ..> DocumentStatus : Status
+    Lead ..> ImmigrationStatus : ImmigrationStatus
+    Lead ..> TriageStatus : TriageStatus
+    AgentRun ..> AgentType : AgentType
+    AgentRun ..> RunStatus : Status
+
+    note "Labels name the property that holds the value.<br>Only Triage is implemented (GeminiAgentService).<br>RunStatus is reused as a string in AgentResponse.Status;<br>no AgentRun row is ever written."

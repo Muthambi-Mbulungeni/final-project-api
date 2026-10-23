@@ -1,5 +1,6 @@
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import ClosedCaseNotice from '../../components/ui/ClosedCaseNotice'
 import EmptyState from '../../components/ui/EmptyState'
 import PageHeader from '../../components/ui/PageHeader'
 import Panel from '../../components/ui/Panel'
@@ -13,6 +14,7 @@ import { documentsPath, documentsToReplace, replaceActionLabel } from '../../lib
 import { listItems } from '../../lib/listData'
 import { getSession } from '../../lib/session'
 import { useApi } from '../../lib/useApi'
+import CaseMessages from '../cases/CaseMessages'
 
 // Only show details the API actually sent.
 function caseDetails(item) {
@@ -60,7 +62,7 @@ function DocumentsAttention({ caseId, consultantName }) {
       </div>
       <Link
         to="/client/documents"
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
+        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-700"
       >
         {replaceActionLabel(toReplace)}
         <ArrowRight className="size-4" strokeWidth={2} aria-hidden="true" />
@@ -88,6 +90,7 @@ export default function ClientDashboard() {
   const details = caseDetails(currentCase)
   const visa = currentCase?.visaCategoryName && currentCase.visaCategoryName !== 'N/A' ? currentCase.visaCategoryName : null
   const consultantName = assignedConsultantName(currentCase)
+  const archived = Boolean(currentCase?.isArchived)
 
   function stateFor(index) {
     if (currentIndex === null) return 'upcoming'
@@ -108,7 +111,14 @@ export default function ClientDashboard() {
 
       {/* The attention card renders nothing when there is nothing to do, so the spacing stays even. */}
       <div className="mt-8 space-y-6">
-        {currentCase?.id && (
+        {currentCase?.isArchived && (
+          <ClosedCaseNotice headingId="closed-case-heading">
+            Your history stays here to read, but nothing more is needed from you and no new documents or messages can be sent.
+            Contact the practice if you think this is a mistake.
+          </ClosedCaseNotice>
+        )}
+
+        {currentCase?.id && !currentCase.isArchived && (
           <DocumentsAttention key={currentCase.id} caseId={currentCase.id} consultantName={consultantName} />
         )}
 
@@ -170,7 +180,7 @@ export default function ClientDashboard() {
           </RequestState>
         </Panel>
 
-        <Panel title="What happens next">
+        <Panel title={archived ? 'Where it ended' : 'What happens next'}>
           {currentCase && currentStage ? (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
               <div>
@@ -179,7 +189,8 @@ export default function ClientDashboard() {
                 </p>
                 <p className="mt-1 text-base font-semibold text-stone-900">{currentStage.label}</p>
                 <p className="mt-1 text-sm text-stone-600">{currentStage.clientHint}</p>
-                {nextStage && (
+                {archived && <p className="mt-4 text-sm text-stone-600">No further steps are needed on this case.</p>}
+                {nextStage && !archived && (
                   <p className="mt-4 text-sm text-stone-600">
                     <span className="font-medium text-stone-900">Next:</span> {nextStage.label.toLowerCase()}.{' '}
                     {nextStage.clientHint}
@@ -208,6 +219,17 @@ export default function ClientDashboard() {
             />
           )}
         </Panel>
+
+        {currentCase?.id && (
+          <Panel title="Messages">
+            <CaseMessages
+              key={currentCase.id}
+              caseId={currentCase.id}
+              archived={currentCase.isArchived}
+              emptyMessage={`Ask ${consultantName ?? 'your consultant'} a question here. Replies appear in this thread.`}
+            />
+          </Panel>
+        )}
       </div>
     </>
   )

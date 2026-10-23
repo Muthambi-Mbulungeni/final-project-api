@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { formatDate } from './format'
 import {
   MAX_UPLOAD_BYTES,
+  reviewerSignature,
   documentStatus,
   documentSummary,
   documentsForClient,
@@ -117,5 +119,30 @@ describe('documentSummary', () => {
   it('counts each status whether the API sends names or numbers', () => {
     const documents = [{ status: 'Approved' }, { status: 1 }, { status: 'Pending' }, { status: 2 }]
     expect(documentSummary(documents)).toEqual({ approved: 2, pending: 1, rejected: 1 })
+  })
+})
+
+describe('reviewerSignature', () => {
+  const reviewedAt = '2026-10-22T10:00:00Z'
+
+  it('signs the note with the reviewer and the date', () => {
+    const signature = reviewerSignature({ reviewedByName: 'Nomvula Zulu', reviewedAt })
+    expect(signature).toBe(`Nomvula Zulu, ${formatDate(reviewedAt)}`)
+    expect(signature).toMatch(/^Nomvula Zulu, 22 Oct 2026$/)
+  })
+
+  it('names an admin reviewer the same way', () => {
+    expect(reviewerSignature({ reviewedByName: 'System Admin', reviewedAt })).toMatch(/^System Admin, /)
+  })
+
+  it('shows the name alone when the date is missing', () => {
+    expect(reviewerSignature({ reviewedByName: ' Nomvula Zulu ', reviewedAt: null })).toBe('Nomvula Zulu')
+  })
+
+  it('falls back to "Your consultant" for older rows without a reviewer', () => {
+    expect(reviewerSignature({ reviewComment: 'Too old.' })).toBe('Your consultant')
+    expect(reviewerSignature({ reviewedByName: null, reviewedAt })).toBe('Your consultant')
+    expect(reviewerSignature({ reviewedByName: '  ', reviewedAt })).toBe('Your consultant')
+    expect(reviewerSignature(null)).toBe('Your consultant')
   })
 })

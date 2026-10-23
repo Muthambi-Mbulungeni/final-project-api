@@ -13,13 +13,11 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | ID | Severity | Issue | Owner |
 |---|---|---|---|
 | [ISS-02](#iss-02) | High | Development secrets committed in `appsettings.json` | Kaan, Mbulungeni |
-| [ISS-04](#iss-04) | High | POPIA consent is checked in the browser only, never sent to or stored by the API | Marco, Lekabe |
-| [ISS-05](#iss-05) | High | No per-account lockout after failed sign-ins | Kaan |
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
-| [ISS-10](#iss-10) | Medium | No automated tests for the API controllers | Marco, Mbulungeni |
+| [ISS-10](#iss-10) | Medium | Several API controllers have no automated tests | Marco, Mbulungeni |
 | [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run; release build has no API address | Kundai |
-| [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan, Marco |
+| [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan |
 | [ISS-07](#iss-07) | Low | Stage change accepts archived cases and unchanged stages | Marco |
 | [ISS-12](#iss-12) | Low | Mixed audit action wording; old lead verdict not recorded | Marco |
 | [ISS-13](#iss-13) | Low | Users list cannot show the join date | Marco, Riaad |
@@ -29,27 +27,11 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 **High. Development secrets committed in `appsettings.json`.**
 
-- **Problem:** `Strategies.Api/appsettings.json` contains a database password and the JWT signing key.
-- **Evidence:** `ConnectionStrings:DefaultConnection` and `Jwt:Key` in that file.
-- **Impact:** if a hosted deployment uses these values, anyone with access to the repository can sign valid tokens for any role.
-- **Fix:** remove the values from the file, set them as environment variables (or user secrets locally) on each host, and rotate the JWT key and the database password.
+- **Problem:** the development database password and JWT signing key were committed in `Strategies.Api/appsettings.json`.
+- **Evidence:** both are now only in `appsettings.Development.json`, which is never loaded outside Development. Outside Development the API refuses to start unless `ConnectionStrings:DefaultConnection`, `Jwt:Key`, `App:BaseUrl` and `Cors:AllowedOrigins` are set, so a hosted deployment cannot fall back to the committed values (`RequiredSettings`, `StartupConfigurationTests`).
+- **Impact:** low while they stay development-only. The values remain in the repository and its history, so anyone with access could sign tokens for a host that uses the same key.
+- **Fix (remaining):** never reuse these values on a host; set each host's own as application settings. If any hosted environment ever used them, rotate the JWT key and the database password there.
 
-### ISS-04
-
-**High. POPIA consent is checked in the browser only.**
-
-- **Problem:** the enquiry form requires the consent box, but the request it sends has no consent field, and the API has no field or column for it.
-- **Evidence:** B1; `EnquiryPage.jsx` request body; no consent field in `CreateLeadRequest` or the `Lead` table.
-- **Impact:** there is no record that a person consented to processing, and a request sent straight to the API skips the check.
-- **Fix:** add a required consent flag to `CreateLeadRequest` (reject the request without it) and store the consent time on the lead (a new migration); the web form then sends it.
-
-### ISS-05
-
-**High. No per-account lockout after failed sign-ins.**
-
-- **Problem:** the only protection against password guessing is the per-address rate limit (A2), which does not stop guesses spread across many addresses. Since PR #25 the API takes the address from the `X-Forwarded-For` header and trusts that header from any sender. Behind a hosting proxy that adds the real address, this is correct. If the API can be reached directly, a caller can put a different address in each request and is never limited (A19).
-- **Evidence:** no lockout fields or logic in the `User` model or `AuthService`; `ForwardedHeadersOptions` in `Program.cs` clears `KnownProxies` and `KnownIPNetworks`.
-- **Fix:** count failed sign-ins per user, lock the account for a set time after, for example, 5 failures, and reset the count after a successful sign-in. Make sure the hosted API is only reachable through its proxy, or list the host's proxy addresses in `ForwardedHeadersOptions`.
 
 ### ISS-08
 
@@ -71,11 +53,13 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 ### ISS-10
 
-**Medium. No automated tests for the API controllers.**
+**Medium. Several API controllers have no automated tests.**
 
-- **Problem:** the API tests cover services only, so role checks, validation responses and audit rows are tested by hand (TESTING.md section 5).
-- **Evidence:** `Strategies.Api.Tests`.
-- **Fix:** integration tests with `WebApplicationFactory` against a test database, run in CI.
+- **Problem:** the API suite (241 tests) covers the services and part of the controllers. Role checks, validation responses and audit rows on the untested controllers are checked by hand (TESTING.md section 5).
+- **Covered now:** `MessagesController` (`MessagesControllerTests`), `AdminController` user actions (`AdminUserTests`), `DocumentsController` review, upload and download (`DocumentReviewerTests`, `DocumentsControllerTests`), `CasesController` list and assign (`CaseListTests`, `CaseAssignTests`), `LeadsController` create, consent and rate limit (`LeadConsentTests`, `LeadsRateLimitTests`, `GeminiAgentServiceTests`). The rate limit and startup checks run through the real pipeline in a test server (`WebApplicationFactory`).
+- **No tests at all:** `AuthController` (its `AuthService` is tested), `DocumentTypesController`, `NotificationController`, `StatsController`.
+- **Partly covered:** `CasesController` create, stage change, export and detail; `LeadsController` list and status update; `AdminController` user list and audit log.
+- **Fix:** add tests for the controllers listed above, using `WebApplicationFactory` against a test database, run in CI.
 
 ### ISS-11
 
@@ -88,6 +72,8 @@ Known issues at the time of submission, checked against the code on `develop` (`
 ### ISS-15
 
 **Medium. Refresh tokens are kept in memory.**
+
+- **Owner:** Kaan. Still open.
 
 - **Problem:** the API stores refresh tokens in an in-memory store, not in the database.
 - **Evidence:** `Program.cs` registers `InMemoryRefreshTokenStore` as `IRefreshTokenStore`.
@@ -156,7 +142,7 @@ Issues found by testing or review and fixed before submission.
 | Admin delete returned 405 | Now a soft delete: the user is marked inactive and kept for the audit trail |
 | Password reset accepted any non-blank token, so a password could be changed without access to the email (was ISS-01, Critical) | The reset link now carries a signed token that expires after 30 minutes and names its purpose and email; a made-up token is refused (A15). The user's refresh tokens are revoked after a reset (PR #25) |
 | Password reset refused every genuine link, a link could have been reused for 30 minutes, and new passwords had no policy (was ISS-01, High) | `PasswordResetTokenService` reads the claims from the validated token, uses its own `password-reset` audience and a password-hash stamp so each link works once; register and reset apply a NIST-style password policy (12 to 64 characters, common and context-word checks) |
-| Behind a hosting proxy, all users would share one sign-in rate limit (was ISS-03) | The API reads the forwarded client address before the rate limiter (PR #25). See the note in [ISS-05](#iss-05) |
+| Behind a hosting proxy, all users would share one sign-in rate limit (was ISS-03) | The API reads the forwarded client address before the rate limiter (PR #25). See the note under ISS-05 below |
 | Lead review with an empty body `{}` returned 200 and reset the lead to Pending (was ISS-06) | Verdict is required: 400 and the lead is unchanged (PR #25, A12) |
 | Stage change with an empty body would have moved a case back to the first stage, and accepted notes that were never saved | Stage is required: 400 (A17); the unsaved notes field was removed (PR #25). Rest open as [ISS-07](#iss-07) |
 | Uploaded test files could be committed | `Strategies.Api/wwwroot/uploads` added to `.gitignore` (PR #18) |
@@ -164,6 +150,8 @@ Issues found by testing or review and fixed before submission.
 | Path traversal in document storage (Critical, found in code review): `POST /api/documents` stored any `FilePath` from the request, and the download served `wwwroot/` plus that path, so a signed-in client could register `../appsettings.json` on their own case and download the JWT key and database password; `//etc/passwd` escaped `wwwroot` entirely | Upload returns only the generated `{Guid}{ext}` name. `POST /api/documents` accepts only such a name for a file that exists (otherwise 400 "Invalid file reference."). The download resolves only the file name inside `Storage:UploadsRoot`, checks the canonical path stays inside the root, and otherwise returns 404. Unit, controller and in-process API tests cover the traversal values |
 | Sign-in fell back to four built-in accounts, with passwords in the source, when the database was unreachable or the user was not found | Fallback removed: users are read from the database only, and a database outage fails the request without signing anyone in. The demo accounts are unchanged because they come from `database/seed` |
 | Known limitation (not fixed): a client who knew another upload's stored file name could register it on their own case and download that file | Impractical, since names are random GUIDs (122 random bits) that only the uploader and staff ever see. A full fix would record the uploader with each stored file and check it in `POST /api/documents` |
+| POPIA consent was checked in the browser only: the request carried no consent and the API stored none (was ISS-04, High) | `POST /api/leads` now requires `consent: true`. Without it (missing or false) the API answers 400 with the field error "You need to agree before we can assess your enquiry." and `code: "consent_required"`, before anything is sent to the model or saved. The time of consent is stored on the lead (`ConsentAt`, migration `AddLeadConsentAt`; older leads have none). The enquiry form sends `consent` and shows a returned consent error under the checkbox. Tests: `LeadConsentTests.ConsentLeftOut_Returns400ConsentRequired_AndStoresNothing`, `ConsentFalse_Returns400ConsentRequired_AndStoresNothing`, `ConsentTrue_CreatesTheLead_AndStoresWhenConsentWasGiven`, `LeadsRateLimitTests.RequestsWithoutConsent_StillCountTowardsTheLimit` (the rate limit still applies), web `enquiryServerFieldErrors` |
+| Password guessing was limited per address only, and the limit could be avoided by sending a made-up `X-Forwarded-For` header (was ISS-05, High; A19) | Two parts. (1) The API reads `X-Forwarded-For` only when `ForwardedHeaders:Enabled` is true (Production), and then only its last entry, the one Azure's front end appends (`ForwardLimit = 1`); see "Rate limiting and proxies" in the root README and `LeadsRateLimitTests`. (2) Per-account lockout (NFR-1.4): 5 failed sign-ins within 15 minutes lock the account for 15 minutes (`Auth:Lockout:MaxAttempts`, `WindowMinutes`, `DurationMinutes`). While locked, even the correct password is refused with 429, code `account_locked` and a `Retry-After` header. The count lives on the user (`FailedLoginCount`, `FailedLoginWindowStart`, `LockoutEndsAt`, migration `AddUserLockout`); an email that does not exist is counted in memory and answered the same way, after a dummy password check, so lockout does not show which accounts exist. A successful sign-in, a completed password reset or an admin unlock (`PATCH /api/admin/users/{id}/reinstate`) clears it. Audit rows "Account locked" and "Account unlocked" (with the admin's id when an admin unlocked it). Tests: `LoginLockoutTests` (22), `LeadsRateLimitTests.SignInRateLimit_StillLimitsEachIp_NextToTheAccountLockout`, web `signInErrorMessage` |
 | Seed data reused the same id pattern across tables | Distinct seed ids (PR #19) |
 | First-time visitors triggered a failed token refresh and a console error | The web portal only refreshes when a session exists (PR #19) |
 | Admin overview panels were read in a different order from how they look (WCAG 1.3.2, 2.4.3) | Source order now matches the visual order (PR #23) |

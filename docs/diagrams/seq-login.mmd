@@ -1,0 +1,59 @@
+---
+title: Sequence diagram - sign in
+---
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant W as Web portal<br/>Login.jsx, lib/auth.js, lib/api.js
+    participant RL as Rate limiter<br/>auth-strict, 5 per min per IP
+    participant AC as AuthController
+    participant AS as AuthService
+    participant PH as PasswordHasherService
+    participant TS as TokenService
+    participant RT as InMemoryRefreshTokenStore
+    participant DB as PostgreSQL<br/>User table
+
+    U->>W: email + password, Sign in
+    W->>W: client-side checks (email format, required)
+    W->>RL: POST /api/auth/login {email, password}
+    alt more than 5 requests this minute from this IP
+        RL-->>W: 429 Too Many Requests
+        W-->>U: "Too many attempts, wait a minute"
+    else within limit
+        RL->>AC: Login(LoginRequest)
+        alt model invalid (email format, password under 6 chars)
+            AC-->>W: 400 ApiErrorResponse {message, errors[]}
+            W-->>U: field errors
+        else model valid
+            AC->>AS: LoginAsync(request)
+            AS->>DB: CanConnectAsync, then SELECT user by lower(email)
+            DB-->>AS: User or null
+            opt database unreachable or user not in DB
+                AS->>AS: fall back to 4 built-in seed users
+            end
+            alt no user, IsActive false or EmailConfirmed false
+                AS-->>AC: null
+                AC-->>W: 401 "Invalid email or password."
+                W-->>U: generic sign-in error
+            else user found
+                AS->>PH: VerifyPassword(password, hash) BCrypt
+                alt wrong password
+                    PH-->>AS: false
+                    AS-->>AC: null
+                    AC-->>W: 401 "Invalid email or password."
+                    W-->>U: generic sign-in error
+                else correct password
+                    PH-->>AS: true
+                    AS->>TS: GenerateAccessToken(user) JWT HS256, 60 min
+                    AS->>TS: GenerateRefreshToken() 64 random bytes
+                    AS->>RT: SaveTokenAsync(refresh token, expires 7 days)
+                    AS-->>AC: AuthResponse
+                    AC-->>W: 200 {accessToken, tokenExpiry, refreshToken, role, displayName, userId}
+                    W->>W: access token in memory, refresh token in sessionStorage
+                    W-->>U: redirect to role home (/admin, /consultant or /client)
+                end
+            end
+        end
+    end
+
+    Note over W,AC: When a later API call returns 401, see seq-token-refresh

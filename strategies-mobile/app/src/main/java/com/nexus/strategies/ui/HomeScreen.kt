@@ -46,7 +46,14 @@ fun HomeScreen(userId: String, name: String, onSignOut: () -> Unit) {
         ) {
             when (tab) {
                 0 -> ProgressTab(ui, name, onOpenDocuments = { tab = 1 }, onRetry = { vm.refresh() })
-                1 -> DocumentsTab(ui, onRetry = { vm.refresh() })
+                1 -> DocumentsTab(
+                    ui,
+                    onRetry = { vm.refresh() },
+                    onPhoto = vm::onPhoto,
+                    onDiscardPhoto = vm::discardPhoto,
+                    onSend = vm::sendPhoto,
+                    onUploadProblem = vm::showUploadError,
+                )
                 else -> NotificationsTab(ui, onOpen = vm::markRead, onRetry = { vm.refresh() })
             }
         }

@@ -1,0 +1,55 @@
+---
+title: UX journey - web portal 2 of 2, role workspaces (config/navigation.js, routes/modulePages.js)
+---
+flowchart TB
+    subgraph ADM["Admin workspace (RequireRole admin); sidebar links every built page"]
+        direction LR
+        A0["/#/admin<br>Overview"]
+        A1["/#/admin/users<br>Users: suspend, reinstate"]
+        A2["/#/admin/leads<br>Leads"]
+        A3["/#/admin/cases<br>Cases + CSV export"]
+        A4["/#/admin/audit-log<br>Audit log"]
+        A5["/#/admin/reports<br>HIDDEN placeholder"]
+        AL[["Lead panel<br>verdict review"]]
+        AC[["Case panel<br>stage, consultant, documents"]]
+        AM[["Message thread in the case panel<br>read only"]]
+        A0 --> A1 & A2 & A3 & A4
+        A2 --> AL
+        A3 --> AC
+        AC --> AM
+        A0 -. URL only .-> A5
+    end
+
+    subgraph CON["Consultant workspace (RequireRole consultant)"]
+        direction LR
+        C0["/#/consultant<br>Overview"]
+        C1["/#/consultant/leads<br>Lead triage"]
+        C2["/#/consultant/cases<br>My cases + CSV export"]
+        C3["/#/consultant/documents<br>HIDDEN placeholder"]
+        CL[["Lead panel<br>verdict review"]]
+        CC[["Case panel<br>stage, documents approve or reject"]]
+        CM[["Message thread in the case panel<br>read, send, unread count in the bell"]]
+        C0 --> C1 & C2
+        C1 --> CL
+        C2 --> CC
+        CC --> CM
+        C0 -. URL only .-> C3
+    end
+
+    subgraph CLI["Client portal (RequireRole client)"]
+        direction LR
+        K0["/#/client<br>My case: 5-stage progress"]
+        KM[["Message thread on My case<br>read, send"]]
+        K1["/#/client/documents<br>Documents + upload new copy"]
+        K3["/#/client/profile<br>HIDDEN placeholder"]
+        K0 -->|See what's needed| K1
+        K0 --> KM
+        K0 -. URL only .-> K3
+    end
+
+    ADM ~~~ CON ~~~ CLI
+
+    classDef hidden stroke-dasharray: 6 4,fill:#f5f5f5,color:#666
+    classDef panel fill:#fff7e6,stroke:#c48a16
+    class A5,C3,K3 hidden
+    class AL,AC,CL,CC,AM,CM,KM panel

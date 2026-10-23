@@ -4,7 +4,9 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Strategies.Api.Configuration;
 using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
@@ -18,6 +20,7 @@ namespace Strategies.Api.Controllers
     public class LeadsController : ControllerBase
     {
         private const int MaxAgentOutputLength = 2000;
+        private const string ConsentRequiredMessage = "You need to agree before we can assess your enquiry.";
 
         private readonly ApplicationDbContext _context;
 
@@ -72,6 +75,7 @@ namespace Strategies.Api.Controllers
         /// </summary>
         [HttpPost]
         [AllowAnonymous]
+        [EnableRateLimiting(LeadsRateLimitSettings.PolicyName)]
         public async Task<IActionResult> CreateLead(
             [FromBody] CreateLeadRequest dto,
             [FromServices] IAgentService agentService)
@@ -84,6 +88,15 @@ namespace Strategies.Api.Controllers
                     .ToList();
                 return BadRequest(new ApiErrorResponse { Message = "Validation failed.", Errors = errors });
             }
+
+            // POPIA: no consent, no processing. Checked before anything is sent to the model or stored.
+            if (!dto.Consent)
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "Validation failed.",
+                    Errors = new List<string> { ConsentRequiredMessage },
+                    Code = ApiErrorResponse.ConsentRequiredCode
+                });
 
             // Id is generated before the AI call so the AgentRun row can reference it.
             var leadId = Guid.NewGuid();
@@ -109,6 +122,7 @@ namespace Strategies.Api.Controllers
                 DesiredStartDate = dto.DesiredStartDate,
                 VisaCategoryId = dto.VisaCategoryId,
                 SubmittedAt = DateTime.UtcNow,
+                ConsentAt = DateTime.UtcNow,
                 TriageStatus = aiResult.TriageStatus,
                 TriageReason = aiResult.Reason
             };

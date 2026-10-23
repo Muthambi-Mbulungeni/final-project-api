@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   emailError,
+  enquiryServerFieldErrors,
   isFutureDate,
   validateEnquiryDetails,
   validateEnquiryPlans,
@@ -86,5 +87,19 @@ describe('validateEnquiryPlans', () => {
 
   it('returns no errors for a future date with consent', () => {
     expect(validateEnquiryPlans({ desiredStartDate: '2026-11-01', consent: true }, TODAY)).toEqual({})
+  })
+})
+
+describe('enquiryServerFieldErrors', () => {
+  it('puts the API consent_required code under the consent checkbox', () => {
+    expect(enquiryServerFieldErrors({ status: 400, code: 'consent_required' })).toEqual({
+      consent: 'You need to agree before we can assess your enquiry.',
+    })
+  })
+
+  it('leaves every other failure as a message above the form', () => {
+    expect(enquiryServerFieldErrors({ status: 400, code: null })).toEqual({})
+    expect(enquiryServerFieldErrors({ status: 429 })).toEqual({})
+    expect(enquiryServerFieldErrors(undefined)).toEqual({})
   })
 })

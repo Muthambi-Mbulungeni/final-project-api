@@ -3,7 +3,9 @@
 // A hosted build served from another origin (e.g. GitHub Pages) sets VITE_API_BASE_URL
 // at build time, and every request is sent to that address instead.
 // Every failure becomes an ApiError with a readable message, using the API's
-// standard error shape { message, errors } when the server provides it.
+// standard error shape { message, errors } when the server provides it, plus the optional
+// machine-readable `code` some errors carry (e.g. "duplicate_email") and, when the API sends a
+// Retry-After header, `retryAfter`: how many seconds to wait.
 //
 // Authentication: every request carries the in-memory access token as a Bearer header.
 // When the API answers 401, the token is refreshed once and the request is retried.
@@ -13,11 +15,13 @@
 import { endSession, getAccessToken, getStoredRefreshToken, startSession } from './session'
 
 export class ApiError extends Error {
-  constructor(message, { status = 0, errors = [] } = {}) {
+  constructor(message, { status = 0, errors = [], code = null, retryAfter = null } = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.errors = errors
+    this.code = code
+    this.retryAfter = retryAfter
   }
 }
 
@@ -57,6 +61,12 @@ async function readBody(response) {
   }
 }
 
+// Retry-After as whole seconds, or null when it is missing or is a date.
+function readRetryAfter(response) {
+  const seconds = Number(response.headers?.get?.('Retry-After'))
+  return Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : null
+}
+
 function toApiError(response, body) {
   // 502, 503 and 504 come from the gateway in front of the API: the API itself did not answer.
   if ([502, 503, 504].includes(response.status)) return new ApiError(unreachableMessage(), { status: response.status })
@@ -72,6 +82,8 @@ function toApiError(response, body) {
   return new ApiError(message, {
     status: response.status,
     errors: Array.isArray(body?.errors) ? body.errors : [],
+    code: typeof body?.code === 'string' ? body.code : null,
+    retryAfter: readRetryAfter(response),
   })
 }
 
