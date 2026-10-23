@@ -56,9 +56,28 @@ data class DocumentDto(
     val reviewComment: String? = null,
     val uploadedAt: String? = null,
     val isArchived: Boolean = false,
+    // Added to the API in PR #14 (for auditing). Absent on older API versions, so both are optional.
+    val reviewedByName: String? = null,
+    val reviewedAt: String? = null,
 ) {
     val state: DocStatus get() = DocStatus.parse(status)
+    /** "Name, 06 Sept 2026"; just the name if the date is unreadable; "Your consultant" if the API sent no name. */
+    val reviewerCredit: String get() = reviewerCredit(reviewedByName, reviewedAt)
 }
+
+const val FALLBACK_REVIEWER = "Your consultant"
+
+fun reviewerCredit(name: String?, reviewedAt: String?): String {
+    val n = name?.trim().orEmpty()
+    if (n.isEmpty()) return FALLBACK_REVIEWER
+    return listOfNotNull(n, formatDate(reviewedAt)).joinToString(", ")
+}
+
+/** Who asked for new copies: the reviewer's name when one person did, otherwise "Your consultant". */
+fun requestedBy(docs: List<DocumentDto>): String =
+    docs.mapNotNull { it.reviewedByName?.trim()?.takeIf { n -> n.isNotEmpty() } }.distinct().singleOrNull()
+        ?.takeIf { name -> docs.all { !it.reviewedByName.isNullOrBlank() } }
+        ?: FALLBACK_REVIEWER
 
 /**
  * The documents a client sees, same rule as the web portal (strategies-web lib/documents.js):
@@ -144,7 +163,7 @@ fun formatDate(iso: String?): String? = runCatching {
 
 /** Everything the UI needs to know about a failed call. Never carries raw server text. */
 class ApiException(val kind: Kind, message: String = kind.name) : IOException(message) {
-    enum class Kind { Unauthorized, SessionExpired, Forbidden, RateLimited, Server, Network, NotClient }
+    enum class Kind { Unauthorized, SessionExpired, Forbidden, RateLimited, Server, Network, NotClient, Rejected }
 
     fun userMessage(): String = when (kind) {
         Kind.Unauthorized -> "Incorrect email or password."
@@ -154,5 +173,6 @@ class ApiException(val kind: Kind, message: String = kind.name) : IOException(me
         Kind.Server -> "Something went wrong on our side. Please try again."
         Kind.Network -> "We can't reach the service right now. Check your connection and try again."
         Kind.NotClient -> "This app is for clients. Staff, please use the web portal."
+        Kind.Rejected -> "We couldn't accept that. Please check it and try again."
     }
 }
