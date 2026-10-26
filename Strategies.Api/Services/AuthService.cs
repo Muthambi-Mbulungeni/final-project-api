@@ -1,14 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Strategies.Api.Configuration;
 using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
 using Strategies.Api.DTOs.Auth;
-using Strategies.Api.Exceptions;
 
 namespace Strategies.Api.Services
 {
@@ -19,94 +23,33 @@ namespace Strategies.Api.Services
         private readonly ITokenService _tokenService;
         private readonly IRefreshTokenStore _refreshTokenStore;
         private readonly ILogger<AuthService> _logger;
+        private readonly IMemoryCache _attempts;
+        private readonly LockoutSettings _lockout;
+        private readonly TimeProvider _time;
 
-        // Seed users computed exactly once across all requests using Lazy<T>.
-        // AuthService is Scoped (per-request), so without Lazy the BCrypt hash
-        // (workFactor=11) would run 4 times on every single request — unacceptable.
-        private static readonly Lazy<List<User>> _lazySeedUsers = new Lazy<List<User>>(() =>
-        {
-            var hasher = new PasswordHasherService();
-            return new List<User>
-            {
-                new User
-                {
-                    Id             = Guid.Parse("00000000-0000-0000-0000-000000000001"),
-                    FullName       = "System Admin",
-                    Email          = "admin@nexus.com",
-                    PasswordHash   = hasher.HashPassword("AdminPassword123!"),
-                    Role           = UserRole.Admin,
-                    IsActive       = true,
-                    EmailConfirmed = true,
-                    CreatedAt      = DateTime.UtcNow
-                },
-                new User
-                {
-                    Id             = Guid.Parse("33333333-3333-3333-3333-333333333333"),
-                    FullName       = "Riaad",
-                    Email          = "riaad@nexus.com",
-                    PasswordHash   = hasher.HashPassword("ConsultantPassword123!"),
-                    Role           = UserRole.Consultant,
-                    IsActive       = true,
-                    EmailConfirmed = true,
-                    CreatedAt      = DateTime.UtcNow
-                },
-                new User
-                {
-                    Id             = Guid.Parse("33333333-3333-3333-3333-333333333334"),
-                    FullName       = "Consultant User",
-                    Email          = "consultant@nexus.com",
-                    PasswordHash   = hasher.HashPassword("ConsultantPassword123!"),
-                    Role           = UserRole.Consultant,
-                    IsActive       = true,
-                    EmailConfirmed = true,
-                    CreatedAt      = DateTime.UtcNow
-                },
-                new User
-                {
-                    Id             = Guid.Parse("77777777-7777-7777-7777-777777777777"),
-                    FullName       = "John Doe",
-                    Email          = "client@nexus.com",
-                    PasswordHash   = hasher.HashPassword("ClientPassword123!"),
-                    Role           = UserRole.Client,
-                    IsActive       = true,
-                    EmailConfirmed = true,
-                    CreatedAt      = DateTime.UtcNow
-                }
-            };
-        });
+        // Checked against when the email is unknown or the account cannot sign in, so those attempts cost
+        // the same time as a wrong password. Computed once: hashing is deliberately slow.
+        private static readonly Lazy<string> DummyHash =
+            new(() => new PasswordHasherService().HashPassword("not-a-real-password"));
 
         public AuthService(
             ApplicationDbContext dbContext,
             IPasswordHasherService passwordHasher,
             ITokenService tokenService,
             IRefreshTokenStore refreshTokenStore,
-            ILogger<AuthService> logger)
+            ILogger<AuthService> logger,
+            IMemoryCache attempts,
+            IOptions<LockoutSettings> lockout,
+            TimeProvider time)
         {
             _dbContext          = dbContext;
             _passwordHasher     = passwordHasher;
             _tokenService       = tokenService;
             _refreshTokenStore  = refreshTokenStore;
             _logger             = logger;
-        }
-
-        private bool _dbConnectionChecked = false;
-        private bool _dbAvailable         = false;
-
-        private async Task<bool> IsDbAvailableAsync()
-        {
-            if (!_dbConnectionChecked)
-            {
-                try
-                {
-                    _dbAvailable = await _dbContext.Database.CanConnectAsync();
-                }
-                catch
-                {
-                    _dbAvailable = false;
-                }
-                _dbConnectionChecked = true;
-            }
-            return _dbAvailable;
+            _attempts           = attempts;
+            _lockout            = lockout.Value;
+            _time               = time;
         }
 
         public async Task<User?> GetUserByEmailAsync(string email)
@@ -115,96 +58,67 @@ namespace Strategies.Api.Services
 
             var normalizedEmail = email.Trim().ToLowerInvariant();
 
-            if (await IsDbAvailableAsync())
-            {
-                try
-                {
-                    var dbUser = await _dbContext.Users
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
-
-                    if (dbUser != null)
-                        return dbUser;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not query database for user, falling back to seed store.");
-                }
-            }
-
-            return _lazySeedUsers.Value.FirstOrDefault(u =>
-                u.Email.ToLowerInvariant() == normalizedEmail);
+            // Database only. If it is unreachable the exception surfaces; nobody is authenticated.
+            return await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
         }
 
         public async Task<User?> GetUserByIdAsync(Guid userId)
         {
-            if (await IsDbAvailableAsync())
-            {
-                try
-                {
-                    var dbUser = await _dbContext.Users
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(u => u.Id == userId);
-
-                    if (dbUser != null)
-                        return dbUser;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not query database for user by id, falling back to seed store.");
-                }
-            }
-
-            return _lazySeedUsers.Value.FirstOrDefault(u => u.Id == userId);
+            return await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
         }
 
-        public async Task<AuthResponse?> LoginAsync(LoginRequest request)
+        public async Task<AuthResponse?> LoginAsync(LoginRequest request) =>
+            (await TryLoginAsync(request)).Response;
+
+        // Sign-in with lockout. Accounts that can sign in keep their failure count on the user row.
+        // Everything else (unknown email, suspended, deleted, unconfirmed) is counted per submitted
+        // email in memory and checked against a dummy hash, so a guess at a real account and a guess at
+        // a made-up one get the same answers, in the same order, at the same cost. That includes the
+        // lockout itself: an address that does not exist locks after the same number of attempts.
+        public async Task<LoginOutcome> TryLoginAsync(LoginRequest request)
         {
-            var user = await GetUserByEmailAsync(request.Email);
-            if (user == null || !user.IsActive || !user.EmailConfirmed || user.DeletedAt != null)
-                return null;
+            var now = _time.GetUtcNow().UtcDateTime;
+            var email = (request.Email ?? string.Empty).Trim().ToLowerInvariant();
 
-            // 1. Check if the account is currently locked out
-            if (user.IsLockedOut)
+            var user = email.Length == 0
+                ? null
+                : await _dbContext.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
+            var canSignIn = user != null && user.IsActive && user.EmailConfirmed && user.DeletedAt == null;
+
+            if (canSignIn)
             {
-                _logger.LogWarning("Sign-in attempt rejected for locked account {Email}. Lockout ends at {LockoutEnd}.", user.Email, user.LockoutEnd);
-                throw new AccountLockedException("Account is temporarily locked due to multiple failed sign-in attempts. Please try again later.", user.LockoutEnd);
+                if (ClearExpiredLock(user!, now))
+                    await _dbContext.SaveChangesAsync();
+                if (user!.LockoutEndsAt is { } until && until > now)
+                    return new LoginOutcome(null, until - now);
+            }
+            else
+            {
+                var held = HeldFor(AttemptsFor(email), now);
+                if (held != null)
+                    return new LoginOutcome(null, held);
             }
 
-            // If a previous lockout has expired, reset the attempt counter and lockout timestamp
-            if (user.LockoutEnd.HasValue && user.LockoutEnd.Value <= DateTime.UtcNow)
+            var passwordOk = _passwordHasher.VerifyPassword(
+                request.Password, canSignIn ? user!.PasswordHash : DummyHash.Value);
+
+            if (!canSignIn || !passwordOk)
             {
-                user.LockoutEnd = null;
-                user.FailedLoginAttempts = 0;
-                await PersistUserLockoutStateAsync(user);
+                var lockedFor = canSignIn
+                    ? await RecordFailureAsync(user!, now)
+                    : RecordFailure(AttemptsFor(email), now);
+                return new LoginOutcome(null, lockedFor);
             }
 
-            // 2. Verify password
-            if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
+            if (user!.FailedLoginCount != 0 || user.FailedLoginWindowStart != null)
             {
-                user.FailedLoginAttempts++;
-                if (user.FailedLoginAttempts >= 5)
-                {
-                    user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
-                    _logger.LogWarning("Account {Email} locked until {LockoutEnd} after {Attempts} failed sign-in attempts.", user.Email, user.LockoutEnd, user.FailedLoginAttempts);
-                }
-
-                await PersistUserLockoutStateAsync(user);
-
-                if (user.FailedLoginAttempts >= 5)
-                {
-                    throw new AccountLockedException("Account is temporarily locked due to multiple failed sign-in attempts. Please try again later.", user.LockoutEnd);
-                }
-
-                return null;
-            }
-
-            // 3. Successful login: reset failed login attempts
-            if (user.FailedLoginAttempts > 0 || user.LockoutEnd != null)
-            {
-                user.FailedLoginAttempts = 0;
-                user.LockoutEnd = null;
-                await PersistUserLockoutStateAsync(user);
+                user.FailedLoginCount = 0;
+                user.FailedLoginWindowStart = null;
+                await _dbContext.SaveChangesAsync();
             }
 
             var (accessToken, expiration) = _tokenService.GenerateAccessToken(user);
@@ -221,7 +135,7 @@ namespace Strategies.Api.Services
 
             await _refreshTokenStore.SaveTokenAsync(refreshToken);
 
-            return new AuthResponse
+            return new LoginOutcome(new AuthResponse
             {
                 AccessToken  = accessToken,
                 TokenExpiry  = expiration,
@@ -229,7 +143,106 @@ namespace Strategies.Api.Services
                 Role         = user.Role.ToString(),
                 DisplayName  = user.FullName,
                 UserId       = user.Id
-            };
+            });
+        }
+
+        // Counts one failed sign-in for a real account. Returns the lock time when this one locks it.
+        private async Task<TimeSpan?> RecordFailureAsync(User user, DateTime now)
+        {
+            if (user.FailedLoginWindowStart == null || now - user.FailedLoginWindowStart.Value > _lockout.Window)
+            {
+                user.FailedLoginWindowStart = now;
+                user.FailedLoginCount = 0;
+            }
+            user.FailedLoginCount++;
+
+            TimeSpan? lockedFor = null;
+            if (user.FailedLoginCount >= _lockout.MaxAttempts)
+            {
+                user.LockoutEndsAt = now + _lockout.Duration;
+                lockedFor = _lockout.Duration;
+                AddAudit(null, "Account locked", user.Id, now);
+                _logger.LogWarning("Account {UserId} locked until {Until} after {Count} failed sign-ins.",
+                    user.Id, user.LockoutEndsAt, user.FailedLoginCount);
+            }
+
+            await _dbContext.SaveChangesAsync();
+            return lockedFor;
+        }
+
+        // The lock ran out: clear it and start the count again (the next attempt, not a timer, notices).
+        private bool ClearExpiredLock(User user, DateTime now)
+        {
+            if (user.LockoutEndsAt == null || user.LockoutEndsAt > now)
+                return false;
+
+            ClearLockout(user);
+            AddAudit(null, "Account unlocked", user.Id, now);
+            return true;
+        }
+
+        private static void ClearLockout(User user)
+        {
+            user.FailedLoginCount = 0;
+            user.FailedLoginWindowStart = null;
+            user.LockoutEndsAt = null;
+        }
+
+        private void AddAudit(Guid? actorId, string action, Guid userId, DateTime now) =>
+            _dbContext.AuditLogs.Add(new AuditLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = actorId,
+                Action = action,
+                EntityType = "User",
+                EntityId = userId,
+                CreatedAt = now
+            });
+
+        private sealed class Attempts
+        {
+            public int Count;
+            public DateTime WindowStart;
+            public DateTime? LockedUntil;
+        }
+
+        // In-memory counter for one submitted email. The key is a hash, so the cache never holds addresses
+        // and a very long value cannot make a very long key.
+        private Attempts AttemptsFor(string email)
+        {
+            var key = "login-attempts:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(email)));
+            return _attempts.GetOrCreate(key, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = (_lockout.Window > _lockout.Duration ? _lockout.Window : _lockout.Duration) * 2;
+                return new Attempts();
+            })!;
+        }
+
+        private static TimeSpan? HeldFor(Attempts attempts, DateTime now)
+        {
+            lock (attempts)
+                return attempts.LockedUntil is { } until && until > now ? until - now : null;
+        }
+
+        private TimeSpan? RecordFailure(Attempts attempts, DateTime now)
+        {
+            lock (attempts)
+            {
+                if (attempts.LockedUntil != null && attempts.LockedUntil <= now)
+                    attempts.LockedUntil = null;
+                if (attempts.Count == 0 || now - attempts.WindowStart > _lockout.Window)
+                {
+                    attempts.WindowStart = now;
+                    attempts.Count = 0;
+                }
+                attempts.Count++;
+                if (attempts.Count < _lockout.MaxAttempts)
+                    return null;
+
+                attempts.LockedUntil = now + _lockout.Duration;
+                attempts.Count = 0;
+                return _lockout.Duration;
+            }
         }
 
         public async Task<AuthResponse?> RefreshTokenAsync(string refreshTokenString)
@@ -301,13 +314,9 @@ namespace Strategies.Api.Services
                 CreatedAt = DateTime.UtcNow
             };
 
-            if (await IsDbAvailableAsync())
-            {
-                _dbContext.Users.Add(user);
-                await _dbContext.SaveChangesAsync();
-                return true;
-            }
-            return false;
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+            return true;
         }
 
         /// <summary>
@@ -318,39 +327,18 @@ namespace Strategies.Api.Services
         public async Task<bool> ResetPasswordAsync(User user, string newPassword)
         {
             user.PasswordHash = _passwordHasher.HashPassword(newPassword);
-            user.FailedLoginAttempts = 0;
-            user.LockoutEnd = null;
 
-            if (await IsDbAvailableAsync())
-            {
-                _dbContext.Users.Update(user);
-                await _dbContext.SaveChangesAsync();
+            // A completed reset proves control of the email address, so it also lifts any lockout.
+            var wasLocked = user.LockoutEndsAt != null;
+            ClearLockout(user);
+            if (wasLocked)
+                AddAudit(user.Id, "Account unlocked", user.Id, _time.GetUtcNow().UtcDateTime);
 
-                await _refreshTokenStore.RevokeAllUserTokensAsync(user.Id);
-                return true;
-            }
-            return false;
-        }
+            _dbContext.Users.Update(user);
+            await _dbContext.SaveChangesAsync();
 
-        private async Task PersistUserLockoutStateAsync(User user)
-        {
-            if (await IsDbAvailableAsync())
-            {
-                try
-                {
-                    var dbUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
-                    if (dbUser != null)
-                    {
-                        dbUser.FailedLoginAttempts = user.FailedLoginAttempts;
-                        dbUser.LockoutEnd = user.LockoutEnd;
-                        await _dbContext.SaveChangesAsync();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not persist lockout state for user {Email}.", user.Email);
-                }
-            }
+            await _refreshTokenStore.RevokeAllUserTokensAsync(user.Id);
+            return true;
         }
     }
 }

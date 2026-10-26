@@ -191,7 +191,7 @@ printf "%-12s %-38s %s\n" "(deleted)" mock.deleted@example.com 'ClientPassword12
 printf "%-12s %-38s %s\n" "(locked)" mock.locked@example.com 'ClientPassword123!  (locked ~15 min after seeding)'
 echo
 echo "5 wrong passwords lock an account for 15 min. To unlock all:"
-echo "  docker exec smp-postgres psql -U postgres -d strategies_db -c 'UPDATE \"User\" SET \"FailedLoginAttempts\"=0, \"LockoutEnd\"=NULL;'"
+echo "  docker exec smp-postgres psql -U postgres -d strategies_db -c 'UPDATE \"User\" SET \"FailedLoginCount\"=0, \"FailedLoginWindowStart\"=NULL, \"LockoutEndsAt\"=NULL;'"
 echo
 if test $api_up -eq 1 -a $web_up -eq 1
     echo "Live logs below. Press Ctrl+C to stop API and web."

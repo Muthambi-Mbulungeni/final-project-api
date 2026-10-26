@@ -15,10 +15,12 @@ namespace Strategies.Api.Data.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         // Set when an admin deletes the account (soft delete). Suspend only clears IsActive.
         public DateTime? DeletedAt { get; set; }
-        public int FailedLoginAttempts { get; set; } = 0;
-        public DateTime? LockoutEnd { get; set; }
 
-        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
-        public bool IsLockedOut => LockoutEnd.HasValue && LockoutEnd.Value > DateTime.UtcNow;
+        // Sign-in lockout. FailedLoginCount counts failed sign-ins since FailedLoginWindowStart; once it
+        // reaches the limit, LockoutEndsAt is set and sign-in is refused until then. A successful
+        // sign-in, a completed password reset or an admin unlock clears all three.
+        public int FailedLoginCount { get; set; }
+        public DateTime? FailedLoginWindowStart { get; set; }
+        public DateTime? LockoutEndsAt { get; set; }
     }
 }

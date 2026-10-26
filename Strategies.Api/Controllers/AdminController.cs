@@ -38,6 +38,7 @@ namespace Strategies.Api.Controllers
                 query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
 
             var totalRecords = await query.CountAsync();
+            var now = DateTime.UtcNow;
             var users = await query
                 .OrderBy(u => u.FullName)
                 .Skip((page - 1) * pageSize)
@@ -48,7 +49,9 @@ namespace Strategies.Api.Controllers
                     FullName = u.FullName,
                     Email = u.Email,
                     Role = u.Role.ToString(),
-                    IsActive = u.IsActive
+                    IsActive = u.IsActive,
+                    IsLocked = u.LockoutEndsAt != null && u.LockoutEndsAt > now,
+                    LockoutEndsAt = u.LockoutEndsAt > now ? u.LockoutEndsAt : null
                 })
                 .ToListAsync();
 
@@ -104,26 +107,44 @@ namespace Strategies.Api.Controllers
             if (user.DeletedAt != null)
                 return Conflict(new ApiErrorResponse { Message = "Deleted accounts cannot be reinstated." });
 
-            if (user.IsActive)
-                return Conflict(new ApiErrorResponse { Message = "User account is already active." });
-
-            user.IsActive = true;
-
             var adminIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
             Guid.TryParse(adminIdStr, out var adminId);
 
-            _context.AuditLogs.Add(new AuditLog
-            {
-                Id = Guid.NewGuid(),
-                UserId = adminId,
-                Action = "Reinstated user",
-                EntityType = "User",
-                EntityId = id,
-                CreatedAt = DateTime.UtcNow
-            });
+            // An active account that is only locked out by failed sign-ins can be unlocked the same way.
+            var locked = user.LockoutEndsAt != null || user.FailedLoginCount > 0;
+            if (user.IsActive && !locked)
+                return Conflict(new ApiErrorResponse { Message = "User account is already active." });
+
+            var wasSuspended = !user.IsActive;
+            user.IsActive = true;
+            user.FailedLoginCount = 0;
+            user.FailedLoginWindowStart = null;
+            user.LockoutEndsAt = null;
+
+            if (wasSuspended)
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = adminId,
+                    Action = "Reinstated user",
+                    EntityType = "User",
+                    EntityId = id,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+            if (locked)
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = adminId,
+                    Action = "Account unlocked",
+                    EntityType = "User",
+                    EntityId = id,
+                    CreatedAt = DateTime.UtcNow
+                });
 
             await _context.SaveChangesAsync();
-            return Ok(new { Message = "User account has been reinstated." });
+            return Ok(new { Message = wasSuspended ? "User account has been reinstated." : "User account has been unlocked." });
         }
 
         [HttpDelete("users/{id}")]
@@ -277,7 +298,9 @@ namespace Strategies.Api.Controllers
                 FullName = user.FullName,
                 Email = user.Email,
                 Role = user.Role.ToString(),
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                IsLocked = user.LockoutEndsAt > DateTime.UtcNow,
+                LockoutEndsAt = user.LockoutEndsAt > DateTime.UtcNow ? user.LockoutEndsAt : null
             });
         }
 

@@ -4,7 +4,7 @@ Demo data for the Strategies Migration Platform. It matches the schema created b
 migrations in `Strategies.Api` (`InitialCreate`, `AddTriageReason`, `FixDeleteBehaviors`): singular
 table names in the `public` schema. Apply the migrations first, then run the two files in order.
 
-Ids are fixed, so re-running gives the same rows. The four dev accounts keep the API's built-in ids;
+Ids are fixed, so re-running gives the same rows. The four dev accounts keep their original fixed ids;
 every other id is distinct, so the 8-character references the portal shows differ between records.
 
 > **Warning:** file 1 starts with `TRUNCATE ... CASCADE` on every application table. Running it
@@ -56,3 +56,13 @@ SELECT count(*) FROM public."User";
 ```
 
 Expected: three migrations and 11 users.
+
+## File 3: extra mock data
+
+`3-mock-data.sql` adds about 21 more users, 40 leads, 30 cases, documents, messages and audit rows on top of files 1 and 2. It does not truncate anything and is safe to re-run. Load it after files 1 and 2:
+
+```bash
+docker exec -i smp-postgres psql -U postgres -d strategies_db -v ON_ERROR_STOP=1 -f /seed/3-mock-data.sql
+```
+
+Mock documents use placeholder file paths, so "Open file" on them will not find a file. Approve and reject still work.

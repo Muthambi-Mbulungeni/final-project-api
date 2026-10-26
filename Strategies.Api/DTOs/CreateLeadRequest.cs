@@ -24,8 +24,7 @@ namespace Strategies.Api.DTOs
 
         public Guid? VisaCategoryId { get; set; }
 
-        [Required(ErrorMessage = "Consent to processing personal information under POPIA is required.")]
-        [Range(typeof(bool), "true", "true", ErrorMessage = "Consent to processing personal information under POPIA is required.")]
+        // POPIA: the person ticked the consent box on the enquiry form. Left out of the body means false.
         public bool Consent { get; set; }
     }
 

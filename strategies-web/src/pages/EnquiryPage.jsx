@@ -8,7 +8,7 @@ import { enumOrder } from '../config/enums'
 import { apiPost } from '../lib/api'
 import { shortId } from '../lib/format'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
-import { dateInputValue, validateEnquiryDetails, validateEnquiryPlans } from '../lib/validation'
+import { dateInputValue, enquiryServerFieldErrors, validateEnquiryDetails, validateEnquiryPlans } from '../lib/validation'
 
 // Values match the backend ImmigrationStatus enum. Descriptions are written for the public.
 const STATUS_OPTIONS = [
@@ -170,6 +170,12 @@ export default function EnquiryPage() {
         reference: result?.leadId ? shortId(result.leadId) : null,
       })
     } catch (error) {
+      // The API can still refuse for missing consent: show that under the checkbox, not above the form.
+      const fieldErrors = enquiryServerFieldErrors(error)
+      if (Object.keys(fieldErrors).length > 0) {
+        showErrors(fieldErrors, STEP_FIELDS[2])
+        return
+      }
       setFormError(submissionErrorMessage(error))
       setServerErrors(Array.isArray(error.errors) ? error.errors : [])
     } finally {

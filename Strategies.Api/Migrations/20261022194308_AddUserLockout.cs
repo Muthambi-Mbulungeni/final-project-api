@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,13 +6,13 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Strategies.Api.Migrations
 {
     /// <inheritdoc />
-    public partial class AddUserLockoutFields : Migration
+    public partial class AddUserLockout : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<int>(
-                name: "FailedLoginAttempts",
+                name: "FailedLoginCount",
                 schema: "public",
                 table: "User",
                 type: "integer",
@@ -20,7 +20,14 @@ namespace Strategies.Api.Migrations
                 defaultValue: 0);
 
             migrationBuilder.AddColumn<DateTime>(
-                name: "LockoutEnd",
+                name: "FailedLoginWindowStart",
+                schema: "public",
+                table: "User",
+                type: "timestamp with time zone",
+                nullable: true);
+
+            migrationBuilder.AddColumn<DateTime>(
+                name: "LockoutEndsAt",
                 schema: "public",
                 table: "User",
                 type: "timestamp with time zone",
@@ -31,12 +38,17 @@ namespace Strategies.Api.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "FailedLoginAttempts",
+                name: "FailedLoginCount",
                 schema: "public",
                 table: "User");
 
             migrationBuilder.DropColumn(
-                name: "LockoutEnd",
+                name: "FailedLoginWindowStart",
+                schema: "public",
+                table: "User");
+
+            migrationBuilder.DropColumn(
+                name: "LockoutEndsAt",
                 schema: "public",
                 table: "User");
         }

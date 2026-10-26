@@ -670,6 +670,29 @@ namespace Strategies.Api.Tests
             Assert.Equal(new[] { "Active", "Suspended" }, page.Data.Select(u => u.FullName).OrderBy(n => n));
         }
 
+        [Fact]
+        public async Task GetUsers_ReportsAnActiveLockoutAndIgnoresOneThatHasEnded()
+        {
+            using var ctx = CreateContext(nameof(GetUsers_ReportsAnActiveLockoutAndIgnoresOneThatHasEnded));
+            var until = DateTime.UtcNow.AddMinutes(10);
+            var locked = await SeedUser(ctx, UserRole.Client, "locked@example.com", "Locked");
+            locked.LockoutEndsAt = until;
+            var expired = await SeedUser(ctx, UserRole.Client, "expired@example.com", "Expired");
+            expired.LockoutEndsAt = DateTime.UtcNow.AddMinutes(-1);
+            await SeedUser(ctx, UserRole.Client, "plain@example.com", "Plain");
+            await ctx.SaveChangesAsync();
+
+            var result = await CreateController(ctx).GetUsers();
+
+            var users = Assert.IsType<PagedResponse<UserDto>>(Assert.IsType<OkObjectResult>(result).Value).Data.ToDictionary(u => u.FullName);
+            Assert.True(users["Locked"].IsLocked);
+            Assert.Equal(until, users["Locked"].LockoutEndsAt);
+            Assert.False(users["Expired"].IsLocked);
+            Assert.Null(users["Expired"].LockoutEndsAt);
+            Assert.False(users["Plain"].IsLocked);
+            Assert.Null(users["Plain"].LockoutEndsAt);
+        }
+
         // ---------- Login ----------
 
         private static AuthService CreateAuthService(ApplicationDbContext ctx)
@@ -685,7 +708,9 @@ namespace Strategies.Api.Tests
                 })
                 .Build();
             return new AuthService(ctx, new PasswordHasherService(), new TokenService(config),
-                new InMemoryRefreshTokenStore(), NullLogger<AuthService>.Instance);
+                new InMemoryRefreshTokenStore(), NullLogger<AuthService>.Instance,
+                new Microsoft.Extensions.Caching.Memory.MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions()),
+                Microsoft.Extensions.Options.Options.Create(new Strategies.Api.Configuration.LockoutSettings()), TimeProvider.System);
         }
 
         [Fact]

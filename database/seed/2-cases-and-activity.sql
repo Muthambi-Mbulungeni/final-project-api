@@ -5,18 +5,18 @@
 -- DocumentStatus: Pending=0 Approved=1 Rejected=2
 BEGIN;
 
-INSERT INTO "Lead" ("Id","ReviewedById","VisaCategoryId","FullName","Email","ImmigrationStatus","NeedsAssistance","DesiredStartDate","TriageStatus","SubmittedAt","ConsentGivenAt") VALUES
-('10ffbfb4-3b55-47e1-b630-dee8bac827ad',NULL,'4822fd67-4407-448f-aed6-bb6997f2e849','Naledi Khumalo','naledi.khumalo@example.com',3,true,now()+interval '60 days',3,now()-interval '2 hours',now()-interval '2 hours'),
-('01e4741e-dd38-4810-9be2-5148865be47a',NULL,'2c0239e6-8648-4ba9-9f9b-e8e614fd2e05','Omar Haddad','omar.haddad@example.com',2,false,now()+interval '45 days',1,now()-interval '1 day',now()-interval '1 day'),
-('8423fbeb-64f8-43c8-8732-8430ce348d51',NULL,NULL,'Sarah Jensen','sarah.jensen@example.com',3,true,now()+interval '90 days',3,now()-interval '29 hours',now()-interval '29 hours'),
-('ba1926ff-7e03-4343-aa05-7aeee313bf42',NULL,NULL,'Bongani Zulu','bongani.zulu@example.com',0,false,now()+interval '30 days',2,now()-interval '2 days',now()-interval '2 days'),
-('d2fb31bb-0ce8-4196-8dae-b6125d6b3572','33333333-3333-3333-3333-333333333334','35f3c178-f925-4725-941f-ef0cf10761ae','Priya Naidoo','priya.naidoo@example.com',1,true,now()+interval '120 days',1,now()-interval '3 days',now()-interval '3 days'),
-('a15ed80c-83a5-4c22-a9dd-861bb02f8ffa',NULL,NULL,'Tomas Silva','tomas.silva@example.com',3,true,now()+interval '75 days',0,now()-interval '4 days',now()-interval '4 days'),
-('ac5e6184-1361-4a80-9fd8-a37f1609a85b',NULL,'29542358-d41e-4e4f-9340-2a0d0bb22ae6','Kwame Asante','kwame.asante@example.com',2,true,now()+interval '50 days',3,now()-interval '5 days',now()-interval '5 days'),
-('8bd4dc25-c065-4136-8232-db1e5520c399',NULL,'4822fd67-4407-448f-aed6-bb6997f2e849','Emily Clarke','emily.clarke@example.com',3,false,now()+interval '100 days',1,now()-interval '6 days',now()-interval '6 days'),
-('f2a5f907-4e9f-411a-b950-eabaca644c74',NULL,NULL,'Lindiwe Mthembu','lindiwe.mthembu@example.com',0,true,now()+interval '20 days',2,now()-interval '8 days',now()-interval '8 days'),
-('9acc97d0-70ef-4b87-b72c-b4df4f304fe6','33333333-3333-3333-3333-333333333334','2c0239e6-8648-4ba9-9f9b-e8e614fd2e05','Ahmed Yusuf','ahmed.yusuf@example.com',3,true,now()+interval '65 days',1,now()-interval '10 days',now()-interval '10 days'),
-('eedbc1f8-5908-43da-88ea-fd435b9b87fe','33333333-3333-3333-3333-333333333334','4822fd67-4407-448f-aed6-bb6997f2e849','John Doe','client@nexus.com',3,true,now()+interval '30 days',1,now()-interval '30 days',now()-interval '30 days');
+INSERT INTO "Lead" ("Id","ReviewedById","VisaCategoryId","FullName","Email","ImmigrationStatus","NeedsAssistance","DesiredStartDate","TriageStatus","SubmittedAt") VALUES
+('10ffbfb4-3b55-47e1-b630-dee8bac827ad',NULL,'4822fd67-4407-448f-aed6-bb6997f2e849','Naledi Khumalo','naledi.khumalo@example.com',3,true,now()+interval '60 days',3,now()-interval '2 hours'),
+('01e4741e-dd38-4810-9be2-5148865be47a',NULL,'2c0239e6-8648-4ba9-9f9b-e8e614fd2e05','Omar Haddad','omar.haddad@example.com',2,false,now()+interval '45 days',1,now()-interval '1 day'),
+('8423fbeb-64f8-43c8-8732-8430ce348d51',NULL,NULL,'Sarah Jensen','sarah.jensen@example.com',3,true,now()+interval '90 days',3,now()-interval '29 hours'),
+('ba1926ff-7e03-4343-aa05-7aeee313bf42',NULL,NULL,'Bongani Zulu','bongani.zulu@example.com',0,false,now()+interval '30 days',2,now()-interval '2 days'),
+('d2fb31bb-0ce8-4196-8dae-b6125d6b3572','33333333-3333-3333-3333-333333333334','35f3c178-f925-4725-941f-ef0cf10761ae','Priya Naidoo','priya.naidoo@example.com',1,true,now()+interval '120 days',1,now()-interval '3 days'),
+('a15ed80c-83a5-4c22-a9dd-861bb02f8ffa',NULL,NULL,'Tomas Silva','tomas.silva@example.com',3,true,now()+interval '75 days',0,now()-interval '4 days'),
+('ac5e6184-1361-4a80-9fd8-a37f1609a85b',NULL,'29542358-d41e-4e4f-9340-2a0d0bb22ae6','Kwame Asante','kwame.asante@example.com',2,true,now()+interval '50 days',3,now()-interval '5 days'),
+('8bd4dc25-c065-4136-8232-db1e5520c399',NULL,'4822fd67-4407-448f-aed6-bb6997f2e849','Emily Clarke','emily.clarke@example.com',3,false,now()+interval '100 days',1,now()-interval '6 days'),
+('f2a5f907-4e9f-411a-b950-eabaca644c74',NULL,NULL,'Lindiwe Mthembu','lindiwe.mthembu@example.com',0,true,now()+interval '20 days',2,now()-interval '8 days'),
+('9acc97d0-70ef-4b87-b72c-b4df4f304fe6','33333333-3333-3333-3333-333333333334','2c0239e6-8648-4ba9-9f9b-e8e614fd2e05','Ahmed Yusuf','ahmed.yusuf@example.com',3,true,now()+interval '65 days',1,now()-interval '10 days'),
+('eedbc1f8-5908-43da-88ea-fd435b9b87fe','33333333-3333-3333-3333-333333333334','4822fd67-4407-448f-aed6-bb6997f2e849','John Doe','client@nexus.com',3,true,now()+interval '30 days',1,now()-interval '30 days');
 
 INSERT INTO "Case" ("Id","LeadId","ClientId","ConsultantId","VisaCategoryId","Stage","IsArchived","CreatedAt","UpdatedAt") VALUES
 ('6adcbe68-5bbb-48cf-87b8-aeb22118714e','eedbc1f8-5908-43da-88ea-fd435b9b87fe','77777777-7777-7777-7777-777777777777','33333333-3333-3333-3333-333333333334','4822fd67-4407-448f-aed6-bb6997f2e849',2,false,now()-interval '28 days',now()-interval '1 day'),

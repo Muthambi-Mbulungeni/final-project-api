@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,13 +6,13 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Strategies.Api.Migrations
 {
     /// <inheritdoc />
-    public partial class AddLeadConsentGivenAt : Migration
+    public partial class AddLeadConsentAt : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<DateTime>(
-                name: "ConsentGivenAt",
+                name: "ConsentAt",
                 schema: "public",
                 table: "Lead",
                 type: "timestamp with time zone",
@@ -23,7 +23,7 @@ namespace Strategies.Api.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "ConsentGivenAt",
+                name: "ConsentAt",
                 schema: "public",
                 table: "Lead");
         }

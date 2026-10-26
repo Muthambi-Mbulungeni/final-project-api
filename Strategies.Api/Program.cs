@@ -41,8 +41,16 @@ builder.Services.AddScoped<IPasswordResetTokenService, PasswordResetTokenService
 builder.Services.AddScoped<IPasswordPolicy, PasswordPolicy>();
 
 // 3. Core Domain & AI Services (Marco - Single clean registration, no duplicates)
-builder.Services.AddHttpClient<IAgentService, GeminiAgentService>();
+// 10-second timeout so a slow AI falls back to NeedsReview instead of hanging the enquiry form (FR-2.3).
+builder.Services.AddHttpClient<IAgentService, GeminiAgentService>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddScoped<CaseManagementService>();
+
+// Document storage root, resolved once against the content root. Production sets an absolute path
+// outside the deploy folder (e.g. /home/data/uploads on Azure) so uploads survive redeploys.
+var uploadsRoot = Path.GetFullPath(Path.Combine(
+    builder.Environment.ContentRootPath,
+    builder.Configuration["Storage:UploadsRoot"] ?? "wwwroot/uploads"));
+builder.Services.AddSingleton<IFileStorage>(new LocalFileStorage(uploadsRoot));
 
 // 4. JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -90,6 +98,13 @@ builder.Services.AddOptions<ForwardedHeadersSettings>()
     .ValidateOnStart();
 builder.Services.AddOptions<ForwardedHeadersOptions>()
     .Configure<IOptions<ForwardedHeadersSettings>>((options, settings) => settings.Value.Apply(options));
+
+builder.Services.AddOptions<LockoutSettings>()
+    .Bind(builder.Configuration.GetSection(LockoutSettings.SectionName))
+    .Validate(settings => settings.IsValid(), "Auth:Lockout: MaxAttempts, WindowMinutes and DurationMinutes must be greater than 0.")
+    .ValidateOnStart();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddOptions<LeadsRateLimitSettings>()
     .Bind(builder.Configuration.GetSection(LeadsRateLimitSettings.SectionName))
@@ -143,6 +158,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(corsOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
+              .WithExposedHeaders("Retry-After")
               .AllowCredentials());
 });
 
@@ -175,6 +191,10 @@ var app = builder.Build();
 // time would strip one more X-Forwarded-For entry, trusting a value the caller can make up.
 if (!string.Equals(app.Configuration["FORWARDEDHEADERS_ENABLED"], "true", StringComparison.OrdinalIgnoreCase))
     app.UseForwardedHeaders();
+
+// Placeholder files for the seeded documents: copied into the storage root if missing, on every startup.
+SeedFileInstaller.EnsureSeedFiles(
+    Path.Combine(app.Environment.ContentRootPath, "SeedFiles"), uploadsRoot, app.Logger);
 
 if (swaggerEnabled)
 {

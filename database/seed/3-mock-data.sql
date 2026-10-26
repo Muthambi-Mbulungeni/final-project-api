@@ -84,10 +84,10 @@ BEGIN
   END LOOP;
 
   -- Suspended, soft-deleted and locked-out clients (no cases, so nothing blocks them).
-  INSERT INTO "User" ("Id","FullName","Email","PasswordHash","Role","IsActive","EmailConfirmed","CreatedAt","DeletedAt","FailedLoginAttempts","LockoutEnd") VALUES
-  (md5('s3-client-susp')::uuid,   'Suspended Sam',  'mock.suspended@example.com', pw_client, 2, false, true, now() - interval '35 days', NULL, 0, NULL),
-  (md5('s3-client-del')::uuid,    'Deleted Dana',   'mock.deleted@example.com',   pw_client, 2, false, true, now() - interval '80 days', now() - interval '9 days', 0, NULL),
-  (md5('s3-client-locked')::uuid, 'Locked Lerato',  'mock.locked@example.com',    pw_client, 2, true,  true, now() - interval '20 days', NULL, 5, now() + interval '15 minutes')
+  INSERT INTO "User" ("Id","FullName","Email","PasswordHash","Role","IsActive","EmailConfirmed","CreatedAt","DeletedAt","FailedLoginCount","FailedLoginWindowStart","LockoutEndsAt") VALUES
+  (md5('s3-client-susp')::uuid,   'Suspended Sam',  'mock.suspended@example.com', pw_client, 2, false, true, now() - interval '35 days', NULL, 0, NULL, NULL),
+  (md5('s3-client-del')::uuid,    'Deleted Dana',   'mock.deleted@example.com',   pw_client, 2, false, true, now() - interval '80 days', now() - interval '9 days', 0, NULL, NULL),
+  (md5('s3-client-locked')::uuid, 'Locked Lerato',  'mock.locked@example.com',    pw_client, 2, true,  true, now() - interval '20 days', NULL, 5, now() - interval '2 minutes', now() + interval '15 minutes')
   ON CONFLICT ("Id") DO NOTHING;
 
   INSERT INTO "AuditLog" ("Id","UserId","Action","EntityType","EntityId","CreatedAt") VALUES
@@ -195,7 +195,7 @@ BEGIN
     nm        := first_names[1 + (i % 20)] || ' ' || last_names[1 + ((i * 7) % 20)];
 
     INSERT INTO "Lead" ("Id","ReviewedById","VisaCategoryId","FullName","Email","ImmigrationStatus","NeedsAssistance",
-                        "DesiredStartDate","TriageStatus","TriageReason","SubmittedAt","ConsentGivenAt")
+                        "DesiredStartDate","TriageStatus","TriageReason","SubmittedAt","ConsentAt")
     VALUES (lead_id, reviewer,
             CASE WHEN i % 3 = 0 THEN NULL ELSE visa_ids[1 + (i % 5)] END,
             nm,

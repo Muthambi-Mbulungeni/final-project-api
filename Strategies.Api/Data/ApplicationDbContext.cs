@@ -90,13 +90,6 @@ namespace Strategies.Api.Data
                     .HasDefaultValueSql("now()");
 
                 user.Property(account => account.DeletedAt);
-
-                user.Property(account => account.FailedLoginAttempts)
-                    .HasDefaultValue(0);
-
-                user.Property(account => account.LockoutEnd);
-
-                user.Ignore(account => account.IsLockedOut);
             });
 
             modelBuilder.Entity<Lead>(lead =>
@@ -120,8 +113,6 @@ namespace Strategies.Api.Data
 
                 lead.Property(application => application.NeedsAssistance)
                     .HasDefaultValue(true);
-
-                lead.Property(application => application.ConsentGivenAt);
             });
 
             modelBuilder.Entity<Case>(caseEntity =>

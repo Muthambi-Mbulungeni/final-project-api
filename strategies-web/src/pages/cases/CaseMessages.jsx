@@ -78,6 +78,9 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage, p
   const textareaRef = useRef(null)
   // The thread as last rendered, for the polling timer, which outlives a single render.
   const threadRef = useRef(thread)
+  // Ids of every message already shown. It only grows, so a late effect from an older render can never
+  // make a message look new again.
+  const shownIds = useRef(new Set())
   // Set before earlier messages are added above, so the reader's place in the thread is kept.
   const keepScrollFromBottom = useRef(null)
 
@@ -94,6 +97,7 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage, p
 
   useEffect(() => {
     threadRef.current = thread
+    thread.messages.forEach((message) => shownIds.current.add(message.id))
   }, [thread])
 
   useEffect(() => {
@@ -123,8 +127,8 @@ export default function CaseMessages({ caseId, archived = false, emptyMessage, p
       try {
         const current = threadRef.current
         const { messages: newer, page } = await loadNewerMessages(caseId, current.latestPage, { signal: controller.signal })
-        const shown = new Set(current.messages.map((message) => message.id))
-        const arrived = newer.filter((message) => !shown.has(message.id))
+        const arrived = newer.filter((message) => !shownIds.current.has(message.id))
+        newer.forEach((message) => shownIds.current.add(message.id))
         setThread((latest) => ({
           ...latest,
           messages: mergeMessages(latest.messages, newer),

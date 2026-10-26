@@ -42,6 +42,10 @@ export function validateEnquiryDetails({ fullName, email, immigrationStatus }) {
 }
 
 // Enquiry step 2: their plans and consent.
+// The code the API sends back when an enquiry arrives without POPIA consent.
+export const CONSENT_REQUIRED_CODE = 'consent_required'
+export const CONSENT_REQUIRED_MESSAGE = 'You need to agree before we can assess your enquiry.'
+
 export function validateEnquiryPlans({ desiredStartDate, consent }, today = new Date()) {
   const errors = {}
   if (!desiredStartDate) {
@@ -49,6 +53,12 @@ export function validateEnquiryPlans({ desiredStartDate, consent }, today = new 
   } else if (!isFutureDate(desiredStartDate, today)) {
     errors.desiredStartDate = 'Choose a date after today.'
   }
-  if (!consent) errors.consent = 'You need to agree before we can assess your enquiry.'
+  if (!consent) errors.consent = CONSENT_REQUIRED_MESSAGE
   return errors
+}
+
+// Field errors for a failed enquiry submission. Only the API's consent_required code is tied to a field
+// (the consent checkbox); anything else stays a message above the form. Empty when nothing maps.
+export function enquiryServerFieldErrors(error) {
+  return error?.code === CONSENT_REQUIRED_CODE ? { consent: CONSENT_REQUIRED_MESSAGE } : {}
 }

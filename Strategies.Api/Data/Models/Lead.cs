@@ -16,6 +16,8 @@ namespace Strategies.Api.Data.Models
         public DateTime DesiredStartDate { get; set; }
         public TriageStatus TriageStatus { get; set; }
         public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
-        public DateTime? ConsentGivenAt { get; set; }
+
+        // When the person gave POPIA consent on the enquiry form. Null for leads taken before consent was recorded.
+        public DateTime? ConsentAt { get; set; }
     }
 }
