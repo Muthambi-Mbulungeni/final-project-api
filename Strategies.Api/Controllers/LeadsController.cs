@@ -77,6 +77,11 @@ namespace Strategies.Api.Controllers
             [FromBody] CreateLeadRequest dto,
             [FromServices] IAgentService agentService)
         {
+            if (!dto.Consent)
+            {
+                ModelState.AddModelError(nameof(dto.Consent), "Consent to processing personal information under POPIA is required.");
+            }
+
             if (!ModelState.IsValid)
             {
                 var errors = ModelState.Values
@@ -126,6 +131,7 @@ namespace Strategies.Api.Controllers
                 DesiredStartDate = dto.DesiredStartDate,
                 VisaCategoryId = dto.VisaCategoryId,
                 SubmittedAt = DateTime.UtcNow,
+                ConsentGivenAt = DateTime.UtcNow,
                 TriageStatus = triageStatus,
                 TriageReason = triageReason
             };
@@ -138,6 +144,7 @@ namespace Strategies.Api.Controllers
                 Message = "Lead successfully submitted.",
                 LeadId = lead.Id,
                 TriageStatus = lead.TriageStatus.ToString(),
+                ConsentGivenAt = lead.ConsentGivenAt,
                 AiAvailable = aiResult.Status == RunStatus.Success.ToString(),
                 AiAnalysis = aiResult.Status == RunStatus.Success.ToString() ? aiResult.ExtractedData : null,
                 FallbackNote = aiResult.Status != RunStatus.Success.ToString() ? aiResult.Message : null

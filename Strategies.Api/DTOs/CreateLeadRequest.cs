@@ -23,6 +23,10 @@ namespace Strategies.Api.DTOs
         public DateTime DesiredStartDate { get; set; }
 
         public Guid? VisaCategoryId { get; set; }
+
+        [Required(ErrorMessage = "Consent to processing personal information under POPIA is required.")]
+        [Range(typeof(bool), "true", "true", ErrorMessage = "Consent to processing personal information under POPIA is required.")]
+        public bool Consent { get; set; }
     }
 
     public class UpdateLeadStatusRequest

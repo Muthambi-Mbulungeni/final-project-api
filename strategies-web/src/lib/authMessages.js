@@ -11,6 +11,8 @@ export function signInErrorMessage(error) {
     case 405:
     case 501:
       return 'Sign-in is temporarily unavailable. Please try again later.'
+    case 423:
+      return error?.message || 'This account is temporarily locked due to multiple failed sign-in attempts. Please try again later.'
     case 429:
       return 'Too many sign-in attempts. Wait a minute and try again.'
     default:

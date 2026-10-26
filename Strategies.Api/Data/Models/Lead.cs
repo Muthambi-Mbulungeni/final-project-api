@@ -16,5 +16,6 @@ namespace Strategies.Api.Data.Models
         public DateTime DesiredStartDate { get; set; }
         public TriageStatus TriageStatus { get; set; }
         public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? ConsentGivenAt { get; set; }
     }
 }

@@ -137,6 +137,9 @@ export default function LeadDetailPanel({ lead, onClose, onDecided }) {
                   {formatDate(lead.desiredStartDate)}
                 </Detail>
                 <Detail label="Submitted">{formatDateTime(lead.submittedAt)}</Detail>
+                <Detail label="POPIA consent">
+                  {lead.consentGivenAt ? formatDateTime(lead.consentGivenAt) : 'Recorded'}
+                </Detail>
                 <Detail label="Reference" hint="Matches the client’s confirmation">
                   <span className="font-mono tracking-wider">{reference ?? '—'}</span>
                 </Detail>

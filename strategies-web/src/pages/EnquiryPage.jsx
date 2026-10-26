@@ -162,6 +162,7 @@ export default function EnquiryPage() {
         immigrationStatus: enumOrder('immigrationStatus', values.immigrationStatus),
         needsAssistance: values.needsAssistance,
         desiredStartDate: `${values.desiredStartDate}T00:00:00Z`,
+        consent: values.consent,
       })
       setSubmitted({
         firstName: values.fullName.trim().split(' ')[0],

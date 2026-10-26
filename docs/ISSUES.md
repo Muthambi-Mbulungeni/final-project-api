@@ -13,7 +13,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | ID | Severity | Issue | Owner |
 |---|---|---|---|
 | [ISS-02](#iss-02) | High | Development secrets committed in `appsettings.json` | Kaan, Mbulungeni |
-| [ISS-04](#iss-04) | High | POPIA consent is checked in the browser only, never sent to or stored by the API | Marco, Lekabe |
 | [ISS-05](#iss-05) | High | No per-account lockout after failed sign-ins | Kaan |
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
@@ -33,15 +32,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Evidence:** both are now only in `appsettings.Development.json`, which is never loaded outside Development. Outside Development the API refuses to start unless `ConnectionStrings:DefaultConnection`, `Jwt:Key`, `App:BaseUrl` and `Cors:AllowedOrigins` are set, so a hosted deployment cannot fall back to the committed values (`RequiredSettings`, `StartupConfigurationTests`).
 - **Impact:** low while they stay development-only. The values remain in the repository and its history, so anyone with access could sign tokens for a host that uses the same key.
 - **Fix (remaining):** never reuse these values on a host; set each host's own as application settings. If any hosted environment ever used them, rotate the JWT key and the database password there.
-
-### ISS-04
-
-**High. POPIA consent is checked in the browser only.**
-
-- **Problem:** the enquiry form requires the consent box, but the request it sends has no consent field, and the API has no field or column for it.
-- **Evidence:** B1; `EnquiryPage.jsx` request body; no consent field in `CreateLeadRequest` or the `Lead` table.
-- **Impact:** there is no record that a person consented to processing, and a request sent straight to the API skips the check.
-- **Fix:** add a required consent flag to `CreateLeadRequest` (reject the request without it) and store the consent time on the lead (a new migration); the web form then sends it.
 
 ### ISS-05
 
@@ -171,3 +161,4 @@ Issues found by testing or review and fixed before submission.
 | Mobile: after a client uploaded a new copy on the web, the app still asked for a replacement and counted both copies | Same rule as the web: a rejected copy is hidden once a newer copy of the same type exists, with unit tests (PR #27) |
 | Mobile: told clients to contact their consultant for a new copy | Points to upload on the web portal (PR #27) |
 | Mobile: Gradle wrapper missing, so a fresh clone could not build or run the tests | `gradlew`, `gradlew.bat` and the wrapper jar committed (PR #27) |
+| POPIA consent was checked in the browser only (was ISS-04, High) | Added required `Consent` validation to `CreateLeadRequest` (400 if false); added `ConsentGivenAt` timestamp to `Lead` model, EF Core migration, and database seed; sent `consent` from `EnquiryPage.jsx`; displayed in `LeadDetailPanel.jsx`; added xUnit tests (`LeadsConsentTests`) |

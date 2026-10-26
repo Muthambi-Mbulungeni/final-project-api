@@ -15,5 +15,10 @@ namespace Strategies.Api.Data.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         // Set when an admin deletes the account (soft delete). Suspend only clears IsActive.
         public DateTime? DeletedAt { get; set; }
+        public int FailedLoginAttempts { get; set; } = 0;
+        public DateTime? LockoutEnd { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+        public bool IsLockedOut => LockoutEnd.HasValue && LockoutEnd.Value > DateTime.UtcNow;
     }
 }

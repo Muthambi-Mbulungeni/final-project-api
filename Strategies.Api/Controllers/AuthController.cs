@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Strategies.Api.DTOs;
 using Strategies.Api.DTOs.Auth;
+using Strategies.Api.Exceptions;
 using Strategies.Api.Services;
 
 namespace Strategies.Api.Controllers
@@ -66,12 +67,19 @@ namespace Strategies.Api.Controllers
                 return BadRequest(new ApiErrorResponse { Message = "Validation failed.", Errors = errors });
             }
 
-            var result = await _authService.LoginAsync(request);
+            try
+            {
+                var result = await _authService.LoginAsync(request);
 
-            if (result == null)
-                return Unauthorized(new ApiErrorResponse { Message = "Invalid email or password." });
+                if (result == null)
+                    return Unauthorized(new ApiErrorResponse { Message = "Invalid email or password." });
 
-            return Ok(result);
+                return Ok(result);
+            }
+            catch (AccountLockedException ex)
+            {
+                return StatusCode(StatusCodes.Status423Locked, new ApiErrorResponse { Message = ex.Message });
+            }
         }
 
         /// <summary>

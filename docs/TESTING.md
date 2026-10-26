@@ -38,7 +38,7 @@ Each requirement from the brief, with the tests that prove it. Test IDs refer to
 | Notifications | `notifications` tests; mobile check 4 | Pass |
 | Soft delete | Admin user delete marks the user inactive instead of deleting | Not yet tested |
 | AI triage with fallback | A14 (no key: lead saved as NeedsReview) | Pass for fallback; live Gemini call not tested ([ISS-08](ISSUES.md#iss-08)) |
-| POPIA consent | B1 (enquiry cannot be sent without consent) | Pass in the web form only; **the API neither requires nor stores consent** ([ISS-04](ISSUES.md#iss-04)) |
+| POPIA consent | B1 (web form requires consent); API requires `Consent` (400 if missing/false), records `ConsentGivenAt`; `LeadsConsentTests` | Pass |
 | Responsive and accessible | Section 7 | Pass |
 | Deployment | Hosted URLs | Not yet tested |
 

@@ -8,6 +8,7 @@ using Strategies.Api.Data;
 using Strategies.Api.Data.Enums;
 using Strategies.Api.Data.Models;
 using Strategies.Api.DTOs.Auth;
+using Strategies.Api.Exceptions;
 
 namespace Strategies.Api.Services
 {
@@ -163,8 +164,48 @@ namespace Strategies.Api.Services
             if (user == null || !user.IsActive || !user.EmailConfirmed || user.DeletedAt != null)
                 return null;
 
+            // 1. Check if the account is currently locked out
+            if (user.IsLockedOut)
+            {
+                _logger.LogWarning("Sign-in attempt rejected for locked account {Email}. Lockout ends at {LockoutEnd}.", user.Email, user.LockoutEnd);
+                throw new AccountLockedException("Account is temporarily locked due to multiple failed sign-in attempts. Please try again later.", user.LockoutEnd);
+            }
+
+            // If a previous lockout has expired, reset the attempt counter and lockout timestamp
+            if (user.LockoutEnd.HasValue && user.LockoutEnd.Value <= DateTime.UtcNow)
+            {
+                user.LockoutEnd = null;
+                user.FailedLoginAttempts = 0;
+                await PersistUserLockoutStateAsync(user);
+            }
+
+            // 2. Verify password
             if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
+            {
+                user.FailedLoginAttempts++;
+                if (user.FailedLoginAttempts >= 5)
+                {
+                    user.LockoutEnd = DateTime.UtcNow.AddMinutes(15);
+                    _logger.LogWarning("Account {Email} locked until {LockoutEnd} after {Attempts} failed sign-in attempts.", user.Email, user.LockoutEnd, user.FailedLoginAttempts);
+                }
+
+                await PersistUserLockoutStateAsync(user);
+
+                if (user.FailedLoginAttempts >= 5)
+                {
+                    throw new AccountLockedException("Account is temporarily locked due to multiple failed sign-in attempts. Please try again later.", user.LockoutEnd);
+                }
+
                 return null;
+            }
+
+            // 3. Successful login: reset failed login attempts
+            if (user.FailedLoginAttempts > 0 || user.LockoutEnd != null)
+            {
+                user.FailedLoginAttempts = 0;
+                user.LockoutEnd = null;
+                await PersistUserLockoutStateAsync(user);
+            }
 
             var (accessToken, expiration) = _tokenService.GenerateAccessToken(user);
             var refreshTokenString        = _tokenService.GenerateRefreshToken();
@@ -277,6 +318,8 @@ namespace Strategies.Api.Services
         public async Task<bool> ResetPasswordAsync(User user, string newPassword)
         {
             user.PasswordHash = _passwordHasher.HashPassword(newPassword);
+            user.FailedLoginAttempts = 0;
+            user.LockoutEnd = null;
 
             if (await IsDbAvailableAsync())
             {
@@ -287,6 +330,27 @@ namespace Strategies.Api.Services
                 return true;
             }
             return false;
+        }
+
+        private async Task PersistUserLockoutStateAsync(User user)
+        {
+            if (await IsDbAvailableAsync())
+            {
+                try
+                {
+                    var dbUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
+                    if (dbUser != null)
+                    {
+                        dbUser.FailedLoginAttempts = user.FailedLoginAttempts;
+                        dbUser.LockoutEnd = user.LockoutEnd;
+                        await _dbContext.SaveChangesAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not persist lockout state for user {Email}.", user.Email);
+                }
+            }
         }
     }
 }
