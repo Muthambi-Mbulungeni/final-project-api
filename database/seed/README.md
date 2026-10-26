@@ -56,3 +56,13 @@ SELECT count(*) FROM public."User";
 ```
 
 Expected: three migrations and 11 users.
+
+## File 3: extra mock data
+
+`3-mock-data.sql` adds about 21 more users, 40 leads, 30 cases, documents, messages and audit rows on top of files 1 and 2. It does not truncate anything and is safe to re-run. Load it after files 1 and 2:
+
+```bash
+docker exec -i smp-postgres psql -U postgres -d strategies_db -v ON_ERROR_STOP=1 -f /seed/3-mock-data.sql
+```
+
+Mock documents use placeholder file paths, so "Open file" on them will not find a file. Approve and reject still work.
