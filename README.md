@@ -207,3 +207,26 @@ Details and the other features not delivered are in [ISSUES.md section 2](docs/I
 | Kundai Makuzha | ST10251297 | Android app |
 | Mbulungeni Kenneth Muthambi | ST10447819 | Repository, CI, QA and deployment |
 | Riaad Hercules | ST10258492 | Web portal, integration testing, documentation |
+
+## Quick start with mock data (Linux, fish shell)
+
+`dev.fish` starts the database container, applies the migrations, loads the demo and mock data when the database is empty, then runs the API and the web portal together. If something already uses port 5151, 5173 or 5432, it is stopped and replaced.
+
+```fish
+fish dev.fish
+```
+
+Logs go to `.devlogs/`. Stop both servers with Ctrl+C. The database container keeps running (`docker compose stop` stops it).
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | admin@nexus.com | AdminPassword123! |
+| Consultant | consultant@nexus.com, riaad@nexus.com, mock.consultant1..3@example.com | ConsultantPassword123! |
+| Client | client@nexus.com, mock.client01..15@example.com | ClientPassword123! |
+| Suspended / deleted / locked client | mock.suspended@, mock.deleted@, mock.locked@example.com | ClientPassword123! |
+
+Repeated wrong passwords lock an account for a while (see `Lockout` in `appsettings.json`). To clear all lockouts:
+
+```bash
+docker exec smp-postgres psql -U postgres -d strategies_db -c 'UPDATE "User" SET "FailedLoginCount"=0, "FailedLoginWindowStart"=NULL, "LockoutEndsAt"=NULL;'
+```
