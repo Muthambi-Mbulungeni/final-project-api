@@ -23,6 +23,7 @@ Class diagrams use UML notation: `+name: Type = default` for attributes, `+Opera
 | [ux-journey-web-workspaces](ux-journey-web-workspaces.mmd) | Admin, consultant and client screens, panels and hidden placeholder routes | 9.1.7 User Experience Journey Map | develop aff26b0 |
 | [ux-journey-mobile](ux-journey-mobile.mmd) | Android app screens (client only): restore, login, three tabs, sign out | 9.1.7 User Experience Journey Map | develop 98ff559 |
 | [domain-class](domain-class.mmd) | Business concepts, key attributes and multiplicities, no methods | 9.1.9 Domain modelling | develop 98ff559 |
+| [erd](erd.mmd) | Entity relationship diagram: all 12 tables in schema public with column types, PK/FK, nullable columns, defaults and FK delete rules | 9.1.9 Design artifacts (database) | develop 6b597a3 |
 | [design-class](design-class.mmd) | Design class 1 of 8: User, Lead, Case, VisaCategory with typed attributes, PK/FK, multiplicities | 9.1.9 Design artifacts | develop 98ff559 |
 | [design-class-documents](design-class-documents.mmd) | Design class 2 of 8: Document, DocumentType, CaseStageHistory and their delete rules | 9.1.9 Design artifacts | develop 98ff559 |
 | [design-class-supporting](design-class-supporting.mmd) | Design class 3 of 8: Message, VisaRecord, ChecklistTemplate, AgentRun, AuditLog | 9.1.9 Design artifacts | develop 98ff559 |
