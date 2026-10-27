@@ -9,6 +9,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.Authenticator
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -170,6 +171,30 @@ class ApiClient(private val tokens: TokenStore, baseUrl: String) {
     suspend fun notifications(): NotificationsResponse =
         json.decodeFromString(get("api/notifications?page=1&pageSize=20"))
 
+    suspend fun documentTypes(): List<DocumentTypeDto> =
+        json.decodeFromString(get("api/DocumentTypes"))
+
+    // A photo is a few MB over a mobile connection: allow longer than the 20 s used for small JSON calls.
+    private val uploader by lazy {
+        authed.newBuilder().writeTimeout(60, TimeUnit.SECONDS).readTimeout(60, TimeUnit.SECONDS).build()
+    }
+
+    /**
+     * Sends a photo to the case in two steps, like the web portal: upload the file (the API returns its stored
+     * name), then register it as a document of [documentTypeId]. It appears as "Awaiting review".
+     */
+    suspend fun sendDocument(caseId: String, documentTypeId: String, fileName: String, jpeg: ByteArray) {
+        val form = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("file", fileName, jpeg.toRequestBody("image/jpeg".toMediaType()))
+            .build()
+        val uploaded = json.decodeFromString<UploadResponse>(
+            exec(uploader, Request.Builder().url(base + "api/Documents/upload").post(form).build())
+        )
+        val record = CreateDocumentRequest(caseId, documentTypeId, fileName, uploaded.filePath)
+        exec(authed, Request.Builder().url(base + "api/Documents")
+            .post(json.encodeToString(record).toRequestBody(jsonType)).build())
+    }
+
     suspend fun markRead(id: String) {
         val req = Request.Builder().url(base + "api/notifications/$id/read")
             .patch("".toRequestBody(jsonType)).build()
@@ -193,6 +218,7 @@ class ApiClient(private val tokens: TokenStore, baseUrl: String) {
                     )
                     resp.code == 403 -> throw ApiException(Kind.Forbidden)
                     resp.code == 429 -> throw ApiException(Kind.RateLimited)
+                    resp.code == 400 || resp.code == 413 -> throw ApiException(Kind.Rejected)
                     resp.code in 502..504 -> throw ApiException(Kind.Network)
                     else -> throw ApiException(Kind.Server)
                 }

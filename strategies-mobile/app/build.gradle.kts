@@ -24,8 +24,8 @@ android {
         }
         release {
             isMinifyEnabled = false
-            // Production MUST be HTTPS. Replace with the deployed API address.
-            buildConfigField("String", "API_BASE_URL", "\"https://CHANGE-ME.example.com/\"")
+            // Production MUST be HTTPS: the hosted API on Render.
+            buildConfigField("String", "API_BASE_URL", "\"https://final-project-api-zm3s.onrender.com/\"")
         }
     }
 
@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)

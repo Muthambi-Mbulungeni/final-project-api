@@ -46,8 +46,26 @@ Run in Android Studio: right-click `ModelsTest` > Run, or `./gradlew testDebugUn
 Result (5 Oct 2026, `./gradlew testDebugUnitTest`): 19 of 19 passed, 0 failures. With the hidden-copy rule switched
 off on purpose, the 2 tests for it failed, so they test the rule.
 
+## 2b. Photo upload (written 23 Oct 2026, not yet run on an emulator)
+Unit tests for the file name, scaling and request/response shapes are in `PhotosTest` (the image shrinking itself needs a device).
+Run these on an emulator against the real API, then fill in Actual and Result.
+
+| # | Check | Expected | Actual | Result |
+|---|---|---|---|---|
+| U1 | Documents > Choose photo, pick a JPG, choose a type, Send | "Sent. Your consultant will review it."; new row "Awaiting review" | | TODO |
+| U2 | Documents > Take photo (emulator camera), Send | Same as U1; photo upright, not sideways | | TODO |
+| U3 | Pick a large photo (over 5 MB) | Preview shows; Send succeeds (it was shrunk below 4.5 MB) | | TODO |
+| U4 | Pick a PNG with transparency | Background is white, not black | | TODO |
+| U5 | Replace a rejected document | Type is preselected; after Send the "Needs replacing" copy disappears and "Action needed" clears | | TODO |
+| U6 | Press Send with no type chosen (no rejected document) | Send is disabled, hint says to choose a type | | TODO |
+| U7 | Turn the API off, press Send | "We can't reach the service right now..."; photo stays so Send can be pressed again | | TODO |
+| U8 | Cancel the camera | Nothing changes, no error | | TODO |
+| U9 | Rotate the phone while the camera is open | Photo is still picked up afterwards | | TODO |
+| U10 | Sign in as staff or open the same case on the web | The photo is listed and downloadable | | TODO |
+
 ## 3. Known issues
-- Registration, password reset and file upload are not in the app. Clients upload new copies on the web portal;
-  password reset waits for the API fix in [ISS-01](../docs/ISSUES.md#iss-01).
+- Registration and password reset are not in the app; password reset waits for the API fix in
+  [ISS-01](../docs/ISSUES.md#iss-01).
+- Messages are read-only until the API has a send endpoint.
 - Release builds still point at `https://CHANGE-ME.example.com/` until the API is hosted.
 - Notification scoping to the user's own cases (POPIA) is done in the API on the version tested; re-check after merges.

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.nexus.strategies.data.CaseDto
 import com.nexus.strategies.data.DocStatus
 import com.nexus.strategies.data.DocumentDto
+import com.nexus.strategies.data.requestedBy
 import com.nexus.strategies.data.Stage
 import com.nexus.strategies.data.formatDate
 
@@ -80,8 +81,8 @@ private fun ActionNeeded(docs: List<DocumentDto>, onOpen: () -> Unit) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            if (docs.size == 1) "Your consultant asked for a new copy of your ${docs[0].documentTypeName.lowercase()}."
-            else "Your consultant asked for new copies of ${docs.size} documents.",
+            if (docs.size == 1) "${requestedBy(docs)} asked for a new copy of your ${docs[0].documentTypeName.lowercase()}."
+            else "${requestedBy(docs)} asked for new copies of ${docs.size} documents.",
             color = Stone600,
         )
         Spacer(Modifier.height(14.dp))

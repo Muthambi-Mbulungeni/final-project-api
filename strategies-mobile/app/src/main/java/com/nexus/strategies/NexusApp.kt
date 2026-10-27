@@ -7,11 +7,14 @@ import com.nexus.strategies.data.TokenStore
 class NexusApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        app = this
         tokens = TokenStore(this)
         api = ApiClient(tokens, BuildConfig.API_BASE_URL)
     }
 
     companion object {
+        lateinit var app: Application
+            private set
         lateinit var tokens: TokenStore
             private set
         lateinit var api: ApiClient
