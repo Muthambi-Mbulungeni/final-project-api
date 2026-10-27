@@ -1,0 +1,134 @@
+---
+title: Entity relationship diagram (PostgreSQL schema public, from ApplicationDbContext)
+---
+erDiagram
+    User {
+        uuid Id PK
+        text FullName
+        text Email "no unique index"
+        text PasswordHash "BCrypt"
+        int Role "UserRole enum"
+        bool IsActive "db default false"
+        bool EmailConfirmed "default false"
+        timestamptz CreatedAt "default now()"
+        timestamptz DeletedAt "nullable, soft delete"
+        int FailedLoginCount
+        timestamptz FailedLoginWindowStart "nullable"
+        timestamptz LockoutEndsAt "nullable"
+    }
+    Lead {
+        uuid Id PK
+        uuid ReviewedById FK "nullable, SET NULL"
+        uuid VisaCategoryId FK "nullable, SET NULL"
+        text FullName
+        text Email
+        int ImmigrationStatus "ImmigrationStatus enum"
+        bool NeedsAssistance "default true"
+        timestamptz DesiredStartDate
+        int TriageStatus "TriageStatus enum"
+        text TriageReason "nullable"
+        timestamptz SubmittedAt
+        timestamptz ConsentAt "nullable, POPIA consent"
+    }
+    Case {
+        uuid Id PK
+        uuid LeadId FK "nullable, SET NULL"
+        uuid ClientId FK "RESTRICT"
+        uuid ConsultantId FK "nullable, SET NULL"
+        uuid VisaCategoryId FK "RESTRICT"
+        int Stage "CaseStage enum"
+        bool IsArchived "default false"
+        timestamptz CreatedAt "default now()"
+        timestamptz UpdatedAt "default now()"
+    }
+    VisaCategory {
+        uuid Id PK
+        text Name
+        text Description "nullable"
+        bool IsActive "default true"
+    }
+    DocumentType {
+        uuid Id PK
+        text Name
+        text Description "nullable"
+    }
+    ChecklistTemplate {
+        uuid Id PK
+        uuid VisaCategoryId FK "CASCADE"
+        uuid DocumentTypeId FK "CASCADE"
+        bool IsMandatory "default true"
+    }
+    Document {
+        uuid Id PK
+        uuid CaseId FK "CASCADE"
+        uuid DocumentTypeId FK "RESTRICT"
+        uuid ReviewedById FK "nullable, SET NULL"
+        text FileName
+        text FilePath
+        int Status "DocumentStatus enum"
+        text ReviewComment "nullable"
+        timestamptz ReviewedAt "nullable"
+        timestamptz UploadedAt "default now()"
+        bool IsArchived "default false"
+    }
+    CaseStageHistory {
+        uuid Id PK
+        uuid CaseId FK "CASCADE"
+        uuid ChangedById FK "nullable, SET NULL"
+        int FromStage "CaseStage enum"
+        int ToStage "CaseStage enum"
+        timestamptz ChangedAt "default now()"
+    }
+    Message {
+        uuid Id PK
+        uuid CaseId FK "CASCADE"
+        uuid SenderId FK "RESTRICT"
+        text Body
+        bool IsRead "default false"
+        timestamptz SentAt "default now()"
+    }
+    VisaRecord {
+        uuid Id PK
+        uuid CaseId FK "CASCADE"
+        text VisaType
+        timestamptz IssuedDate
+        timestamptz ExpiryDate
+        bool RenewalFlagged "default false"
+    }
+    AgentRun {
+        uuid Id PK
+        uuid CaseId FK "nullable, CASCADE"
+        uuid LeadId FK "nullable, SET NULL"
+        int AgentType "AgentType enum"
+        text Output
+        int Status "RunStatus enum"
+        timestamptz RanAt "default now()"
+    }
+    AuditLog {
+        uuid Id PK
+        uuid UserId FK "nullable, SET NULL"
+        text Action
+        text EntityType
+        uuid EntityId "no FK, any table"
+        timestamptz CreatedAt "default now()"
+    }
+
+    User |o--o{ Lead : "reviews"
+    VisaCategory |o--o{ Lead : "requested in"
+    Lead |o--o{ Case : "converted to"
+    User ||--o{ Case : "is client of"
+    User |o--o{ Case : "is consultant for"
+    VisaCategory ||--o{ Case : "categorises"
+    Case ||--o{ CaseStageHistory : "records stage change"
+    User |o--o{ CaseStageHistory : "changed by"
+    VisaCategory ||--o{ ChecklistTemplate : "requires"
+    DocumentType ||--o{ ChecklistTemplate : "listed in"
+    Case ||--o{ Document : "holds"
+    DocumentType ||--o{ Document : "types"
+    User |o--o{ Document : "reviews"
+    Case ||--o{ Message : "has"
+    User ||--o{ Message : "sends"
+    Case ||--o{ VisaRecord : "issues"
+    Case |o--o{ AgentRun : "runs for"
+    Lead |o--o{ AgentRun : "triaged by"
+    User |o--o{ AuditLog : "acts in"
