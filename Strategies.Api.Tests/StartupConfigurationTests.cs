@@ -77,7 +77,8 @@ namespace Strategies.Api.Tests
             {
                 ["ConnectionStrings:DefaultConnection"] = "",
                 ["Jwt:Key"] = "",
-                ["App:BaseUrl"] = ""
+                ["App:BaseUrl"] = "",
+                ["Cors:AllowedOrigins:0"] = ""
             }, withRequiredSettings: false);
 
             var error = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
@@ -184,6 +185,35 @@ namespace Strategies.Api.Tests
             Assert.Equal("https://staging.example.test", await AllowedOriginFor("https://staging.example.test"));
             Assert.Null(await AllowedOriginFor("http://localhost:5173"));
             Assert.Null(await AllowedOriginFor("https://evil.example.test"));
+        }
+
+        [Fact]
+        public async Task Cors_ProductionDefaults_AllowGitHubPagesOnly()
+        {
+            // No Cors setting from the host: appsettings.Production.json supplies the Pages origin.
+            using var factory = new ApiFactory(new()
+            {
+                ["ConnectionStrings:DefaultConnection"] = RequiredTestSettings["ConnectionStrings:DefaultConnection"],
+                ["Jwt:Key"] = RequiredTestSettings["Jwt:Key"],
+                ["App:BaseUrl"] = RequiredTestSettings["App:BaseUrl"]
+            }, withRequiredSettings: false, inMemoryDatabase: true);
+            using var client = factory.CreateClient();
+
+            async Task<HttpResponseMessage> PreflightFrom(string origin)
+            {
+                var request = new HttpRequestMessage(HttpMethod.Options, "/api/auth/login");
+                request.Headers.Add("Origin", origin);
+                request.Headers.Add("Access-Control-Request-Method", "POST");
+                request.Headers.Add("Access-Control-Request-Headers", "content-type,authorization");
+                return await client.SendAsync(request);
+            }
+
+            var pages = await PreflightFrom("https://emgprs.github.io");
+            Assert.Equal("https://emgprs.github.io", Assert.Single(pages.Headers.GetValues("Access-Control-Allow-Origin")));
+            Assert.Equal("true", Assert.Single(pages.Headers.GetValues("Access-Control-Allow-Credentials")));
+
+            foreach (var origin in new[] { "http://localhost:5173", "http://localhost:3000", "https://evil.example.test" })
+                Assert.False((await PreflightFrom(origin)).Headers.Contains("Access-Control-Allow-Origin"), origin);
         }
 
         [Fact]

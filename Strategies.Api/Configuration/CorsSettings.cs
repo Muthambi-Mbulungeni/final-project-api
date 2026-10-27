@@ -5,7 +5,8 @@ using Microsoft.Extensions.Configuration;
 namespace Strategies.Api.Configuration
 {
     // "Cors:AllowedOrigins": the web portal origins allowed to call the API with credentials.
-    // Production sets Cors__AllowedOrigins__0, __1 and so on. The localhost defaults live in
+    // appsettings.Production.json allows the GitHub Pages portal; a host can replace or add
+    // origins with Cors__AllowedOrigins__0, __1 and so on. The localhost defaults live in
     // appsettings.Development.json only, because configuration arrays merge by index: a default
     // at index 1 in appsettings.json would stay allowed in production next to the real origin.
     public static class CorsSettings
