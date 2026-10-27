@@ -41,10 +41,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The Pages site is served from another origin than the API, so the build needs the API
+      # address (repository variable VITE_API_BASE_URL, e.g. https://example.onrender.com).
+      # Without it every API call would go to github.io and sign-in would fail.
+      - name: Check API address
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "::error::Repository variable VITE_API_BASE_URL is not set (Settings > Secrets and variables > Actions > Variables)."
+            exit 1
+          fi
+
       - name: Build
         run: npm run build
         env:
           NODE_ENV: production
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
