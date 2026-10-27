@@ -7,12 +7,19 @@ import com.nexus.strategies.data.ApiException
 import com.nexus.strategies.data.AuthResponse
 import com.nexus.strategies.data.CaseDto
 import com.nexus.strategies.data.DocumentDto
+import com.nexus.strategies.data.DocumentTypeDto
+import com.nexus.strategies.data.PhotoPrep
+import com.nexus.strategies.data.photoFileName
 import com.nexus.strategies.data.NotificationDto
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.LocalDateTime
 
 sealed interface AuthState {
     data object Restoring : AuthState
@@ -91,6 +98,9 @@ class AuthViewModel : ViewModel() {
     private fun signedIn(a: AuthResponse) = AuthState.SignedIn(a.userId, a.displayName.ifBlank { "there" })
 }
 
+/** A photo already shrunk to a JPEG the API accepts, waiting for the client to press Send. */
+class PreparedPhoto(val bytes: ByteArray)
+
 data class HomeUi(
     val loading: Boolean = true,
     val error: String? = null,
@@ -99,6 +109,12 @@ data class HomeUi(
     val notifications: List<NotificationDto> = emptyList(),
     val unread: Int = 0,
     val notificationsError: String? = null,
+    val docTypes: List<DocumentTypeDto> = emptyList(),
+    val docTypesError: String? = null,
+    val photo: PreparedPhoto? = null,
+    val uploadBusy: Boolean = false,
+    val uploadMessage: String? = null,
+    val uploadError: String? = null,
 )
 
 class HomeViewModel : ViewModel() {
@@ -127,12 +143,67 @@ class HomeViewModel : ViewModel() {
                 _ui.update { it.copy(error = e.userMessage()) }
             }
             try {
+                val types = api.documentTypes()
+                _ui.update { it.copy(docTypes = types, docTypesError = null) }
+            } catch (e: ApiException) {
+                _ui.update { it.copy(docTypesError = e.userMessage()) }
+            }
+            try {
                 val n = api.notifications()
                 _ui.update { it.copy(notifications = n.data, unread = n.unreadCount) }
             } catch (e: ApiException) {
                 _ui.update { it.copy(notificationsError = e.userMessage()) }
             }
             _ui.update { it.copy(loading = false) }
+        }
+    }
+
+    // ---------- Photo upload ----------
+
+    /** A photo was taken or chosen: shrink it off the main thread, then show it for confirmation. */
+    fun onPhoto(uri: Uri?, deleteAfter: Boolean = false) {
+        if (uri == null || _ui.value.uploadBusy) return
+        viewModelScope.launch {
+            _ui.update { it.copy(uploadBusy = true, uploadError = null, uploadMessage = null) }
+            val resolver = NexusApp.app.contentResolver
+            val result = withContext(Dispatchers.IO) {
+                // Catches OutOfMemoryError too: a huge photo must show an error, not crash the app.
+                val r = runCatching { PhotoPrep.prepare(resolver, uri) }
+                // The camera's temporary file is no longer needed once it has been read.
+                if (deleteAfter) runCatching { resolver.delete(uri, null, null) }
+                r
+            }
+            _ui.update { s ->
+                result.fold(
+                    onSuccess = { s.copy(photo = PreparedPhoto(it), uploadBusy = false) },
+                    onFailure = { s.copy(uploadBusy = false, uploadError = "We couldn't read that photo. Try another one.") },
+                )
+            }
+        }
+    }
+
+    fun discardPhoto() = _ui.update { it.copy(photo = null, uploadError = null) }
+
+    fun showUploadError(message: String) = _ui.update { it.copy(uploadError = message, uploadMessage = null) }
+
+    fun sendPhoto(documentType: DocumentTypeDto) {
+        val s = _ui.value
+        val photo = s.photo ?: return
+        val case = s.case ?: return
+        if (s.uploadBusy) return
+        viewModelScope.launch {
+            _ui.update { it.copy(uploadBusy = true, uploadError = null, uploadMessage = null) }
+            try {
+                api.sendDocument(case.id, documentType.id, photoFileName(documentType.name, LocalDateTime.now()), photo.bytes)
+                _ui.update { it.copy(photo = null, uploadMessage = "Sent. Your consultant will review it.") }
+                // Show the new copy straight away; a failure here must not look like a failed upload.
+                runCatching { api.documents(case.id) }.onSuccess { docs -> _ui.update { it.copy(documents = docs) } }
+            } catch (e: ApiException) {
+                // The photo is kept so the client can simply press Send again.
+                _ui.update { it.copy(uploadError = e.userMessage()) }
+            } finally {
+                _ui.update { it.copy(uploadBusy = false) }
+            }
         }
     }
 
