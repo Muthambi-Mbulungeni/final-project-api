@@ -412,7 +412,7 @@ namespace Strategies.Api.Tests
         }
 
         private static AuthController AuthController(IAuthService service) =>
-            new(service, null!, null!, null!, null!, null!, NullLogger<AuthController>.Instance)
+            new(service, null!, null!, null!, null!, null!, null!, null!, NullLogger<AuthController>.Instance)
             {
                 ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
             };

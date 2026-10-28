@@ -17,7 +17,9 @@ namespace Strategies.Api.Services
         Task<bool> RevokeTokenAsync(string refreshToken);
         Task<User?> GetUserByIdAsync(Guid userId);
         Task<User?> GetUserByEmailAsync(string email);
-        Task<bool> RegisterAsync(RegisterRequest request);
+        // The new, unconfirmed user, or null when the email is already registered.
+        Task<User?> RegisterAsync(RegisterRequest request);
         Task<bool> ResetPasswordAsync(User user, string newPassword);
+        Task<bool> ConfirmEmailAsync(User user);
     }
 }

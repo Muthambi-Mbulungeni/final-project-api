@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Strategies.Api.Data.Models;
 using Strategies.Api.DTOs;
 using Strategies.Api.DTOs.Auth;
 using Strategies.Api.Services;
@@ -21,11 +23,14 @@ namespace Strategies.Api.Controllers
     {
         private const string InvalidResetTokenMessage = "Invalid or expired reset token.";
         private const string PasswordPolicyMessage = "Password does not meet the requirements.";
+        private const string InvalidConfirmationTokenMessage = "Invalid or expired confirmation token.";
 
         private readonly IAuthService _authService;
         private readonly IEmailService _emailService;
         private readonly IPasswordResetTokenService _resetTokenService;
         private readonly IPasswordPolicy _passwordPolicy;
+        private readonly IEmailConfirmationTokenService _confirmationTokenService;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<AuthController> _logger;
@@ -35,6 +40,8 @@ namespace Strategies.Api.Controllers
             IEmailService emailService,
             IPasswordResetTokenService resetTokenService,
             IPasswordPolicy passwordPolicy,
+            IEmailConfirmationTokenService confirmationTokenService,
+            IServiceScopeFactory scopeFactory,
             Microsoft.Extensions.Configuration.IConfiguration configuration,
             IWebHostEnvironment environment,
             ILogger<AuthController> logger)
@@ -43,6 +50,8 @@ namespace Strategies.Api.Controllers
             _emailService = emailService;
             _resetTokenService = resetTokenService;
             _passwordPolicy = passwordPolicy;
+            _confirmationTokenService = confirmationTokenService;
+            _scopeFactory = scopeFactory;
             _configuration = configuration;
             _environment = environment;
             _logger = logger;
@@ -177,9 +186,13 @@ namespace Strategies.Api.Controllers
             if (passwordErrors.Count > 0)
                 return BadRequest(new ApiErrorResponse { Message = PasswordPolicyMessage, Errors = passwordErrors.ToList() });
 
-            var result = await _authService.RegisterAsync(request);
-            if (!result)
+            var user = await _authService.RegisterAsync(request);
+            if (user == null)
                 return BadRequest(new ApiErrorResponse { Message = "Registration failed or email already exists." });
+
+            var confirmationLink = BuildConfirmationLink(user);
+            if (confirmationLink != null)
+                await _emailService.SendAccountConfirmationEmailAsync(user.Email, confirmationLink);
 
             return StatusCode(201, new { Message = "Registration successful. Please check your email to confirm your account." });
         }
@@ -210,6 +223,88 @@ namespace Strategies.Api.Controllers
                 return BadRequest(new ApiErrorResponse { Message = InvalidResetTokenMessage });
 
             return Ok(new { Message = "Password reset successfully." });
+        }
+
+        /// <summary>
+        /// POST /api/auth/confirm-email
+        /// Body { token }. 200 { message } and the account can sign in; 400 { message, errors: [] } for an
+        /// invalid, expired or already used token.
+        /// </summary>
+        [HttpPost("confirm-email")]
+        [AllowAnonymous]
+        [EnableRateLimiting("auth-strict")]
+        public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailRequest request)
+        {
+            var user = await _confirmationTokenService.ValidateTokenAsync(request.Token ?? string.Empty);
+            if (user == null)
+                return BadRequest(new ApiErrorResponse { Message = InvalidConfirmationTokenMessage });
+
+            await _authService.ConfirmEmailAsync(user);
+            return Ok(new { Message = "Email confirmed. You can now sign in." });
+        }
+
+        /// <summary>
+        /// POST /api/auth/resend-confirmation
+        /// Body { email }. Always 200 with the same body, to prevent account enumeration. Sends a new
+        /// confirmation email only to an existing, unconfirmed account. The email goes out after the
+        /// response, so how long the request takes does not depend on whether one was sent.
+        /// </summary>
+        [HttpPost("resend-confirmation")]
+        [AllowAnonymous]
+        [EnableRateLimiting("auth-strict")]
+        public async Task<IActionResult> ResendConfirmation([FromBody] ResendConfirmationRequest request)
+        {
+            var user = await _authService.GetUserByEmailAsync(request.Email ?? string.Empty);
+            if (user != null && !user.EmailConfirmed && user.DeletedAt == null)
+            {
+                var confirmationLink = BuildConfirmationLink(user);
+                if (confirmationLink != null)
+                    SendConfirmationInBackground(user.Email, confirmationLink);
+            }
+
+            return Ok(new { Message = "If an account with that email needs confirming, a new confirmation link has been sent." });
+        }
+
+        // Null (and logged) when App:BaseUrl is not configured.
+        private string? BuildConfirmationLink(User user)
+        {
+            var baseUrl = _configuration["App:BaseUrl"];
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                _logger.LogError("App:BaseUrl is not configured, so no confirmation email was sent.");
+                return null;
+            }
+
+            var confirmationToken = _confirmationTokenService.CreateToken(user);
+
+            // The web portal uses HashRouter, so the route goes after /#.
+            var confirmationLink = $"{baseUrl.TrimEnd('/')}/#/confirm-email?token={Uri.EscapeDataString(confirmationToken)}";
+
+            // Lets developers test without SMTP. Never logged outside Development.
+            if (_environment.IsDevelopment())
+                _logger.LogInformation("Development only. Email confirmation link for {Email}: {ConfirmationLink}", user.Email, confirmationLink);
+
+            return confirmationLink;
+        }
+
+        // Runs after the request has ended, so it gets its own scope instead of the request's services.
+        private void SendConfirmationInBackground(string email, string confirmationLink)
+        {
+            var scopeFactory = _scopeFactory;
+            var logger = _logger;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    await scope.ServiceProvider.GetRequiredService<IEmailService>()
+                        .SendAccountConfirmationEmailAsync(email, confirmationLink);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to send a confirmation email.");
+                }
+            });
         }
 
         /// <summary>

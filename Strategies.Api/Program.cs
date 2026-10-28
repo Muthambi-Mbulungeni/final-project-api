@@ -38,6 +38,7 @@ builder.Services.AddSingleton<IRefreshTokenStore, InMemoryRefreshTokenStore>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<IPasswordResetTokenService, PasswordResetTokenService>();
+builder.Services.AddScoped<IEmailConfirmationTokenService, EmailConfirmationTokenService>();
 builder.Services.AddScoped<IPasswordPolicy, PasswordPolicy>();
 
 // 3. Core Domain & AI Services (Marco - Single clean registration, no duplicates)
