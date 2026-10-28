@@ -7,6 +7,7 @@ import TextField from '../components/ui/TextField'
 import { destinationFor, signIn, signInNotice } from '../lib/auth'
 import { signInErrorMessage } from '../lib/authMessages'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
+import { useResendConfirmation } from '../lib/useResendConfirmation'
 import { useSession } from '../lib/useSession'
 import { validateSignIn } from '../lib/validation'
 
@@ -20,6 +21,9 @@ export default function Login() {
   const [values, setValues] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')
+  // A plain 401 may be an unconfirmed account (the API does not say which), so a resend is offered.
+  const [offerResend, setOfferResend] = useState(false)
+  const resend = useResendConfirmation()
   const [submitting, setSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [capsLockOn, setCapsLockOn] = useState(false)
@@ -29,13 +33,15 @@ export default function Login() {
   const from = location.state?.from
   const reason = location.state?.reason
   const notice = signInNotice(reason)
-  const positiveNotice = reason === 'signed-out' || reason === 'password-reset'
+  const positiveNotice = reason === 'signed-out' || reason === 'password-reset' || reason === 'email-confirmed'
   const NoticeIcon = positiveNotice ? CircleCheck : Clock
 
   function handleChange(event) {
     const { name, value } = event.target
     setValues((previous) => ({ ...previous, [name]: value }))
     setFormError('')
+    setOfferResend(false)
+    resend.reset()
     if (errors[name]) {
       setErrors((previous) => ({ ...previous, [name]: undefined }))
     }
@@ -59,12 +65,15 @@ export default function Login() {
 
     setSubmitting(true)
     setFormError('')
+    setOfferResend(false)
+    resend.reset()
 
     try {
       // On success the session changes and this page redirects below.
       await signIn(values.email.trim(), values.password)
     } catch (error) {
       setFormError(signInErrorMessage(error))
+      setOfferResend(error?.status === 401 && !error?.code)
       setShaking(true)
       setSubmitting(false)
     }
@@ -116,6 +125,29 @@ export default function Login() {
         {formError && (
           <div role="alert" className="rounded-xl bg-brand-50 px-3.5 py-2.5 text-sm text-brand-800">
             {formError}
+          </div>
+        )}
+
+        {offerResend && (
+          <div className="-mt-2 space-y-2">
+            <button
+              type="button"
+              onClick={() => resend.send(values.email)}
+              disabled={resend.sending}
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-brand-700 hover:text-brand-800 disabled:cursor-wait disabled:opacity-80"
+            >
+              {resend.sending && <LoaderCircle className="size-4 motion-safe:animate-spin" strokeWidth={2.25} aria-hidden="true" />}
+              {resend.sending ? 'Sending…' : 'Resend confirmation email'}
+            </button>
+            {/* Always rendered so the outcome is announced when it appears. */}
+            <div role="status">
+              {resend.message && <p className="text-[13px] text-stone-700">{resend.message}</p>}
+            </div>
+            {resend.error && (
+              <p role="alert" className="text-[13px] text-brand-700">
+                {resend.error}
+              </p>
+            )}
           </div>
         )}
 
