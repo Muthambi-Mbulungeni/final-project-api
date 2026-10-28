@@ -16,8 +16,10 @@ export function signInErrorMessage(error) {
 
   switch (error?.status) {
     case 400:
-    case 401:
       return 'The email address or password is incorrect.'
+    // The API answers an unconfirmed account exactly like a wrong password, so both are mentioned.
+    case 401:
+      return "The email address or password is incorrect. If you've just registered, confirm your email first."
     case 403:
       return 'This account is not active. Contact your consultant or the practice administrator.'
     case 404:

@@ -3,7 +3,9 @@ import { signInErrorMessage } from './authMessages'
 
 describe('signInErrorMessage', () => {
   it('gives one message for wrong details without saying which field was wrong', () => {
-    expect(signInErrorMessage({ status: 401 })).toBe('The email address or password is incorrect.')
+    expect(signInErrorMessage({ status: 401 })).toBe(
+      "The email address or password is incorrect. If you've just registered, confirm your email first.",
+    )
     expect(signInErrorMessage({ status: 400 })).toBe('The email address or password is incorrect.')
   })
 

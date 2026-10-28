@@ -8,6 +8,7 @@ import { onSessionExpired } from './lib/api'
 import { ROLES } from './lib/session'
 import { useRestoredSession } from './lib/useSession'
 import AdminDashboard from './pages/admin/AdminDashboard'
+import ConfirmEmail from './pages/ConfirmEmail'
 import ClientDashboard from './pages/client/ClientDashboard'
 import ConsultantDashboard from './pages/consultant/ConsultantDashboard'
 import EnquiryPage from './pages/EnquiryPage'
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/confirm-email" element={<ConfirmEmail />} />
         <Route path="/enquire" element={<EnquiryPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
 
