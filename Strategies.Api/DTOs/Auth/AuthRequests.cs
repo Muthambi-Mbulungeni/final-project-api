@@ -40,4 +40,17 @@ namespace Strategies.Api.DTOs.Auth
 
         public string? NewPassword { get; set; }
     }
+
+    // Nullable, no [Required]: same reason as ResetPasswordRequest.
+    public class ConfirmEmailRequest
+    {
+        public string? Token { get; set; }
+    }
+
+    // Nullable, no [Required] or [EmailAddress]: resend-confirmation answers 200 for any email,
+    // so a malformed one must not get a different response.
+    public class ResendConfirmationRequest
+    {
+        public string? Email { get; set; }
+    }
 }

@@ -297,10 +297,10 @@ namespace Strategies.Api.Services
             return true;
         }
 
-        public async Task<bool> RegisterAsync(RegisterRequest request)
+        public async Task<User?> RegisterAsync(RegisterRequest request)
         {
             var existingUser = await GetUserByEmailAsync(request.Email);
-            if (existingUser != null) return false;
+            if (existingUser != null) return null;
 
             var user = new User
             {
@@ -315,6 +315,18 @@ namespace Strategies.Api.Services
             };
 
             _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+            return user;
+        }
+
+        /// <summary>
+        /// Marks the email of a user already identified by a validated confirmation token
+        /// (IEmailConfirmationTokenService) as confirmed, which also makes that token unusable.
+        /// </summary>
+        public async Task<bool> ConfirmEmailAsync(User user)
+        {
+            user.EmailConfirmed = true;
+            _dbContext.Users.Update(user);
             await _dbContext.SaveChangesAsync();
             return true;
         }

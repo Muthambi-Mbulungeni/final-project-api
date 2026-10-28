@@ -1,5 +1,4 @@
 using System;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -31,32 +30,19 @@ namespace Strategies.Api.Services
             ApplicationDbContext dbContext,
             ILogger<PasswordResetTokenService> logger)
         {
-            var secretKey = configuration["Jwt:Key"];
-            if (string.IsNullOrWhiteSpace(secretKey))
-                throw new InvalidOperationException("Jwt:Key is not configured. Set it via .NET User Secrets or environment variables.");
-
-            _key       = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+            _key       = PurposeTokenHelper.ReadKey(configuration);
             _dbContext = dbContext;
             _logger    = logger;
         }
 
         public string CreateToken(User user)
         {
-            var tokenDescriptor = new SecurityTokenDescriptor
+            return PurposeTokenHelper.Create(_key, Audience, new[]
             {
-                Subject = new ClaimsIdentity(new[]
-                {
-                    new Claim(ClaimTypes.Email, user.Email),
-                    new Claim(PurposeClaim, Purpose),
-                    new Claim(PasswordStampClaim, PasswordStamp(user.PasswordHash))
-                }),
-                Audience           = Audience,
-                Expires            = DateTime.UtcNow.Add(Lifetime),
-                SigningCredentials = new SigningCredentials(_key, SecurityAlgorithms.HmacSha256)
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            return tokenHandler.WriteToken(tokenHandler.CreateToken(tokenDescriptor));
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(PurposeClaim, Purpose),
+                new Claim(PasswordStampClaim, PasswordStamp(user.PasswordHash))
+            }, Lifetime);
         }
 
         public async Task<User?> ValidateTokenAsync(string token)
@@ -64,25 +50,10 @@ namespace Strategies.Api.Services
             if (string.IsNullOrWhiteSpace(token))
                 return null;
 
-            ClaimsPrincipal principal;
-            try
+            var principal = PurposeTokenHelper.Validate(_key, Audience, token, out var refusedBecause);
+            if (principal == null)
             {
-                principal = new JwtSecurityTokenHandler().ValidateToken(token, new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey         = _key,
-                    ValidAlgorithms          = new[] { SecurityAlgorithms.HmacSha256 },
-                    ValidateIssuer           = false,
-                    ValidateAudience         = true,
-                    ValidAudience            = Audience,
-                    ValidateLifetime         = true,
-                    RequireExpirationTime    = true,
-                    ClockSkew                = TimeSpan.Zero
-                }, out _);
-            }
-            catch (Exception ex) when (ex is SecurityTokenException || ex is ArgumentException)
-            {
-                _logger.LogInformation("Password reset token refused: {Reason}", ex.GetType().Name);
+                _logger.LogInformation("Password reset token refused: {Reason}", refusedBecause);
                 return null;
             }
 

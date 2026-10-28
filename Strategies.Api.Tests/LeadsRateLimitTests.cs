@@ -160,6 +160,34 @@ namespace Strategies.Api.Tests
         }
 
         [Fact]
+        public async Task ResendConfirmationRateLimit_LimitsEachIp_LikeTheOtherAuthRoutes()
+        {
+            using var factory = new ApiFactory();
+            using var client = factory.CreateClient();
+
+            // No email in the body: answered 200 without touching the database, but each request still counts.
+            async Task<HttpResponseMessage> PostResend(string remoteIp)
+            {
+                var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/resend-confirmation")
+                {
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                };
+                request.Headers.Add(RemoteIpHeader, remoteIp);
+                return await client.SendAsync(request);
+            }
+
+            for (var i = 0; i < 5; i++)
+                Assert.Equal(HttpStatusCode.OK, (await PostResend("198.51.100.80")).StatusCode);
+
+            var rejected = await PostResend("198.51.100.80");
+            Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
+            var body = await rejected.Content.ReadFromJsonAsync<ApiErrorResponse>();
+            Assert.Equal("Too many requests. Please try again later.", body!.Message);
+            Assert.NotEmpty(rejected.Headers.GetValues("Retry-After"));
+            Assert.Equal(HttpStatusCode.OK, (await PostResend("198.51.100.81")).StatusCode);
+        }
+
+        [Fact]
         public async Task Limits_ComeFromConfiguration()
         {
             using var factory = new ApiFactory(new()
