@@ -21,6 +21,7 @@ namespace Strategies.Api.Data
         public DbSet<Message> Messages { get; set; }
         public DbSet<AgentRun> AgentRuns { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<RefreshTokenRecord> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -323,6 +324,45 @@ namespace Strategies.Api.Data
 
                 visaRecord.Property(record => record.RenewalFlagged)
                     .HasDefaultValue(false);
+            });
+
+            modelBuilder.Entity<RefreshTokenRecord>(refreshToken =>
+            {
+                refreshToken.ToTable("RefreshToken");
+
+                refreshToken.HasKey(token => token.Id);
+
+                refreshToken.Property(token => token.Id)
+                    .ValueGeneratedOnAdd();
+
+                refreshToken.Property(token => token.TokenHash)
+                    .IsRequired()
+                    .HasMaxLength(64);
+
+                refreshToken.HasIndex(token => token.TokenHash)
+                    .IsUnique();
+
+                refreshToken.Property(token => token.UserId)
+                    .IsRequired();
+
+                refreshToken.HasOne(token => token.User)
+                    .WithMany()
+                    .HasForeignKey(token => token.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                refreshToken.Property(token => token.CreatedAt)
+                    .HasDefaultValueSql("now()");
+
+                refreshToken.Property(token => token.ExpiresAt)
+                    .IsRequired();
+
+                refreshToken.Property(token => token.IsRevoked)
+                    .HasDefaultValue(false);
+
+                refreshToken.Property(token => token.RevokedAt);
+
+                refreshToken.Property(token => token.ReplacedByTokenHash)
+                    .HasMaxLength(64);
             });
         }
     }

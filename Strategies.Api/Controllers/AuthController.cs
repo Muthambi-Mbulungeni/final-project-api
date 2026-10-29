@@ -117,21 +117,29 @@ namespace Strategies.Api.Controllers
         }
 
         /// <summary>
-        /// POST /api/auth/revoke (or /api/auth/revoke-token)
-        /// Signs the user out by revoking their refresh token.
+        /// POST /api/auth/revoke (or /api/auth/revoke-token, or /api/auth/logout)
+        /// Signs the user out by revoking their refresh tokens.
         /// </summary>
         [HttpPost("revoke")]
         [HttpPost("revoke-token")]
+        [HttpPost("logout")]
         [AllowAnonymous]
-        public async Task<IActionResult> Revoke([FromBody] RevokeTokenRequest request)
+        public async Task<IActionResult> Revoke([FromBody] RevokeTokenRequest? request)
         {
-            if (string.IsNullOrWhiteSpace(request.RefreshToken))
-                return BadRequest(new ApiErrorResponse { Message = "Refresh token is required." });
+            if (!string.IsNullOrWhiteSpace(request?.RefreshToken))
+            {
+                await _authService.RevokeTokenAsync(request.RefreshToken);
+                return Ok(new { Message = "Signed out successfully." });
+            }
 
-            await _authService.RevokeTokenAsync(request.RefreshToken);
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(userIdStr, out var userId))
+            {
+                await _authService.RevokeAllUserTokensAsync(userId);
+                return Ok(new { Message = "Signed out successfully." });
+            }
 
-            // Always 200 — don't reveal whether the token existed or not.
-            return Ok(new { Message = "Signed out successfully." });
+            return BadRequest(new ApiErrorResponse { Message = "Refresh token is required." });
         }
 
         /// <summary>

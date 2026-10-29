@@ -15,6 +15,7 @@ namespace Strategies.Api.Services
         Task<LoginOutcome> TryLoginAsync(LoginRequest request);
         Task<AuthResponse?> RefreshTokenAsync(string refreshToken);
         Task<bool> RevokeTokenAsync(string refreshToken);
+        Task RevokeAllUserTokensAsync(Guid userId);
         Task<User?> GetUserByIdAsync(Guid userId);
         Task<User?> GetUserByEmailAsync(string email);
         // The new, unconfirmed user, or null when the email is already registered.
