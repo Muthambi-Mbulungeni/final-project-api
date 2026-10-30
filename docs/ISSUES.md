@@ -63,11 +63,11 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 ### ISS-11
 
-**Medium. Mobile: 4 manual checks not run; release build has no API address.**
+**Medium. Mobile: 4 manual checks not run.**
 
-- **Problem:** checks 7 (rate limit), 8 (reopen app), 9 (expired access token) and 11 (API stopped) are not yet run. Release builds point at `https://CHANGE-ME.example.com/` because the API is not hosted yet.
+- **Problem:** checks 7 (rate limit), 8 (reopen app), 9 (expired access token) and 11 (API stopped) are not yet run. ~~Release builds pointed at `https://CHANGE-ME.example.com/`.~~
+- **Fix (partial):** the release build API address is now set to `https://final-project-api-1.onrender.com/` in `strategies-mobile/app/build.gradle.kts` (chore/phase0-fixes). The 4 manual checks remain open — Kundai to run.
 - **Evidence:** [mobile test log](../strategies-mobile/TESTING.md); `strategies-mobile/app/build.gradle.kts`.
-- **Fix:** run the 4 checks; set the hosted API address once deployed.
 
 ### ISS-15
 
