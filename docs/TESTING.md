@@ -129,7 +129,7 @@ Run against the local API with the seeded database, 2026-10-03 and 2026-10-04. A
 | A15 | Password reset only with a valid reset token | Request refused without a valid token | Pass: 400 for a made-up token and for a token issued for another email (failed before PR #25) |
 | A16 | Password reset with a valid token, made by the same code and key the API uses | 200 | **Fail**: 400 "Invalid token claims" ([ISS-01](ISSUES.md#iss-01)) |
 | A17 | Stage change with an empty body `{}` | 400 | Pass |
-| A18 | Stage change to the stage the case already has | 400 | **Fail**: 200, with a history row and an audit row ([ISS-07](ISSUES.md#iss-07)) |
+| A18 | Stage change to the stage the case already has, or on an archived case | 400 | Pass: 400, no history or audit row written (was [ISS-07](ISSUES.md#fixed-during-the-project)) |
 | A19 | Seven failed sign-ins sent straight to the API, each with a different `X-Forwarded-For` header | 429 after 5 | Was **Fail** (no 429); fixed: the header is read only behind the configured proxy (`LeadsRateLimitTests`) |
 | A20 | Five wrong passwords for `client@nexus.com`, then the right one (local API) | 5th answer 429 `account_locked` with `Retry-After: 900`; the right password is still refused, with the time left | Pass |
 

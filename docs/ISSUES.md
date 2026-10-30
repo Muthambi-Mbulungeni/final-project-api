@@ -16,11 +16,8 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
 | [ISS-10](#iss-10) | Medium | Several API controllers have no automated tests | Marco, Mbulungeni |
-| [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run; release build has no API address | Kundai |
+| [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run | Kundai |
 | [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan |
-| [ISS-07](#iss-07) | Low | Stage change accepts archived cases and unchanged stages | Marco |
-| [ISS-12](#iss-12) | Low | Mixed audit action wording; old lead verdict not recorded | Marco |
-| [ISS-13](#iss-13) | Low | Users list cannot show the join date | Marco, Riaad |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
 
 ### ISS-02
@@ -80,32 +77,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Impact:** every API restart or redeploy, and every wake-up of a free host that sleeps when idle, forgets all refresh tokens. Users are signed out when their access token next expires. With more than one API instance, a token issued by one instance is unknown to the others.
 - **Fix:** store refresh tokens (hashed) in a database table behind the same `IRefreshTokenStore` interface.
 
-### ISS-07
-
-**Low. Stage change accepts archived cases and unchanged stages.**
-
-PR #25 fixed the empty body (section 3).
-
-- **Problem:** `PATCH /api/cases/{id}/stage` still changes archived cases. Sending the stage a case already has returns 200 and writes a history row and an audit row for a change that did not happen.
-- **Evidence:** A18; `CasesController.UpdateStage` has no archived or same-stage check.
-- **Impact:** the case history can show stage changes that never happened. The web portal disables the current stage in its stage list.
-- **Fix:** return 400 for archived cases and for unchanged stages.
-
-### ISS-12
-
-**Low. Mixed audit action wording; old lead verdict not recorded.**
-
-- **Problem:** some audit actions are stored as code names (`UpdateCaseStage`, `UpdateLeadStatus`), others as sentences ("Suspended user"). The lead review audit row does not record the previous verdict, and sending the verdict a lead already has returns 200 and writes another audit row.
-- **Evidence:** `CasesController`, `LeadsController`.
-- **Fix:** store sentences and include the old value. The web audit page already shows the code names in plain words.
-
-### ISS-13
-
-**Low. Users list cannot show the join date.**
-
-- **Problem:** the API's user data (`UserDto`) has no creation date, so the admin Users list cannot show it.
-- **Fix:** add `CreatedAt` to `UserDto`; the web column follows.
-
 ### ISS-14
 
 **Low. Client logo is low resolution.**
@@ -162,3 +133,6 @@ Issues found by testing or review and fixed before submission.
 | Mobile: after a client uploaded a new copy on the web, the app still asked for a replacement and counted both copies | Same rule as the web: a rejected copy is hidden once a newer copy of the same type exists, with unit tests (PR #27) |
 | Mobile: told clients to contact their consultant for a new copy | Points to upload on the web portal (PR #27) |
 | Mobile: Gradle wrapper missing, so a fresh clone could not build or run the tests | `gradlew`, `gradlew.bat` and the wrapper jar committed (PR #27) |
+| Stage change accepted archived cases and unchanged stages (was ISS-07, Low) | `PATCH /api/cases/{id}/stage` now returns 400 "This case is archived and cannot be changed." for archived cases and 400 "The case is already at that stage." when the stage is unchanged, writing no history or audit records. Tests: `CasesControllerStageTests` (5) |
+| Mixed audit action wording and old lead verdict not recorded (was ISS-12, Low) | Audit actions for stage updates and lead triage are now stored as sentences ("Changed case stage from X to Y", "Changed lead verdict from X to Y") preserving the previous value. `PATCH /api/leads/{id}/status` returns 400 "The lead already has that verdict." if unchanged, writing no audit row. Tests: `LeadsStatusTests` (4), `CasesControllerStageTests` |
+| Users list could not show the join date (was ISS-13, Low) | Added `CreatedAt` to `UserDto`, populated from `User.CreatedAt` in `AdminController.GetUsers` and `UpdateUser`, and added a "Joined" column to the admin Users page with formatted dates. Tests: `AdminUserTests.GetUsers_ReturnsCreatedAtForEachUser` |

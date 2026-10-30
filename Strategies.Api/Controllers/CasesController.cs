@@ -303,6 +303,12 @@ namespace Strategies.Api.Controllers
             if (User.IsInRole("Consultant") && c.ConsultantId != currentUserId)
                 return Forbid();
 
+            if (c.IsArchived)
+                return BadRequest(new ApiErrorResponse { Message = "This case is archived and cannot be changed." });
+
+            if (c.Stage == request.Stage.Value)
+                return BadRequest(new ApiErrorResponse { Message = "The case is already at that stage." });
+
             var oldStage = c.Stage;
             c.Stage = request.Stage.Value;
             c.UpdatedAt = DateTime.UtcNow;
@@ -322,7 +328,7 @@ namespace Strategies.Api.Controllers
             {
                 Id = Guid.NewGuid(),
                 UserId = currentUserId,
-                Action = "UpdateCaseStage",
+                Action = $"Changed case stage from {oldStage} to {request.Stage.Value}",
                 EntityType = "Case",
                 EntityId = id,
                 CreatedAt = DateTime.UtcNow

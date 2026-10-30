@@ -51,7 +51,8 @@ namespace Strategies.Api.Controllers
                     Role = u.Role.ToString(),
                     IsActive = u.IsActive,
                     IsLocked = u.LockoutEndsAt != null && u.LockoutEndsAt > now,
-                    LockoutEndsAt = u.LockoutEndsAt > now ? u.LockoutEndsAt : null
+                    LockoutEndsAt = u.LockoutEndsAt > now ? u.LockoutEndsAt : null,
+                    CreatedAt = u.CreatedAt
                 })
                 .ToListAsync();
 
@@ -300,7 +301,8 @@ namespace Strategies.Api.Controllers
                 Role = user.Role.ToString(),
                 IsActive = user.IsActive,
                 IsLocked = user.LockoutEndsAt > DateTime.UtcNow,
-                LockoutEndsAt = user.LockoutEndsAt > DateTime.UtcNow ? user.LockoutEndsAt : null
+                LockoutEndsAt = user.LockoutEndsAt > DateTime.UtcNow ? user.LockoutEndsAt : null,
+                CreatedAt = user.CreatedAt
             });
         }
 

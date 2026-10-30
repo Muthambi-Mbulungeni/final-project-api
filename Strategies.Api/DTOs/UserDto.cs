@@ -12,5 +12,6 @@ namespace Strategies.Api.DTOs
         // True only while a sign-in lockout is running; LockoutEndsAt is then when it lifts, otherwise null.
         public bool IsLocked { get; set; }
         public DateTime? LockoutEndsAt { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 }

@@ -693,6 +693,22 @@ namespace Strategies.Api.Tests
             Assert.Null(users["Plain"].LockoutEndsAt);
         }
 
+        [Fact]
+        public async Task GetUsers_ReturnsCreatedAtForEachUser()
+        {
+            using var ctx = CreateContext(nameof(GetUsers_ReturnsCreatedAtForEachUser));
+            var createdTime = new DateTime(2026, 10, 15, 8, 30, 0, DateTimeKind.Utc);
+            var user = await SeedUser(ctx, UserRole.Client, "alice@example.com", "Alice");
+            user.CreatedAt = createdTime;
+            await ctx.SaveChangesAsync();
+
+            var result = await CreateController(ctx).GetUsers();
+
+            var page = Assert.IsType<PagedResponse<UserDto>>(Assert.IsType<OkObjectResult>(result).Value);
+            var alice = Assert.Single(page.Data);
+            Assert.Equal(createdTime, alice.CreatedAt);
+        }
+
         // ---------- Login ----------
 
         private static AuthService CreateAuthService(ApplicationDbContext ctx)
