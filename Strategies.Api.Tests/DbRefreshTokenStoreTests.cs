@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
@@ -211,14 +212,25 @@ namespace Strategies.Api.Tests
             Assert.False(u2Tokens[0].IsRevoked);
         }
 
+        // Stands in for a database that is unreachable or has no RefreshToken table.
+        private sealed class FailingSaveContext : ApplicationDbContext
+        {
+            public FailingSaveContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
+
+            public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+                throw new DbUpdateException("Simulated database failure.");
+        }
+
         [Fact]
         public async Task DatabaseError_IsThrown_NotHiddenByAFallbackStore()
         {
-            var ctx = CreateContext(nameof(DatabaseError_IsThrown_NotHiddenByAFallbackStore));
+            var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseInMemoryDatabase(nameof(DatabaseError_IsThrown_NotHiddenByAFallbackStore))
+                .Options;
+            using var ctx = new FailingSaveContext(options);
             var store = new DbRefreshTokenStore(ctx);
-            await ctx.DisposeAsync();
 
-            await Assert.ThrowsAsync<ObjectDisposedException>(() => store.SaveTokenAsync(
+            await Assert.ThrowsAsync<DbUpdateException>(() => store.SaveTokenAsync(
                 new RefreshToken { Token = "lost-token", UserId = Guid.NewGuid(), ExpiresAt = DateTime.UtcNow.AddDays(7) }));
         }
 
