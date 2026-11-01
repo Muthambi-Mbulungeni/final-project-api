@@ -52,9 +52,9 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 **Medium. Several API controllers have no automated tests.**
 
-- **Problem:** the API suite (241 tests) covers the services and part of the controllers. Role checks, validation responses and audit rows on the untested controllers are checked by hand (TESTING.md section 5).
-- **Covered now:** `MessagesController` (`MessagesControllerTests`), `AdminController` user actions (`AdminUserTests`), `DocumentsController` review, upload and download (`DocumentReviewerTests`, `DocumentsControllerTests`), `CasesController` list and assign (`CaseListTests`, `CaseAssignTests`), `LeadsController` create, consent and rate limit (`LeadConsentTests`, `LeadsRateLimitTests`, `GeminiAgentServiceTests`). The rate limit and startup checks run through the real pipeline in a test server (`WebApplicationFactory`).
-- **No tests at all:** `AuthController` (its `AuthService` is tested), `DocumentTypesController`, `NotificationController`, `StatsController`.
+- **Problem:** the API suite (311 tests) covers the services and part of the controllers. Role checks, validation responses and audit rows on the untested controllers are checked by hand (TESTING.md section 5).
+- **Covered now:** `AuthController` over HTTP in a test server (`AuthControllerTests`: login, refresh and its alias, revoke and its alias, `me`, register, email confirmation, resend confirmation, forgot password), `MessagesController` (`MessagesControllerTests`), `AdminController` user actions (`AdminUserTests`), `DocumentsController` review, upload and download (`DocumentReviewerTests`, `DocumentsControllerTests`), `CasesController` list and assign (`CaseListTests`, `CaseAssignTests`), `LeadsController` create, consent and rate limit (`LeadConsentTests`, `LeadsRateLimitTests`, `GeminiAgentServiceTests`). The rate limit and startup checks run through the real pipeline in a test server (`WebApplicationFactory`).
+- **No tests at all:** `DocumentTypesController`, `NotificationController`, `StatsController`.
 - **Partly covered:** `CasesController` create, stage change, export and detail; `LeadsController` list and status update; `AdminController` user list and audit log.
 - **Fix:** add tests for the controllers listed above, using `WebApplicationFactory` against a test database, run in CI.
 
@@ -83,6 +83,7 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 - **Problem:** the logo is a small PNG without transparency and looks soft on high-resolution screens.
 - **Fix:** ask the client for an SVG or a 2x transparent PNG.
+- **Note:** Riaad will replace the logo asset in the web portal himself; no API change is needed.
 
 ## 2. Planned but not delivered
 
@@ -134,5 +135,5 @@ Issues found by testing or review and fixed before submission.
 | Mobile: told clients to contact their consultant for a new copy | Points to upload on the web portal (PR #27) |
 | Mobile: Gradle wrapper missing, so a fresh clone could not build or run the tests | `gradlew`, `gradlew.bat` and the wrapper jar committed (PR #27) |
 | Stage change accepted archived cases and unchanged stages (was ISS-07, Low) | `PATCH /api/cases/{id}/stage` now returns 400 "This case is archived and cannot be changed." for archived cases and 400 "The case is already at that stage." when the stage is unchanged, writing no history or audit records. Tests: `CasesControllerStageTests` (5) |
-| Mixed audit action wording and old lead verdict not recorded (was ISS-12, Low) | Audit actions for stage updates and lead triage are now stored as sentences ("Changed case stage from X to Y", "Changed lead verdict from X to Y") preserving the previous value. `PATCH /api/leads/{id}/status` returns 400 "The lead already has that verdict." if unchanged, writing no audit row. Tests: `LeadsStatusTests` (4), `CasesControllerStageTests` |
+| Mixed audit action wording and old lead verdict not recorded (was ISS-12, Low) | Audit actions for stage updates and lead triage are now stored as sentences ("Changed case stage from X to Y", "Changed lead verdict from X to Y") preserving the previous value. The old verdict is recorded in the Action sentence rather than a separate Detail field: `AuditLog` has no Detail column, and adding one would need a migration. `PATCH /api/leads/{id}/status` returns 400 "The lead already has that verdict." if unchanged, writing no audit row. Tests: `LeadsStatusTests` (4), `CasesControllerStageTests` |
 | Users list could not show the join date (was ISS-13, Low) | Added `CreatedAt` to `UserDto`, populated from `User.CreatedAt` in `AdminController.GetUsers` and `UpdateUser`, and added a "Joined" column to the admin Users page with formatted dates. Tests: `AdminUserTests.GetUsers_ReturnsCreatedAtForEachUser` |

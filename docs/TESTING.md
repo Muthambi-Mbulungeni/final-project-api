@@ -74,10 +74,13 @@ Out of scope for this submission: load and performance testing, a live Gemini ca
 
 ## 4. Automated tests
 
-### 4.1 API (xUnit, 27 cases)
+### 4.1 API (xUnit, 311 tests)
+
+The table lists the original service tests and the controller tests added since. Every test file is in `Strategies.Api.Tests`.
 
 | Area | What is tested |
 |---|---|
+| Auth endpoints over HTTP (`AuthControllerTests`) | Real pipeline in a test server with an in-memory database: login 200 with tokens, 401 for a wrong password, an unconfirmed email or a suspended account, 400 for an empty body; refresh (and `refresh-token`) rotates the token and refuses the old one; revoke (and `revoke-token`) stops the refresh token working and answers 200 for unknown tokens; `me` needs a bearer token; register 201 sends a confirmation link, refuses an existing email, a weak password or an invalid email; register, confirm, then sign in works end to end, and a confirmation link works once; resend confirmation and forgot password answer the same for known and unknown emails |
 | Login (`AuthServiceTests`) | Valid credentials return tokens; a wrong password, an unknown email or an inactive user is refused; email matching ignores case |
 | Refresh tokens (`AuthServiceTests`) | A valid token issues new tokens; revoked and garbage tokens are refused; revoking works once only |
 | JWT (`TokenServiceTests`) | The access token carries the right subject and role, and its expiry is in the future; refresh tokens are URL-safe, unique and long enough; the service refuses to start without a JWT key |
@@ -85,7 +88,7 @@ Out of scope for this submission: load and performance testing, a live Gemini ca
 
 Run: `dotnet test` from the repository root.
 
-**Known gap.** These tests cover the services only. No automated test calls the API controllers, so role checks, validation responses and audit rows are not tested automatically. They are covered by the scripted API checks in section 5, which have to be repeated by hand. The next step is integration tests using `WebApplicationFactory` against a test database, so that section 5 runs in CI.
+**Known gap.** Some controllers still have no automated tests or only partial ones; [ISS-10](ISSUES.md#iss-10) lists which. Their role checks, validation responses and audit rows are covered by the scripted API checks in section 5, which have to be repeated by hand.
 
 ### 4.2 Web (Vitest, 185 tests in 19 files)
 
