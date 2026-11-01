@@ -189,6 +189,7 @@ Previously, refresh tokens were stored in memory (`InMemoryRefreshTokenStore`), 
 - **Deterministic O(1) Lookup:** SHA-256 enables direct indexed lookup (`WHERE "TokenHash" = @hash`) without requiring full table scans.
 - **Rotation on Every Refresh:** Each successful refresh call issues a brand-new token pair and marks the old refresh token as revoked (`IsRevoked = true`, `ReplacedByTokenHash = newHash`).
 - **Token Reuse Detection (RFC 6819):** If an attacker attempts to present an already-revoked refresh token, the API detects token theft, immediately rejects the request with HTTP 401, and revokes **all** active tokens belonging to that user.
+- **Grace window:** a token sent again within 30 seconds of its rotation is refused (401) without revoking the other sessions, so a duplicated browser tab or a retry after a lost response does not sign the user out everywhere. Reuse after that, or after logout, is treated as theft.
 - **Revocation on Logout & Password Reset:**
   - Logging out (`POST /api/auth/revoke` or `/logout`) revokes all active refresh tokens for the user.
   - Completing a password reset automatically revokes all existing refresh tokens across all devices.
