@@ -343,6 +343,45 @@ namespace Strategies.Api.Tests
             Assert.Contains(",\"Mokoena, Thabo\",Critical Skills Work Visa,DocumentGathering,False,", csv);
         }
 
+        // The client's cell in the one data row: between the case id and the visa category.
+        private async Task<string> ExportedClientCellAsync(string clientName)
+        {
+            var clientId = Guid.NewGuid();
+            Seed(db =>
+            {
+                db.Users.Add(NewUser(clientId, clientName, UserRole.Client));
+                db.Cases.Add(NewCase(clientId, _consultant));
+            });
+
+            var csv = await (await Send(HttpMethod.Get, "/api/cases/export", TokenFor(_admin, UserRole.Admin))).Content.ReadAsStringAsync();
+
+            var row = csv[(csv.IndexOf('\n') + 1)..];
+            var start = row.IndexOf(',') + 1;
+            return row[start..row.LastIndexOf(",Critical Skills Work Visa,", StringComparison.Ordinal)];
+        }
+
+        [Theory]
+        [InlineData("=HYPERLINK(\"http://example.com\")", "\"'=HYPERLINK(\"\"http://example.com\"\")\"")]
+        [InlineData("+27 82 555 0101", "'+27 82 555 0101")]
+        [InlineData("-1+1", "'-1+1")]
+        [InlineData("@SUM(A1)", "'@SUM(A1)")]
+        [InlineData("\tTabbed", "'\tTabbed")]
+        [InlineData("\rReturned", "\"'\rReturned\"")]
+        [InlineData("=1,2", "\"'=1,2\"")]
+        public async Task Export_NameThatStartsLikeAFormula_IsWrittenAsText(string name, string expectedCell)
+        {
+            Assert.Equal(expectedCell, await ExportedClientCellAsync(name));
+        }
+
+        [Theory]
+        [InlineData("Lerato Mahlangu", "Lerato Mahlangu")]
+        [InlineData("Anne-Marie du Toit", "Anne-Marie du Toit")]
+        [InlineData("O'Neil = Smith", "O'Neil = Smith")]
+        public async Task Export_OrdinaryName_IsUnchanged(string name, string expectedCell)
+        {
+            Assert.Equal(expectedCell, await ExportedClientCellAsync(name));
+        }
+
         [Fact]
         public async Task Export_ForAConsultant_HasOnlyTheirCases()
         {

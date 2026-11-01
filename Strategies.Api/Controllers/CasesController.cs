@@ -385,9 +385,15 @@ namespace Strategies.Api.Controllers
             return Ok(new { Message = "Consultant assigned." });
         }
 
+        // Spreadsheets run a cell that starts with one of these as a formula. Names are typed by
+        // clients themselves, so such a cell gets a leading ' to be shown as text (CSV injection).
+        private const string FormulaStarts = "=+-@\t\r";
+
         private static string EscapeCsv(string value)
         {
-            if (value.Contains(',') || value.Contains('"') || value.Contains('\n'))
+            if (value.Length > 0 && FormulaStarts.Contains(value[0]))
+                value = "'" + value;
+            if (value.Contains(',') || value.Contains('"') || value.Contains('\n') || value.Contains('\r'))
                 return $"\"{value.Replace("\"", "\"\"")}\"";
             return value;
         }
