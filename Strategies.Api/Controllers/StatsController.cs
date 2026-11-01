@@ -76,7 +76,8 @@ namespace Strategies.Api.Controllers
         /// <summary>
         /// GET /api/stats/client/{clientId}
         /// Metrics scoped to a specific client — current stage and document counts.
-        /// Clients can only retrieve their own stats.
+        /// Clients can only retrieve their own stats; consultants only those of a client with a case
+        /// assigned to them (same ownership rule as the case endpoints).
         /// </summary>
         [HttpGet("client/{clientId}")]
         [Authorize(Roles = "Admin,Consultant,Client")]
@@ -87,6 +88,13 @@ namespace Strategies.Api.Controllers
             {
                 var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 if (!Guid.TryParse(userIdStr, out var currentUserId) || currentUserId != clientId)
+                    return Forbid();
+            }
+            else if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!Guid.TryParse(userIdStr, out var consultantId) ||
+                    !await _context.Cases.AnyAsync(c => c.ClientId == clientId && c.ConsultantId == consultantId))
                     return Forbid();
             }
 

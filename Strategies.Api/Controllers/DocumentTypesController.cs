@@ -21,8 +21,8 @@ namespace Strategies.Api.Controllers
         }
 
         /// <summary>
-        /// GET /api/document-types
-        /// Returns a list of all active document types.
+        /// GET /api/DocumentTypes (routes ignore case, so /api/documenttypes also works)
+        /// Returns every document type, sorted by name.
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetDocumentTypes()

@@ -16,9 +16,11 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
 | [ISS-10](#iss-10) | Medium | Several API controllers have no automated tests | Marco, Mbulungeni |
+| [ISS-17](#iss-17) | Medium | A consultant can list the cases of any client | Marco |
 | [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run | Kundai |
 | [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
+| [ISS-16](#iss-16) | Low | Small API notes: stats counts, unused stats endpoints | Marco |
 
 ### ISS-02
 
@@ -84,6 +86,24 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Problem:** the logo is a small PNG without transparency and looks soft on high-resolution screens.
 - **Fix:** ask the client for an SVG or a 2x transparent PNG.
 - **Note:** Riaad will replace the logo asset in the web portal himself; no API change is needed.
+
+### ISS-16
+
+**Low. Small API notes found while adding controller tests.**
+
+- `GET /api/stats/client/{clientId}`: `totalDocuments` also counts archived documents.
+- `GET /api/stats/consultant` called by an admin answers with the admin's own numbers, which are always zero (the admin has no assigned cases).
+- The web portal calls none of the `/api/stats` endpoints; the dashboards count from the list endpoints instead.
+- `DocumentTypesController`: the comment named the route `/api/document-types` (a 404) and said "active" types, but there is no active flag. Fixed: the comment now gives `/api/DocumentTypes`.
+- **Evidence:** `StatsControllerTests`, `DocumentTypesControllerTests`.
+
+### ISS-17
+
+**Medium. A consultant can list the cases of any client.**
+
+- **Problem:** `GET /api/cases/client/{clientId}` checks ownership only for clients. A consultant can list any client's cases, including clients whose cases are assigned to another consultant. The other case endpoints allow a consultant only cases assigned to them.
+- **Evidence:** `CasesController.GetClientCases`. The same gap in `GET /api/stats/client/{clientId}` was fixed with `StatsControllerTests` (a consultant now needs a case for that client assigned to them).
+- **Fix:** apply the same rule in `GetClientCases`: consultants see only cases where `ConsultantId` is their own id.
 
 ## 2. Planned but not delivered
 
