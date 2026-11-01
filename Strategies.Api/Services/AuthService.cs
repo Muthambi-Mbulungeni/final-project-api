@@ -33,6 +33,11 @@ namespace Strategies.Api.Services
         private static readonly Lazy<string> DummyHash =
             new(() => new PasswordHasherService().HashPassword("not-a-real-password"));
 
+        // How long after a rotation the old refresh token is refused quietly instead of being treated
+        // as stolen (which revokes every session of the user). The store stamps RevokedAt with
+        // DateTime.UtcNow, so the check uses the same clock.
+        public static readonly TimeSpan RotationReuseGrace = TimeSpan.FromSeconds(30);
+
         public AuthService(
             ApplicationDbContext dbContext,
             IPasswordHasherService passwordHasher,
@@ -310,6 +315,17 @@ namespace Strategies.Api.Services
 
             if (existingToken == null || !existingToken.IsActive)
             {
+                // A token rotated moments ago is refused without the theft response: a duplicated
+                // browser tab, or a client retrying after a lost response, sends it again in good faith.
+                if (existingToken is { IsRevoked: true, ReplacedByToken: not null, RevokedAt: { } rotatedAt } &&
+                    DateTime.UtcNow - rotatedAt < RotationReuseGrace)
+                {
+                    _logger.LogInformation(
+                        "Refresh token for user {UserId} reused within the grace window; refused without revoking other sessions.",
+                        existingToken.UserId);
+                    return null;
+                }
+
                 if (existingToken != null && existingToken.IsRevoked)
                 {
                     _logger.LogWarning(

@@ -4,183 +4,102 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Strategies.Api.Data;
 using Strategies.Api.Data.Models;
 
 namespace Strategies.Api.Services
 {
+    /// <summary>
+    /// Keeps refresh tokens in the RefreshToken table, so they survive an API restart or redeploy and
+    /// are shared by every API instance. Only a SHA-256 hash of each token is stored, never the token.
+    ///
+    /// There is no fallback store: a database error is thrown, so a missing table or a lost connection
+    /// shows up as a failed request and in the logs instead of signing users out without a trace.
+    /// </summary>
     public class DbRefreshTokenStore : IRefreshTokenStore
     {
         private readonly ApplicationDbContext _dbContext;
-        private readonly ILogger<DbRefreshTokenStore> _logger;
-        private readonly InMemoryRefreshTokenStore _fallbackStore = new();
-        private bool _dbChecked = false;
-        private bool _dbAvailable = false;
 
-        public DbRefreshTokenStore(ApplicationDbContext dbContext, ILogger<DbRefreshTokenStore> logger)
+        public DbRefreshTokenStore(ApplicationDbContext dbContext)
         {
             _dbContext = dbContext;
-            _logger = logger;
         }
 
+        // Lowercase hex SHA-256 of the token (64 characters, the TokenHash column length).
         public static string HashToken(string token)
         {
             if (string.IsNullOrEmpty(token)) return string.Empty;
-            using var sha256 = SHA256.Create();
-            var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(token));
-            return Convert.ToHexString(bytes).ToLowerInvariant();
-        }
-
-        private async Task<bool> IsDbAvailableAsync()
-        {
-            if (!_dbChecked)
-            {
-                try
-                {
-                    _dbAvailable = await _dbContext.Database.CanConnectAsync();
-                }
-                catch
-                {
-                    _dbAvailable = false;
-                }
-                _dbChecked = true;
-            }
-            return _dbAvailable;
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
         }
 
         public async Task SaveTokenAsync(RefreshToken token)
         {
-            if (await IsDbAvailableAsync())
+            _dbContext.RefreshTokens.Add(new RefreshTokenRecord
             {
-                try
-                {
-                    var record = new RefreshTokenRecord
-                    {
-                        Id = Guid.NewGuid(),
-                        UserId = token.UserId,
-                        TokenHash = HashToken(token.Token),
-                        CreatedAt = token.CreatedAt,
-                        ExpiresAt = token.ExpiresAt,
-                        IsRevoked = token.IsRevoked,
-                        RevokedAt = token.RevokedAt,
-                        ReplacedByTokenHash = !string.IsNullOrWhiteSpace(token.ReplacedByToken)
-                            ? HashToken(token.ReplacedByToken)
-                            : null
-                    };
-
-                    _dbContext.RefreshTokens.Add(record);
-                    await _dbContext.SaveChangesAsync();
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to save refresh token to database, saving to fallback store.");
-                }
-            }
-
-            await _fallbackStore.SaveTokenAsync(token);
+                Id = Guid.NewGuid(),
+                UserId = token.UserId,
+                TokenHash = HashToken(token.Token),
+                CreatedAt = token.CreatedAt,
+                ExpiresAt = token.ExpiresAt,
+                IsRevoked = token.IsRevoked,
+                RevokedAt = token.RevokedAt,
+                ReplacedByTokenHash = string.IsNullOrWhiteSpace(token.ReplacedByToken) ? null : HashToken(token.ReplacedByToken)
+            });
+            await _dbContext.SaveChangesAsync();
         }
 
+        // ReplacedByToken comes back as the replacement's hash: only whether it is set matters to callers.
         public async Task<RefreshToken?> GetTokenAsync(string token)
         {
             if (string.IsNullOrWhiteSpace(token)) return null;
+
             var tokenHash = HashToken(token);
+            var record = await _dbContext.RefreshTokens
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
+            if (record == null) return null;
 
-            if (await IsDbAvailableAsync())
+            return new RefreshToken
             {
-                try
-                {
-                    var record = await _dbContext.RefreshTokens
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
-
-                    if (record != null)
-                    {
-                        return new RefreshToken
-                        {
-                            Token = token,
-                            UserId = record.UserId,
-                            CreatedAt = record.CreatedAt,
-                            ExpiresAt = record.ExpiresAt,
-                            IsRevoked = record.IsRevoked,
-                            RevokedAt = record.RevokedAt,
-                            ReplacedByToken = record.ReplacedByTokenHash
-                        };
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to query refresh token from database, checking fallback store.");
-                }
-            }
-
-            return await _fallbackStore.GetTokenAsync(token);
+                Token = token,
+                UserId = record.UserId,
+                CreatedAt = record.CreatedAt,
+                ExpiresAt = record.ExpiresAt,
+                IsRevoked = record.IsRevoked,
+                RevokedAt = record.RevokedAt,
+                ReplacedByToken = record.ReplacedByTokenHash
+            };
         }
 
         public async Task RevokeTokenAsync(string token, string? replacedByToken = null)
         {
             if (string.IsNullOrWhiteSpace(token)) return;
+
             var tokenHash = HashToken(token);
+            var record = await _dbContext.RefreshTokens.FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
+            if (record == null) return;
 
-            if (await IsDbAvailableAsync())
-            {
-                try
-                {
-                    var record = await _dbContext.RefreshTokens
-                        .FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
-
-                    if (record != null)
-                    {
-                        record.IsRevoked = true;
-                        record.RevokedAt = DateTime.UtcNow;
-                        if (!string.IsNullOrWhiteSpace(replacedByToken))
-                        {
-                            record.ReplacedByTokenHash = HashToken(replacedByToken);
-                        }
-
-                        await _dbContext.SaveChangesAsync();
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to revoke refresh token in database, revoking in fallback store.");
-                }
-            }
-
-            await _fallbackStore.RevokeTokenAsync(token, replacedByToken);
+            record.IsRevoked = true;
+            record.RevokedAt = DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(replacedByToken))
+                record.ReplacedByTokenHash = HashToken(replacedByToken);
+            await _dbContext.SaveChangesAsync();
         }
 
         public async Task RevokeAllUserTokensAsync(Guid userId)
         {
-            if (await IsDbAvailableAsync())
+            var activeTokens = await _dbContext.RefreshTokens
+                .Where(r => r.UserId == userId && !r.IsRevoked)
+                .ToListAsync();
+            if (activeTokens.Count == 0) return;
+
+            var now = DateTime.UtcNow;
+            foreach (var record in activeTokens)
             {
-                try
-                {
-                    var activeTokens = await _dbContext.RefreshTokens
-                        .Where(r => r.UserId == userId && !r.IsRevoked)
-                        .ToListAsync();
-
-                    if (activeTokens.Count > 0)
-                    {
-                        var now = DateTime.UtcNow;
-                        foreach (var t in activeTokens)
-                        {
-                            t.IsRevoked = true;
-                            t.RevokedAt = now;
-                        }
-
-                        await _dbContext.SaveChangesAsync();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to revoke all user tokens in database.");
-                }
+                record.IsRevoked = true;
+                record.RevokedAt = now;
             }
-
-            await _fallbackStore.RevokeAllUserTokensAsync(userId);
+            await _dbContext.SaveChangesAsync();
         }
     }
 }

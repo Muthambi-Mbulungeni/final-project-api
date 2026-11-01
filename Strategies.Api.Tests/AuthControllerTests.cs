@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -251,6 +252,62 @@ namespace Strategies.Api.Tests
             var reused = await Post(path, new { refreshToken = first.RefreshToken });
             Assert.Equal(HttpStatusCode.Unauthorized, reused.StatusCode);
             Assert.Equal("Refresh token is invalid or has expired. Please sign in again.", await MessageOf(reused));
+        }
+
+        [Fact]
+        public async Task Refresh_OldTokenReusedAfterTheGraceWindow_Returns401_AndSignsOutEverySession()
+        {
+            await AddUserAsync();
+            var phone = await SignInAsync();
+            var first = await SignInAsync();
+            var second = (await (await Post("/api/auth/refresh", new { refreshToken = first.RefreshToken }))
+                .Content.ReadFromJsonAsync<AuthResponse>())!;
+
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var hash = DbRefreshTokenStore.HashToken(first.RefreshToken);
+                var rotated = await db.RefreshTokens.SingleAsync(r => r.TokenHash == hash);
+                rotated.RevokedAt = DateTime.UtcNow - AuthService.RotationReuseGrace - TimeSpan.FromSeconds(1);
+                await db.SaveChangesAsync();
+            }
+
+            var reused = await Post("/api/auth/refresh", new { refreshToken = first.RefreshToken });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, reused.StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await Post("/api/auth/refresh", new { refreshToken = second.RefreshToken })).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await Post("/api/auth/refresh", new { refreshToken = phone.RefreshToken })).StatusCode);
+        }
+
+        [Fact]
+        public async Task Refresh_OldTokenSentAgainAtOnce_Returns401_ButTheNewTokenStillWorks()
+        {
+            await AddUserAsync();
+            var first = await SignInAsync();
+            var second = (await (await Post("/api/auth/refresh", new { refreshToken = first.RefreshToken }))
+                .Content.ReadFromJsonAsync<AuthResponse>())!;
+
+            var duplicate = await Post("/api/auth/refresh", new { refreshToken = first.RefreshToken });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, duplicate.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await Post("/api/auth/refresh", new { refreshToken = second.RefreshToken })).StatusCode);
+        }
+
+        [Fact]
+        public async Task Logout_RevokesEveryTokenOfTheUser_InTheDatabase()
+        {
+            var user = await AddUserAsync();
+            var browser = await SignInAsync();
+            await SignInAsync();
+
+            Assert.Equal(HttpStatusCode.OK, (await Post("/api/auth/logout", new { refreshToken = browser.RefreshToken })).StatusCode);
+
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var rows = await db.RefreshTokens.AsNoTracking().Where(r => r.UserId == user.Id).ToListAsync();
+            Assert.Equal(2, rows.Count);
+            Assert.All(rows, r => Assert.True(r.IsRevoked));
+            Assert.All(rows, r => Assert.NotEqual(browser.RefreshToken, r.TokenHash));
         }
 
         [Fact]
