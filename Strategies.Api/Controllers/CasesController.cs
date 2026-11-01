@@ -242,11 +242,21 @@ namespace Strategies.Api.Controllers
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10)
         {
+            // Consultants see only the cases assigned to them, as on the other case endpoints.
+            Guid? onlyConsultantId = null;
             if (User.IsInRole("Client"))
             {
                 var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 if (!Guid.TryParse(userIdStr, out var currentUserId) || currentUserId != clientId)
                     return Forbid();
+            }
+            else if (User.IsInRole("Consultant"))
+            {
+                var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (!Guid.TryParse(userIdStr, out var consultantId) ||
+                    !await _context.Cases.AnyAsync(c => c.ClientId == clientId && c.ConsultantId == consultantId))
+                    return Forbid();
+                onlyConsultantId = consultantId;
             }
 
             var query = from c in _context.Cases
@@ -256,7 +266,7 @@ namespace Strategies.Api.Controllers
                         from consultant in cog.DefaultIfEmpty()
                         join vc in _context.VisaCategories on c.VisaCategoryId equals vc.Id into vcg
                         from visaCat in vcg.DefaultIfEmpty()
-                        where c.ClientId == clientId
+                        where c.ClientId == clientId && (onlyConsultantId == null || c.ConsultantId == onlyConsultantId)
                         select new { c, client, consultant, visaCat };
 
             var totalRecords = await query.CountAsync();

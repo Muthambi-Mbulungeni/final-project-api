@@ -16,7 +16,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
 | [ISS-10](#iss-10) | Medium | Several API controllers have no automated tests | Marco, Mbulungeni |
-| [ISS-17](#iss-17) | Medium | A consultant can list the cases of any client | Marco |
 | [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run | Kundai |
 | [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
@@ -97,14 +96,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - `DocumentTypesController`: the comment named the route `/api/document-types` (a 404) and said "active" types, but there is no active flag. Fixed: the comment now gives `/api/DocumentTypes`.
 - **Evidence:** `StatsControllerTests`, `DocumentTypesControllerTests`.
 
-### ISS-17
-
-**Medium. A consultant can list the cases of any client.**
-
-- **Problem:** `GET /api/cases/client/{clientId}` checks ownership only for clients. A consultant can list any client's cases, including clients whose cases are assigned to another consultant. The other case endpoints allow a consultant only cases assigned to them.
-- **Evidence:** `CasesController.GetClientCases`. The same gap in `GET /api/stats/client/{clientId}` was fixed with `StatsControllerTests` (a consultant now needs a case for that client assigned to them).
-- **Fix:** apply the same rule in `GetClientCases`: consultants see only cases where `ConsultantId` is their own id.
-
 ## 2. Planned but not delivered
 
 These were in the original plan or came up in the client interview, and are not in this submission. The database already has tables for most of them, so they can be added without changing the design.
@@ -127,6 +118,7 @@ Issues found by testing or review and fixed before submission.
 
 | Issue | Fix |
 |---|---|
+| A consultant could list the cases of any client (was ISS-17, Medium; owner Riaad) | `GET /api/cases/client/{clientId}` now gives a consultant 403 unless a case of that client is assigned to them, and lists only those cases, the same rule as the other case endpoints and `/api/stats/client/{clientId}`. Clients and admins are unchanged. Tests: `CasesClientAccessTests` |
 | AI verdict was never read: every successful Gemini call marked the lead Qualified, and no reason was saved | The API now reads the verdict and reason, and falls back to NeedsReview (PR #18); the reason is shown to consultants (PR #19) |
 | Consultants could export, and change documents on, cases that were not theirs | Ownership checks on export and on document approval, rejection and archiving (PR #18) |
 | Archiving a document wrote no audit row | Audit row added (PR #18) |
