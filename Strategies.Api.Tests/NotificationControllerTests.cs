@@ -218,6 +218,58 @@ namespace Strategies.Api.Tests
             Assert.Equal(5, page2.GetProperty("unreadCount").GetInt32());
         }
 
+        [Theory]
+        [InlineData("?page=0")]
+        [InlineData("?page=-1")]
+        public async Task Paging_PageBelowOne_GivesTheFirstPage(string query)
+        {
+            await AddMessageAsync(_caseA, _consultantA, "To client A");
+
+            var list = await GetListAsync(TokenFor(_clientA, UserRole.Client), query);
+
+            Assert.Equal(1, list.GetProperty("currentPage").GetInt32());
+            Assert.Equal(new[] { "To client A" }, Bodies(list));
+        }
+
+        [Theory]
+        [InlineData("?pageSize=0")]
+        [InlineData("?pageSize=-5")]
+        public async Task Paging_PageSizeBelowOne_GivesOnePerPage(string query)
+        {
+            await AddMessageAsync(_caseA, _consultantA, "Older", minutesAgo: 2);
+            await AddMessageAsync(_caseA, _consultantA, "Newer", minutesAgo: 1);
+
+            var list = await GetListAsync(TokenFor(_clientA, UserRole.Client), query);
+
+            Assert.Equal(new[] { "Newer" }, Bodies(list));
+            Assert.Equal(2, list.GetProperty("totalPages").GetInt32());
+        }
+
+        [Fact]
+        public async Task Paging_PageSizeAbove100_GivesAtMost100()
+        {
+            using (var scope = _factory.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                for (var i = 0; i < 101; i++)
+                    db.Messages.Add(new Message
+                    {
+                        Id = Guid.NewGuid(),
+                        CaseId = _caseA,
+                        SenderId = _consultantA,
+                        Body = $"Message {i}",
+                        SentAt = DateTime.UtcNow.AddMinutes(-i)
+                    });
+                await db.SaveChangesAsync();
+            }
+
+            var list = await GetListAsync(TokenFor(_clientA, UserRole.Client), "?pageSize=1000");
+
+            Assert.Equal(100, list.GetProperty("data").GetArrayLength());
+            Assert.Equal(2, list.GetProperty("totalPages").GetInt32());
+            Assert.Equal(101, list.GetProperty("totalRecords").GetInt32());
+        }
+
         // ── PATCH /api/notifications/{id}/read ─────────────────────────────
 
         [Fact]
