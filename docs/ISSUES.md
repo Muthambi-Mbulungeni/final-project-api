@@ -16,7 +16,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
 | [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run | Kundai |
-| [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
 | [ISS-16](#iss-16) | Low | Small API notes: stats counts, unused stats endpoints | Marco |
 
@@ -55,17 +54,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Problem:** checks 7 (rate limit), 8 (reopen app), 9 (expired access token) and 11 (API stopped) are not yet run. ~~Release builds pointed at `https://CHANGE-ME.example.com/`.~~
 - **Fix (partial):** the release build API address is now set to `https://final-project-api-1.onrender.com/` in `strategies-mobile/app/build.gradle.kts` (chore/phase0-fixes). The 4 manual checks remain open — Kundai to run.
 - **Evidence:** [mobile test log](../strategies-mobile/TESTING.md); `strategies-mobile/app/build.gradle.kts`.
-
-### ISS-15
-
-**Medium. Refresh tokens are kept in memory.**
-
-- **Owner:** Kaan. Still open.
-
-- **Problem:** the API stores refresh tokens in an in-memory store, not in the database.
-- **Evidence:** `Program.cs` registers `InMemoryRefreshTokenStore` as `IRefreshTokenStore`.
-- **Impact:** every API restart or redeploy, and every wake-up of a free host that sleeps when idle, forgets all refresh tokens. Users are signed out when their access token next expires. With more than one API instance, a token issued by one instance is unknown to the others.
-- **Fix:** store refresh tokens (hashed) in a database table behind the same `IRefreshTokenStore` interface.
 
 ### ISS-14
 
@@ -140,6 +128,7 @@ Issues found by testing or review and fixed before submission.
 | Mobile: Gradle wrapper missing, so a fresh clone could not build or run the tests | `gradlew`, `gradlew.bat` and the wrapper jar committed (PR #27) |
 | Stage change accepted archived cases and unchanged stages (was ISS-07, Low) | `PATCH /api/cases/{id}/stage` now returns 400 "This case is archived and cannot be changed." for archived cases and 400 "The case is already at that stage." when the stage is unchanged, writing no history or audit records. Tests: `CasesControllerStageTests` (5) |
 | Mixed audit action wording and old lead verdict not recorded (was ISS-12, Low) | Audit actions for stage updates and lead triage are now stored as sentences ("Changed case stage from X to Y", "Changed lead verdict from X to Y") preserving the previous value. The old verdict is recorded in the Action sentence rather than a separate Detail field: `AuditLog` has no Detail column, and adding one would need a migration. `PATCH /api/leads/{id}/status` returns 400 "The lead already has that verdict." if unchanged, writing no audit row. Tests: `LeadsStatusTests` (4), `CasesControllerStageTests` |
+| Refresh tokens kept in memory, so an API restart or redeploy signed everyone out (was ISS-15, Medium) | Refresh tokens are stored hashed (SHA-256) in the `RefreshToken` table (`DbRefreshTokenStore`, migration `AddRefreshTokenTable`, also in `migrate.sql`), with no in-memory fallback. Each refresh rotates the token; reusing an old token more than 30 seconds after its rotation, or after logout, revokes every session of the user. A token sent again within 30 seconds of its rotation (duplicated tab, retry after a lost response) is refused without revoking other sessions. Logout and password reset revoke every session. Tests: `DbRefreshTokenStoreTests`, `AuthControllerTests` |
 | Users list could not show the join date (was ISS-13, Low) | Added `CreatedAt` to `UserDto`, populated from `User.CreatedAt` in `AdminController.GetUsers` and `UpdateUser`, and added a "Joined" column to the admin Users page with formatted dates. Tests: `AdminUserTests.GetUsers_ReturnsCreatedAtForEachUser` |
 | Several API controllers had no automated tests (was ISS-10, Medium) | Every controller now has tests that call it over HTTP in a test server (`WebApplicationFactory`, in-memory database): `AuthControllerTests`, `DocumentTypesControllerTests`, `NotificationControllerTests`, `StatsControllerTests`, `CasesControllerTests` (create, detail, export), `CasesClientAccessTests`, `LeadsControllerTests` (list, review), `AdminControllerTests` (user list, audit log), next to the existing controller tests. Each new test file was checked by breaking the controller on purpose and seeing the tests fail |
 | CSV export wrote spreadsheet formulas in names as they were (was ISS-18, Medium) | `GET /api/cases/export` now puts a single quote in front of any cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return, so a client name such as `=HYPERLINK(...)` is shown as text in Excel or Google Sheets instead of running. Ordinary names, including ones with a hyphen or an apostrophe inside, are unchanged. Tests: `CasesControllerTests` (`Export_NameThatStartsLikeAFormula_IsWrittenAsText`, `Export_OrdinaryName_IsUnchanged`) |
