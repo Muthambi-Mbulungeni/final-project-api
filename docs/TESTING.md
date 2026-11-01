@@ -74,7 +74,7 @@ Out of scope for this submission: load and performance testing, a live Gemini ca
 
 ## 4. Automated tests
 
-### 4.1 API (xUnit, 311 tests)
+### 4.1 API (xUnit, 343 tests)
 
 The table lists the original service tests and the controller tests added since. Every test file is in `Strategies.Api.Tests`.
 
@@ -83,6 +83,7 @@ The table lists the original service tests and the controller tests added since.
 | Auth endpoints over HTTP (`AuthControllerTests`) | Real pipeline in a test server with an in-memory database: login 200 with tokens, 401 for a wrong password, an unconfirmed email or a suspended account, 400 for an empty body; refresh (and `refresh-token`) rotates the token and refuses the old one; revoke (and `revoke-token`) stops the refresh token working and answers 200 for unknown tokens; `me` needs a bearer token; register 201 sends a confirmation link, refuses an existing email, a weak password or an invalid email; register, confirm, then sign in works end to end, and a confirmation link works once; resend confirmation and forgot password answer the same for known and unknown emails |
 | Login (`AuthServiceTests`) | Valid credentials return tokens; a wrong password, an unknown email or an inactive user is refused; email matching ignores case |
 | Refresh tokens (`AuthServiceTests`) | A valid token issues new tokens; revoked and garbage tokens are refused; revoking works once only |
+| Dashboard stats over HTTP (`StatsControllerTests`) | 401 without a token; admin stats only for admins, consultant stats for admins and consultants, client stats refused for another client; admin counts include only active users and unarchived cases, active cases leave out FinalDecision, leads are counted by verdict; consultant counts include only their own unarchived cases and the whole Pending and NeedsReview queue; client stats show the newest unarchived case and its documents, or None |
 | JWT (`TokenServiceTests`) | The access token carries the right subject and role, and its expiry is in the future; refresh tokens are URL-safe, unique and long enough; the service refuses to start without a JWT key |
 | Case lifecycle (`CaseManagementServiceTests`) | Each of the five stages advances to the next one; FinalDecision does not advance; `UpdatedAt` is refreshed; an unknown case returns false |
 
