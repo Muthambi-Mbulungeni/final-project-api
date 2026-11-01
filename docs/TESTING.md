@@ -86,6 +86,7 @@ The table lists the original service tests and the controller tests added since.
 | Refresh tokens (`AuthServiceTests`) | A valid token issues new tokens; revoked and garbage tokens are refused; revoking works once only |
 | JWT (`TokenServiceTests`) | The access token carries the right subject and role, and its expiry is in the future; refresh tokens are URL-safe, unique and long enough; the service refuses to start without a JWT key |
 | Case lifecycle (`CaseManagementServiceTests`) | Each of the five stages advances to the next one; FinalDecision does not advance; `UpdatedAt` is refreshed; an unknown case returns false |
+| Notifications over HTTP (`NotificationControllerTests`) | 401 without a token; a client sees only messages on their own case, a consultant only on assigned cases, an admin on every case, and nobody sees their own messages; newest first, with the unread count and only id, case, body, read flag and date; paging counts across all pages; marking read works once and again (idempotent) for the recipient or an admin, 403 for the sender or someone outside the case, 404 for an unknown message |
 
 Run: `dotnet test` from the repository root.
 
