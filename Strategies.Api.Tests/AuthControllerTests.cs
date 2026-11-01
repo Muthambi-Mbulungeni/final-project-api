@@ -311,6 +311,28 @@ namespace Strategies.Api.Tests
         }
 
         [Fact]
+        public async Task Logout_WithOnlyTheAccessToken_RevokesEveryRefreshToken()
+        {
+            await AddUserAsync();
+            var browser = await SignInAsync();
+            var phone = await SignInAsync();
+
+            var response = await Send(HttpMethod.Post, "/api/auth/logout", bearer: browser.AccessToken);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await Post("/api/auth/refresh", new { refreshToken = browser.RefreshToken })).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await Post("/api/auth/refresh", new { refreshToken = phone.RefreshToken })).StatusCode);
+        }
+
+        [Fact]
+        public async Task Logout_WithNoTokenAtAll_Returns400()
+        {
+            var response = await Send(HttpMethod.Post, "/api/auth/logout");
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        [Fact]
         public async Task Refresh_UnknownToken_Returns401()
         {
             var response = await Post("/api/auth/refresh", new { refreshToken = "made-up-token" });
