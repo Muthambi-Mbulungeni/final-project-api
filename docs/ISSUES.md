@@ -15,11 +15,11 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-02](#iss-02) | High | Development secrets committed in `appsettings.json` | Kaan, Mbulungeni |
 | [ISS-08](#iss-08) | Medium | Gemini model name may be retired; live call not tested | Marco |
 | [ISS-09](#iss-09) | Medium | Uploaded files are stored on the API server's disk | Kaan, Mbulungeni |
-| [ISS-10](#iss-10) | Medium | Several API controllers have no automated tests | Marco, Mbulungeni |
 | [ISS-11](#iss-11) | Medium | Mobile: 4 manual checks not run | Kundai |
 | [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
 | [ISS-16](#iss-16) | Low | Small API notes: stats counts, unused stats endpoints | Marco |
+| [ISS-18](#iss-18) | Medium | CSV export does not neutralise spreadsheet formulas in names | Marco |
 
 ### ISS-02
 
@@ -48,16 +48,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - **Evidence:** `LocalFileStorage`, rooted at `Storage:UploadsRoot` (default `wwwroot/uploads`). A host can point it at a persistent folder outside the deploy folder, such as `/home/data/uploads` on Azure App Service.
 - **Impact:** on a host whose disk is reset on each deploy, files would be lost while their database rows remain.
 - **Fix:** move uploads to R2 or another object store, or use a host with a persistent disk.
-
-### ISS-10
-
-**Medium. Several API controllers have no automated tests.**
-
-- **Problem:** the API suite (343 tests) covers the services and part of the controllers. Role checks, validation responses and audit rows on the partly covered controllers are checked by hand (TESTING.md section 5).
-- **Covered now:** `AuthController` over HTTP in a test server (`AuthControllerTests`: login, refresh and its alias, revoke and its alias, `me`, register, email confirmation, resend confirmation, forgot password), `DocumentTypesController` (`DocumentTypesControllerTests`), `NotificationController` (`NotificationControllerTests`), `StatsController` (`StatsControllerTests`), `MessagesController` (`MessagesControllerTests`), `AdminController` user actions (`AdminUserTests`), `DocumentsController` review, upload and download (`DocumentReviewerTests`, `DocumentsControllerTests`), `CasesController` list and assign (`CaseListTests`, `CaseAssignTests`), `LeadsController` create, consent and rate limit (`LeadConsentTests`, `LeadsRateLimitTests`, `GeminiAgentServiceTests`). The rate limit and startup checks run through the real pipeline in a test server (`WebApplicationFactory`).
-- **No tests at all:** none. Every controller now has HTTP-level tests.
-- **Partly covered:** `CasesController` create, stage change, export and detail; `LeadsController` list and status update; `AdminController` user list and audit log.
-- **Fix:** add tests for the controllers listed above, using `WebApplicationFactory` against a test database, run in CI.
 
 ### ISS-11
 
@@ -94,7 +84,18 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - `GET /api/stats/consultant` called by an admin answers with the admin's own numbers, which are always zero (the admin has no assigned cases).
 - The web portal calls none of the `/api/stats` endpoints; the dashboards count from the list endpoints instead.
 - `DocumentTypesController`: the comment named the route `/api/document-types` (a 404) and said "active" types, but there is no active flag. Fixed: the comment now gives `/api/DocumentTypes`.
-- **Evidence:** `StatsControllerTests`, `DocumentTypesControllerTests`.
+- `POST /api/cases` accepts any active user as the client, including a consultant or an admin; it checks only that the account exists and is active. `LeadId` is not checked either.
+- `POST /api/cases` writes the audit action as the code name `CreateCase`, not a sentence like the other actions (see the ISS-12 fix).
+- The case, lead, user and audit-log lists do not check `page` and `pageSize`, as notifications did before its fix: `pageSize=0` gives a huge page count and `page=0` asks PostgreSQL for a negative offset.
+- **Evidence:** `StatsControllerTests`, `DocumentTypesControllerTests`, `CasesControllerTests`, `LeadsControllerTests`, `AdminControllerTests`.
+
+### ISS-18
+
+**Medium. CSV export does not neutralise spreadsheet formulas in names.**
+
+- **Problem:** `GET /api/cases/export` quotes values that contain a comma, quote or line break, but a client name that starts with `=`, `+`, `-` or `@` is written as it is. Clients choose their own name when they register, so a name such as `=HYPERLINK(...)` becomes a live formula when staff open the export in Excel or Google Sheets (CSV injection).
+- **Evidence:** `CasesController.EscapeCsv`; `CasesControllerTests.Export_QuotesANameThatContainsAComma` shows the quoting that does exist.
+- **Fix:** in `EscapeCsv`, put a single quote (`'`) in front of any value that starts with `=`, `+`, `-`, `@`, a tab or a carriage return, then quote it as now.
 
 ## 2. Planned but not delivered
 
@@ -149,3 +150,4 @@ Issues found by testing or review and fixed before submission.
 | Stage change accepted archived cases and unchanged stages (was ISS-07, Low) | `PATCH /api/cases/{id}/stage` now returns 400 "This case is archived and cannot be changed." for archived cases and 400 "The case is already at that stage." when the stage is unchanged, writing no history or audit records. Tests: `CasesControllerStageTests` (5) |
 | Mixed audit action wording and old lead verdict not recorded (was ISS-12, Low) | Audit actions for stage updates and lead triage are now stored as sentences ("Changed case stage from X to Y", "Changed lead verdict from X to Y") preserving the previous value. The old verdict is recorded in the Action sentence rather than a separate Detail field: `AuditLog` has no Detail column, and adding one would need a migration. `PATCH /api/leads/{id}/status` returns 400 "The lead already has that verdict." if unchanged, writing no audit row. Tests: `LeadsStatusTests` (4), `CasesControllerStageTests` |
 | Users list could not show the join date (was ISS-13, Low) | Added `CreatedAt` to `UserDto`, populated from `User.CreatedAt` in `AdminController.GetUsers` and `UpdateUser`, and added a "Joined" column to the admin Users page with formatted dates. Tests: `AdminUserTests.GetUsers_ReturnsCreatedAtForEachUser` |
+| Several API controllers had no automated tests (was ISS-10, Medium) | Every controller now has tests that call it over HTTP in a test server (`WebApplicationFactory`, in-memory database): `AuthControllerTests`, `DocumentTypesControllerTests`, `NotificationControllerTests`, `StatsControllerTests`, `CasesControllerTests` (create, detail, export), `CasesClientAccessTests`, `LeadsControllerTests` (list, review), `AdminControllerTests` (user list, audit log), next to the existing controller tests. Each new test file was checked by breaking the controller on purpose and seeing the tests fail |

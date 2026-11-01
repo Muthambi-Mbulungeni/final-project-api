@@ -74,7 +74,7 @@ Out of scope for this submission: load and performance testing, a live Gemini ca
 
 ## 4. Automated tests
 
-### 4.1 API (xUnit, 343 tests)
+### 4.1 API (xUnit, 428 tests)
 
 The table lists the original service tests and the controller tests added since. Every test file is in `Strategies.Api.Tests`.
 
@@ -89,10 +89,13 @@ The table lists the original service tests and the controller tests added since.
 | JWT (`TokenServiceTests`) | The access token carries the right subject and role, and its expiry is in the future; refresh tokens are URL-safe, unique and long enough; the service refuses to start without a JWT key |
 | Case lifecycle (`CaseManagementServiceTests`) | Each of the five stages advances to the next one; FinalDecision does not advance; `UpdatedAt` is refreshed; an unknown case returns false |
 | Notifications over HTTP (`NotificationControllerTests`) | 401 without a token; a client sees only messages on their own case, a consultant only on assigned cases, an admin on every case, and nobody sees their own messages; newest first, with the unread count and only id, case, body, read flag and date; paging counts across all pages, a page below 1 gives page 1 and the page size is kept between 1 and 100; marking read works once and again (idempotent) for the recipient or an admin, 403 for the sender or someone outside the case, 404 for an unknown message |
+| Cases over HTTP (`CasesControllerTests`) | Create: 401, 403 for clients, a consultant's new case is assigned to them at InitialIntake with an audit row, an admin's is unassigned, the Location header opens the new case, 400 and nothing saved for an unknown or inactive client or visa category; detail: 401, names shown (or Unassigned), consultants and clients open only their own cases, 404 for an unknown case; export: 401, 403 for clients, a CSV file newest first, a name with a comma is quoted, a consultant gets only their cases |
+| Leads over HTTP (`LeadsControllerTests`) | List: 401, 403 for clients, newest first, paged (10 by default), search by name or email, verdict filter ignores case and an unknown verdict is ignored, verdicts are sent as names; review: 401, 403 for clients, the verdict name sets the verdict and the reviewer with a sentence audit row, 400 for a missing or unknown verdict with nothing changed, 404 for an unknown lead |
+| Admin over HTTP (`AdminControllerTests`) | 401 without a token and 403 for consultants and clients on both endpoints; users sorted by name, deleted accounts left out and suspended ones kept, no password field, search by name or email, paged; audit log newest first with the actor's name (System/Unknown when there is none), filter by user, 20 per page by default |
 
 Run: `dotnet test` from the repository root.
 
-**Known gap.** Some controllers still have no automated tests or only partial ones; [ISS-10](ISSUES.md#iss-10) lists which. Their role checks, validation responses and audit rows are covered by the scripted API checks in section 5, which have to be repeated by hand.
+**Coverage.** Every API controller now has tests that call it over HTTP in a test server, so role checks, validation responses and audit rows run automatically (was [ISS-10](ISSUES.md#3-fixed-during-the-project)). The scripted checks in section 5 remain the evidence against a real PostgreSQL database.
 
 ### 4.2 Web (Vitest, 319 tests in 34 files)
 
