@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { useToast } from '../../components/ui/toastContext'
 import { apiPatch } from '../../lib/api'
-import { getInitials } from '../../lib/format'
+import { formatDate, getInitials } from '../../lib/format'
 import { listItems } from '../../lib/listData'
 import { usersPath } from '../../lib/listPaths'
 import { getSession } from '../../lib/session'
@@ -150,6 +150,12 @@ export default function UsersPage() {
         ) : (
           <StatusBadge tone="success" label="Active" />
         ),
+    },
+    {
+      key: 'createdAt',
+      header: 'Joined',
+      cardInline: true,
+      render: (user) => formatDate(user.createdAt),
     },
     {
       key: 'actions',

@@ -166,6 +166,9 @@ namespace Strategies.Api.Controllers
             var lead = await _context.Leads.FindAsync(id);
             if (lead == null) return NotFound(new ApiErrorResponse { Message = "Lead not found." });
 
+            if (lead.TriageStatus == request.Status.Value)
+                return BadRequest(new ApiErrorResponse { Message = "The lead already has that verdict." });
+
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
             Guid.TryParse(userIdStr, out var currentUserId);
 
@@ -177,7 +180,7 @@ namespace Strategies.Api.Controllers
             {
                 Id = Guid.NewGuid(),
                 UserId = currentUserId,
-                Action = "UpdateLeadStatus",
+                Action = $"Changed lead verdict from {oldStatus} to {request.Status.Value}",
                 EntityType = "Lead",
                 EntityId = id,
                 CreatedAt = DateTime.UtcNow
