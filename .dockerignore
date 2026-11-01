@@ -1,0 +1,16 @@
+# Only the API is built into the image. Keep the build context small and free of
+# local build output (a Windows obj folder would confuse dotnet restore in Linux).
+**/bin
+**/obj
+**/node_modules
+.git
+.github
+.vs
+.vscode
+.claude
+strategies-web
+strategies-mobile
+database
+docs
+Strategies.Api/wwwroot/uploads
+*.md
