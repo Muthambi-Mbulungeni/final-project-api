@@ -51,7 +51,7 @@ Known issues at the time of submission, checked against the code on `develop` (`
 
 **Medium. Several API controllers have no automated tests.**
 
-- **Problem:** the API suite (360 tests) covers the services and part of the controllers. Role checks, validation responses and audit rows on the partly covered controllers are checked by hand (TESTING.md section 5).
+- **Problem:** the API suite (343 tests) covers the services and part of the controllers. Role checks, validation responses and audit rows on the partly covered controllers are checked by hand (TESTING.md section 5).
 - **Covered now:** `AuthController` over HTTP in a test server (`AuthControllerTests`: login, refresh and its alias, revoke and its alias, `me`, register, email confirmation, resend confirmation, forgot password), `DocumentTypesController` (`DocumentTypesControllerTests`), `NotificationController` (`NotificationControllerTests`), `StatsController` (`StatsControllerTests`), `MessagesController` (`MessagesControllerTests`), `AdminController` user actions (`AdminUserTests`), `DocumentsController` review, upload and download (`DocumentReviewerTests`, `DocumentsControllerTests`), `CasesController` list and assign (`CaseListTests`, `CaseAssignTests`), `LeadsController` create, consent and rate limit (`LeadConsentTests`, `LeadsRateLimitTests`, `GeminiAgentServiceTests`). The rate limit and startup checks run through the real pipeline in a test server (`WebApplicationFactory`).
 - **No tests at all:** none. Every controller now has HTTP-level tests.
 - **Partly covered:** `CasesController` create, stage change, export and detail; `LeadsController` list and status update; `AdminController` user list and audit log.

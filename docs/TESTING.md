@@ -74,7 +74,7 @@ Out of scope for this submission: load and performance testing, a live Gemini ca
 
 ## 4. Automated tests
 
-### 4.1 API (xUnit, 360 tests)
+### 4.1 API (xUnit, 343 tests)
 
 The table lists the original service tests and the controller tests added since. Every test file is in `Strategies.Api.Tests`.
 
