@@ -19,7 +19,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 | [ISS-15](#iss-15) | Medium | Refresh tokens are kept in memory, so an API restart signs everyone out | Kaan |
 | [ISS-14](#iss-14) | Low | Client logo is low resolution | Riaad |
 | [ISS-16](#iss-16) | Low | Small API notes: stats counts, unused stats endpoints | Marco |
-| [ISS-18](#iss-18) | Medium | CSV export does not neutralise spreadsheet formulas in names | Marco |
 
 ### ISS-02
 
@@ -89,14 +88,6 @@ Known issues at the time of submission, checked against the code on `develop` (`
 - The case, lead, user and audit-log lists do not check `page` and `pageSize`, as notifications did before its fix: `pageSize=0` gives a huge page count and `page=0` asks PostgreSQL for a negative offset.
 - **Evidence:** `StatsControllerTests`, `DocumentTypesControllerTests`, `CasesControllerTests`, `LeadsControllerTests`, `AdminControllerTests`.
 
-### ISS-18
-
-**Medium. CSV export does not neutralise spreadsheet formulas in names.**
-
-- **Problem:** `GET /api/cases/export` quotes values that contain a comma, quote or line break, but a client name that starts with `=`, `+`, `-` or `@` is written as it is. Clients choose their own name when they register, so a name such as `=HYPERLINK(...)` becomes a live formula when staff open the export in Excel or Google Sheets (CSV injection).
-- **Evidence:** `CasesController.EscapeCsv`; `CasesControllerTests.Export_QuotesANameThatContainsAComma` shows the quoting that does exist.
-- **Fix:** in `EscapeCsv`, put a single quote (`'`) in front of any value that starts with `=`, `+`, `-`, `@`, a tab or a carriage return, then quote it as now.
-
 ## 2. Planned but not delivered
 
 These were in the original plan or came up in the client interview, and are not in this submission. The database already has tables for most of them, so they can be added without changing the design.
@@ -151,3 +142,4 @@ Issues found by testing or review and fixed before submission.
 | Mixed audit action wording and old lead verdict not recorded (was ISS-12, Low) | Audit actions for stage updates and lead triage are now stored as sentences ("Changed case stage from X to Y", "Changed lead verdict from X to Y") preserving the previous value. The old verdict is recorded in the Action sentence rather than a separate Detail field: `AuditLog` has no Detail column, and adding one would need a migration. `PATCH /api/leads/{id}/status` returns 400 "The lead already has that verdict." if unchanged, writing no audit row. Tests: `LeadsStatusTests` (4), `CasesControllerStageTests` |
 | Users list could not show the join date (was ISS-13, Low) | Added `CreatedAt` to `UserDto`, populated from `User.CreatedAt` in `AdminController.GetUsers` and `UpdateUser`, and added a "Joined" column to the admin Users page with formatted dates. Tests: `AdminUserTests.GetUsers_ReturnsCreatedAtForEachUser` |
 | Several API controllers had no automated tests (was ISS-10, Medium) | Every controller now has tests that call it over HTTP in a test server (`WebApplicationFactory`, in-memory database): `AuthControllerTests`, `DocumentTypesControllerTests`, `NotificationControllerTests`, `StatsControllerTests`, `CasesControllerTests` (create, detail, export), `CasesClientAccessTests`, `LeadsControllerTests` (list, review), `AdminControllerTests` (user list, audit log), next to the existing controller tests. Each new test file was checked by breaking the controller on purpose and seeing the tests fail |
+| CSV export wrote spreadsheet formulas in names as they were (was ISS-18, Medium) | `GET /api/cases/export` now puts a single quote in front of any cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return, so a client name such as `=HYPERLINK(...)` is shown as text in Excel or Google Sheets instead of running. Ordinary names, including ones with a hyphen or an apostrophe inside, are unchanged. Tests: `CasesControllerTests` (`Export_NameThatStartsLikeAFormula_IsWrittenAsText`, `Export_OrdinaryName_IsUnchanged`) |
