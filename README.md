@@ -9,7 +9,7 @@ Case management for **Strategies Migration Services**, a South African immigrati
 | Live system | Address |
 |---|---|
 | Web portal | https://emgprs.github.io/insy7315-2026-insy7315-2026-final-project-herculesriaadst10258492/ |
-| API | https://final-project-api-zm3s.onrender.com (Render) |
+| API | https://final-project-api-1.onrender.com (Render) |
 
 ## The problem and the solution
 
