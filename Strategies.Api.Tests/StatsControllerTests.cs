@@ -268,6 +268,34 @@ namespace Strategies.Api.Tests
         }
 
         [Fact]
+        public async Task ClientStats_TheAssignedConsultant_CanRead()
+        {
+            await SeedAsync(db => db.Cases.Add(NewCase(_client, _consultant, CaseStage.UnderReview)));
+
+            var stats = await GetOkAsync($"/api/stats/client/{_client}", TokenFor(_consultant, UserRole.Consultant));
+
+            Assert.Equal("UnderReview", stats.GetProperty("currentStage").GetString());
+        }
+
+        [Fact]
+        public async Task ClientStats_AConsultantNotAssigned_Returns403()
+        {
+            await SeedAsync(db => db.Cases.Add(NewCase(_client, _otherConsultant)));
+
+            var response = await Get($"/api/stats/client/{_client}", TokenFor(_consultant, UserRole.Consultant));
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task ClientStats_AConsultant_ForAClientWithNoCase_Returns403()
+        {
+            var response = await Get($"/api/stats/client/{_client}", TokenFor(_consultant, UserRole.Consultant));
+
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        [Fact]
         public async Task ClientStats_AnAdmin_CanReadAnyClient()
         {
             await SeedAsync(db => db.Cases.Add(NewCase(_client, _consultant, CaseStage.InitialIntake)));
