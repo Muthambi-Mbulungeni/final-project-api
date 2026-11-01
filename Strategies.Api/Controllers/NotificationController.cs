@@ -16,6 +16,8 @@ namespace Strategies.Api.Controllers
     [Authorize]
     public class NotificationController : ControllerBase
     {
+        private const int MaxPageSize = 100;
+
         private readonly ApplicationDbContext _context;
 
         public NotificationController(ApplicationDbContext context)
@@ -34,12 +36,17 @@ namespace Strategies.Api.Controllers
         ///   Client    — messages from cases where they are the client (ClientId match)
         ///
         /// In all cases, messages the user sent themselves are excluded.
+        ///
+        /// page is at least 1 and pageSize between 1 and 100; values outside are moved to the nearest limit.
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetNotifications(
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
         {
+            page = Math.Max(page, 1);
+            pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
+
             var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!Guid.TryParse(userIdStr, out var userId))
                 return Unauthorized(new ApiErrorResponse { Message = "Invalid token." });
